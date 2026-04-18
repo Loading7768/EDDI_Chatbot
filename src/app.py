@@ -26,10 +26,14 @@ from linebot.v3.webhooks import (
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
+from pathlib import Path
 
 app = Flask(__name__)
 
 # 使用 os.environ 取得變數
+base_dir = Path(__file__).resolve().parent.parent
+env_path = base_dir / ".env"
+load_dotenv(dotenv_path=env_path)
 channel_access_token = os.getenv("CHANNEL_ACCESS_TOKEN")
 channel_secret = os.getenv("CHANNEL_SECRET")
 gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -110,8 +114,7 @@ def handle_message(event):
                 try:
                     # 加入 generation_config 限制最高輸出字數，避免 Vercel 10秒 timeout 導致不回覆
                     response = gemini_model.generate_content(
-                        user_message,
-                        generation_config={"max_output_tokens": 250}
+                        user_message
                     )
                     reply_msg = response.text
                     print(reply_msg)

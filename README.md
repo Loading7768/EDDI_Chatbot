@@ -212,5 +212,85 @@
 * **如果成功：** 你會看到綠色的 `Active: active (running)`。
 * **如果失敗：** 你會看到紅色的 `Active: failed` 或不斷閃爍的 `activating (auto-restart)`，並且在畫面下方會直接印出 Python 的錯誤日誌（例如缺少套件、金鑰沒填等）。
 
+# Ubuntu Webhook Service
 
+## 1. 複製專案、啟動虛擬環境
+1. 複製專案。
+```bash
+cd /var/www
+git clone https://github.com/Loading7768/EDDI_Chatbot
+```
+2. 設定專案資料夾權限。
+```bash
+sudo chown -R $USER:www-data /var/www/EDDI_Chatbot
+sudo chmod -R 775 $USER:www-data /var/www/EDDI_Chatbot
+```
+3. 建立虛擬環境、安裝套件。
+```bash
+python -m venv .venv
+source .venv/bin/activate
 
+pip install -r requirements.txt
+```
+4. 複製 `.env` 到 project root.
+
+## 2. System Service
+1. 在 `/etc/systemd/system` 新增 `webhook.service`.
+```bash
+sudo vim /etc/systemd/system/webhook.service
+```
+
+2. 輸入以下：
+```toml
+[Unit]
+Description=EDDI Line Chat Bot
+After=network.target
+
+[Service]
+User=your-username
+Group=www-data
+WorkingDirectory=/var/www/EDDI_Chatbot
+Environment="PATH=/var/www/EDDI_Chatbot/.venv/bin"
+Environment=PYTHONUNBUFFERED=1
+
+# Ubuntu is less restrictive, but we'll keep it secure
+ExecStart=/var/www/EDDI_Chatbot/.venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/var/www/EDDI_Chatbot/webhook.sock \
+    -m 007 \
+    --chdir /var/www/EDDI_Chatbot/src \
+    app:app
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. 啟動 service.
+```bash
+sudo systemctl enable --now webhook
+```
+## 3. 設定 nginx
+```nginx
+server {
+    server_name yourdomain.com;
+
+    # ADD THIS NEW BLOCK for the webhook
+    location /eddichatbot {
+        include proxy_params;
+        proxy_pass http://unix:/var/www/EDDI_Chatbot/webhook.sock;
+    }
+}
+```
+
+啟動。
+```bash
+sudo ln -s /etc/nginx/sites-available/eddichatbot /etc/nginx/sites-enabled
+# 確認語法
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+## 4. 查看 Log
+```bash
+sudo journalctl -u webhook -f
+```

@@ -223,7 +223,7 @@ git clone https://github.com/Loading7768/EDDI_Chatbot
 2. 設定專案資料夾權限。
 ```bash
 sudo chown -R $USER:www-data /var/www/EDDI_Chatbot
-sudo chmod -R 775 $USER:www-data /var/www/EDDI_Chatbot
+sudo chmod -R 775 /var/www/EDDI_Chatbot
 ```
 3. 建立虛擬環境、安裝套件。
 ```bash

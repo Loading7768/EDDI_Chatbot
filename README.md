@@ -235,9 +235,9 @@ pip install -r requirements.txt
 4. 複製 `.env` 到 project root.
 
 ## 2. System Service
-1. 在 `/etc/systemd/system` 新增 `webhook.service`.
+1. 在 `/etc/systemd/system` 新增 `eddichatbot.service`.
 ```bash
-sudo vim /etc/systemd/system/webhook.service
+sudo vim /etc/systemd/system/eddichatbot.service
 ```
 
 2. 輸入以下：
@@ -267,7 +267,7 @@ WantedBy=multi-user.target
 
 3. 啟動 service.
 ```bash
-sudo systemctl enable --now webhook
+sudo systemctl enable --now eddichatbot
 ```
 ## 3. 設定 nginx
 ```nginx
@@ -292,5 +292,5 @@ sudo systemctl restart nginx
 
 ## 4. 查看 Log
 ```bash
-sudo journalctl -u webhook -f
+sudo journalctl -u eddichatbot -f
 ```

@@ -56,8 +56,10 @@
 
 
 ### LINE Developers Webhook URL:
-1. https://eddi-chatbot-own.vercel.app/callback
+1. https://eddi-chatbot-own.vercel.app/eddichatbot
 2. https://nlp.cse.ntou.edu.tw/cjlin/app.py
+3. https://eddichatbot.duckdns.org:8443/eddichatbot
+4. https://nlp.cse.ntou.edu.tw/eddichatbot
 
 # Ubuntu 模擬器
 

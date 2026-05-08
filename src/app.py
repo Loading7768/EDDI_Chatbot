@@ -59,7 +59,7 @@ def hello():
 def favicon():
     return "", 204  # 回傳「無內容」，告訴瀏覽器不用找了
 
-@app.route("/callback", methods=['POST'])
+@app.route("/eddichatbot", methods=['POST'])
 def callback():
     # get X-Line-Signature header value
     signature = request.headers['X-Line-Signature']

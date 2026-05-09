@@ -20,13 +20,15 @@
 
 ### 2.2 醫師端 (Doctor Side)
 *   **醫囑範疇設定表單**：
-    *   醫師可輸入病患資訊：出院日期、主治醫師、病患 ID、姓名、主述 (Chief Complaint)。
+    *   醫師可輸入病患資訊：出院日期、主治醫師、病歷號碼 (Medical Record Number)。
     *   **症狀勾選**：醫師可多選特定症狀標記，以界定機器人的回答範疇。
     *   **身分驗證**：進入表單頁面需輸入共用的 **通行碼 (Passcode)**，以防止病患誤入設定頁面。
 *   **遙測數據後台 (Telemetry Dashboard)**：
-    *   網頁介面供醫師查看系統運作紀錄。
-    *   **回診次數統計**：以「醫師填寫表單數」扣除初始出院表單後的數量作為估計依據。
-    *   **錯誤標記功能**：醫師可透過 Checkbox 標記機器人不適當的回覆。標記後系統將紀錄存入本地檔案，供技術人員後續校正。
+    *   網頁介面供醫師/管理員查看系統運作紀錄。
+    *   **帳號管理**：管理員可透過網頁啟用或停用 (Activate/Deactivate) 醫師帳號。
+    *   **回診次數統計**：以「特定病患在系統中的表單總數減一」作為重複就醫之估計依據。
+    *   **聊天機器人使用率**：統計「已填寫表單」與「實際有開始對話」的比例。
+    *   **對話回顧**：醫師可於後台根據病歷號碼與日期篩選並查看對話歷史紀錄。
 *   **即時通知服務**：
     *   若聊天機器人在對話中建議病患「需要回診」，系統需立即向醫師推送訊息通知（Push Alert）。
 
@@ -35,43 +37,80 @@
     *   機器人需根據醫師在表單中選定的範圍，動態將相關知識文件導入 System Prompt。
     *   機器人回覆邏輯僅限於醫師指定的知識範疇。
 *   **數據關聯 (Mapping)**：
-    *   系統需自動將 LINE Friend ID 與醫師表單輸入的病患資訊進行對應關聯。
+    *   系統需自動將 LINE Friend ID 與資料庫中的病患病歷號碼 (Medical Record Number) 進行對應關聯。
 *   **數據追蹤**：
-    *   紀錄病患使用率（加好友及實際聊天紀錄）。
-    *   紀錄所有對話歷史以供醫療與技術分析。
+    *   **資料庫存儲**：所有資訊皆統一存儲於 SQLite 資料庫。
+    *   **使用偵測**：當系統收到病患的第一則訊息時，自動將對應病歷號與日期的表單 `is_chatted` 狀態設為 True。
 
 ---
 
 ## 3. 非功能需求 (Non-Functional Requirements)
 
 ### 3.1 效能與可用性
-*   **回應速度**：
-    *   LINE Bot 回覆時間需控制在 **5 秒內**（避免 Vercel 或 LINE 逾時導致失效）。
-    *   網頁端（表單、後台）操作需接近即時回應。
+*   **回應速度**：LINE Bot 回覆時間需控制在 **5 秒內**。
 *   **可用性**：系統需具備 24/7 全天候運作之潛力。
 
 ### 3.2 數據處理與隱私 (Privacy & Data Handling)
 *   **LLM 隱私保護**：
-    *   嚴格禁止將病患姓名、ID 等個人識別資訊 (PII) 傳送至外部 LLM API (如 Google Gemini)。
+    *   嚴格禁止將病患姓名、ID 等個人識別資訊 (PII) 傳送至外部 LLM API。
     *   傳送至 LLM 的內容僅限於「病患症狀描述」與「醫療知識文件」。
 *   **本地化存儲**：
-    *   所有病患個人資訊、對話紀錄與標記紀錄皆存儲於醫院內部伺服器。
+    *   所有病患病歷號與對話紀錄皆存儲於醫院內部伺服器之資料庫中。
 *   **存儲方式**：
-    *   因目前無複雜查詢需求，數據採 **純文字檔 (Plain Text)** 或 **CSV** 格式存儲，不使用資料庫系統。
+    *   採用 **SQLite** 關聯式資料庫系統。
 
 ---
 
-## 4. 技術規格與限制 (Technical Constraints)
+## 4. 技術規格與資料庫設計 (Technical Specs & DB Design)
 
-*   **部署環境**：醫院內部實體伺服器或虛擬機。
-*   **外部依賴**：僅允許 LINE Messaging API 與 LLM API (Google Gemini API) 通訊。
-*   **網頁伺服器**：使用 **Nginx** 作為反向代理與 Web Server。
-*   **前端框架**：醫師端網頁介面考慮使用 **React** 構建。
-*   **後端框架**：基於現有架構使用 **Python Flask**。
+### 4.1 實體關聯圖 (ER Diagram)
+
+```mermaid
+erDiagram
+    DOCTOR ||--o{ FORM : fills
+    PATIENT ||--o{ FORM : assigned_to
+    PATIENT ||--o{ CHAT_LOG : generates
+
+    PATIENT {
+        string medical_record_num PK "病歷號碼"
+        string line_id "LINE 識別碼"
+    }
+
+    DOCTOR {
+        string account_name PK "帳號名稱"
+        string password_hash "密碼雜湊"
+        string doctor_name "醫師姓名"
+        boolean is_active "是否啟用"
+    }
+
+    FORM {
+        string medical_record_num FK "病歷號碼"
+        string doctor_account FK "醫師帳號"
+        date checkout_date PK "出院日期"
+        string symptoms "症狀 (JSON 格式)"
+        boolean is_chatted "是否已開始聊天"
+    }
+
+    CHAT_LOG {
+        int id PK
+        string medical_record_num FK "病歷號碼"
+        string role "角色 (user/assistant)"
+        string content "對話內容"
+        timestamp created_at "紀錄時間"
+    }
+```
+
+### 4.2 技術棧
+*   **資料庫**：SQLite 3
+*   **部署環境**：醫院內部伺服器。
+*   **外部依賴**：LINE Messaging API, Google Gemini API。
+*   **網頁伺服器**：Nginx
+*   **前端框架**：React (用於醫師端後台)
+*   **後端框架**：Python Flask
 
 ---
 
 ## 5. 未來展望 (Future Scope)
 
 *   **跨科別擴充**：系統架構需保持靈活性，以便未來可導入其他醫療科別（如內科、外科等）的專屬醫囑知識庫。
-*   **系統優化**：根據醫師標記的錯誤紀錄，持續精進 LLM 的 Prompt Engineering 或進行 Fine-tuning。
+*   **系統優化**：根據累積之對話數據與臨床回饋，持續精進 LLM 的 Prompt Engineering。

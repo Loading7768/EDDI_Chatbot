@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系統登入驗證</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; margin-top: 50px; background-color: #f9f9f9; }
+        .container { background-color: white; border: 1px solid #ddd; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 300px; }
+        h2 { text-align: center; margin-top: 0; color: #333; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #666; font-size: 14px; }
+        input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { width: 100%; padding: 12px; background-color: #06C755; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background-color: #05A044; }
+        #error-msg { color: #d9534f; font-size: 14px; margin-top: 15px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>病患表單登入</h2>
+    
+    <div class="form-group">
+        <label for="code">請輸入 LINE 取得的 6 位數驗證碼：</label>
+        <input type="text" id="code" maxlength="6" placeholder="例如：123456" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="password">請輸入管理員密碼：</label>
+        <input type="password" id="password" placeholder="請輸入密碼" required>
+    </div>
+    
+    <button onclick="submitVerify()">驗證並進入</button>
+    <div id="error-msg"></div>
+</div>
+
+<script>
+    async function submitVerify() {
+        const code = document.getElementById('code').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const errorMsg = document.getElementById('error-msg');
+
+        if (!code || !password) {
+            errorMsg.innerText = "請填寫驗證碼與密碼";
+            return;
+        }
+
+        if (code.length !== 6 || isNaN(code)) {
+            errorMsg.innerText = "驗證碼必須是 6 位數字";
+            return;
+        }
+
+        errorMsg.style.color = "#333";
+        errorMsg.innerText = "驗證中，請稍候...";
+
+        try {
+            const response = await fetch('/api/verify_code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code: code,
+                    password: password
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                errorMsg.style.color = "#06C755";
+                errorMsg.innerText = "驗證成功！正在導向...";
+                sessionStorage.setItem('isVerified', 'true');
+                window.location.href = result.redirect_url;
+            } else {
+                errorMsg.style.color = "#d9534f";
+                errorMsg.innerText = result.message;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            errorMsg.style.color = "#d9534f";
+            errorMsg.innerText = "系統連線錯誤，請檢查網路狀態";
+        }
+    }
+</script>
+
+</body>
+</html>

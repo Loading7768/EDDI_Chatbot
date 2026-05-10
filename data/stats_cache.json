@@ -1,0 +1,11 @@
+{
+  "data": {
+    "total_friends": 4,
+    "total_patients": 4,
+    "total_forms": 5,
+    "patients_chatted": 1,
+    "bot_usage_rate": 25.0,
+    "return_visits": 1
+  },
+  "last_updated": "2026-05-11 04:07:36"
+}

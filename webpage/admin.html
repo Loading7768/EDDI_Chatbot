@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDDI 醫師後台管理系統</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --primary:   #1e40af;
+    --primary-l: #3b82f6;
+    --accent:    #10b981;
+    --danger:    #ef4444;
+    --warn:      #f59e0b;
+    --text:      #1f2937;
+    --muted:     #6b7280;
+    --border:    #e5e7eb;
+    --bg:        #f3f4f6;
+    --card:      #ffffff;
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+  }
+  .login-card {
+    background: var(--card); border-radius: 16px; padding: 48px 40px;
+    width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  }
+  .login-logo { text-align: center; margin-bottom: 32px; }
+  .login-logo .logo-icon {
+    width: 64px; height: 64px; background: var(--primary);
+    border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 32px; margin-bottom: 12px;
+  }
+  .login-logo h1 { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .login-logo p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600;
+                      color: var(--text); margin-bottom: 6px; }
+  .form-group input {
+    width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: 15px; outline: none; transition: border .2s;
+  }
+  .form-group input:focus { border-color: var(--primary-l); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s;
+  }
+  .btn:active  { transform: scale(.97); }
+  .btn-primary { background: var(--primary); color: #fff; width: 100%; padding: 12px; }
+  .btn-primary:hover { opacity: .9; }
+  .btn-sm      { padding: 6px 14px; font-size: 13px; }
+  .btn-accent  { background: var(--accent); color: #fff; }
+  .btn-outline { background: transparent; border: 1.5px solid rgba(255,255,255,.5);
+                 color: #fff; }
+  .btn-outline:hover { background: rgba(255,255,255,.1); }
+
+  .error-msg { color: var(--danger); font-size: 13px; margin-top: 8px;
+               text-align: center; min-height: 20px; }
+
+  /* ── APP SHELL ── */
+  #app { display: none; height: 100vh; flex-direction: column; }
+
+  header {
+    height: 56px; background: var(--primary); color: #fff;
+    display: flex; align-items: center; padding: 0 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2); position: relative; z-index: 100;
+  }
+  .header-logo { font-weight: 700; font-size: 18px; letter-spacing: .5px; flex: 1; }
+  .header-user { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+  .user-badge  { background: rgba(255,255,255,.2); border-radius: 20px;
+                 padding: 4px 12px; font-weight: 600; }
+  .role-tag    { font-size: 11px; padding: 2px 8px; border-radius: 10px;
+                 font-weight: 700; letter-spacing: .5px; }
+  .role-admin  { background: #fbbf24; color: #78350f; }
+  .role-doctor { background: #6ee7b7; color: #065f46; }
+
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 220px; background: var(--card); border-right: 1px solid var(--border);
+    padding: 16px 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500;
+    color: var(--muted); border-left: 3px solid transparent; transition: all .15s;
+    user-select: none;
+  }
+  .nav-item:hover  { background: var(--bg); color: var(--text); }
+  .nav-item.active { color: var(--primary); background: #eff6ff;
+                     border-left-color: var(--primary); font-weight: 700; }
+  .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+
+  /* ── MAIN ── */
+  main { flex: 1; overflow-y: auto; padding: 28px; }
+
+  .section       { display: none; }
+  .section.active{ display: block; }
+  .section-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+
+  /* ── STATS ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px;
+  }
+  @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--card); border-radius: 12px; padding: 22px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+  .stat-icon  { font-size: 28px; margin-bottom: 10px; }
+  .stat-value { font-size: 36px; font-weight: 800; color: var(--primary); line-height: 1; }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 6px; font-weight: 500; }
+  .stat-card.green  .stat-value { color: var(--accent); }
+  .stat-card.orange .stat-value { color: var(--warn); }
+  .stat-card.red    .stat-value { color: var(--danger); }
+  .last-updated { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: right; }
+
+  /* ── CHATS ── */
+  .chat-layout { display: flex; gap: 16px; height: calc(100vh - 196px); margin-top: 20px; }
+
+  .patient-list {
+    width: 280px; flex-shrink: 0; background: var(--card);
+    border-radius: 12px; border: 1px solid var(--border); overflow-y: auto;
+  }
+  .plist-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px;
+    position: sticky; top: 0; background: var(--card);
+  }
+  .patient-item {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background .1s; border-left: 3px solid transparent;
+  }
+  .patient-item:hover  { background: var(--bg); }
+  .patient-item.active { background: #eff6ff; border-left-color: var(--primary); }
+  .patient-item:last-child { border-bottom: none; }
+  .patient-mrn  { font-weight: 700; font-size: 14px; font-family: monospace; }
+  .patient-meta { font-size: 12px; color: var(--muted); margin-top: 3px;
+                  display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+
+  .badge        { display: inline-block; padding: 1px 7px; border-radius: 10px;
+                  font-size: 11px; font-weight: 700; }
+  .badge-blue   { background: #dbeafe; color: var(--primary); }
+  .badge-green  { background: #d1fae5; color: #065f46; }
+  .badge-orange { background: #fef3c7; color: #92400e; }
+  .badge-gray   { background: #f3f4f6; color: var(--muted); }
+
+  /* chat panel */
+  .chat-panel {
+    flex: 1; background: var(--card); border-radius: 12px;
+    border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .chat-panel-header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .chat-panel-title { font-weight: 700; font-size: 15px; }
+  .chat-panel-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chat-panel-body  { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted); gap: 12px;
+  }
+  .empty-icon { font-size: 48px; opacity: .4; }
+  .empty-state p { font-size: 14px; }
+
+  /* form cards */
+  .subsection-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .form-card {
+    background: var(--bg); border-radius: 8px; padding: 12px 14px;
+    margin-bottom: 8px; border: 1px solid var(--border); font-size: 13px;
+  }
+  .form-card-head { display: flex; justify-content: space-between;
+                    align-items: center; margin-bottom: 6px; }
+  .form-card-label { font-weight: 700; }
+  .form-card-date  { font-size: 11px; color: var(--muted); }
+  .form-row   { color: var(--muted); margin-top: 4px; font-size: 12px; }
+  .form-row b { color: var(--text); }
+  .form-topics { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .topic-tag   { background: #dbeafe; color: var(--primary); font-size: 11px;
+                 padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .chatted-tag { background: #d1fae5; color: #065f46; font-size: 11px;
+                 padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .not-chatted-tag { background: #f3f4f6; color: var(--muted); font-size: 11px;
+                     padding: 2px 8px; border-radius: 10px; }
+
+  .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+  /* chat bubbles */
+  .bubble-row { display: flex; margin-bottom: 10px; }
+  .bubble-row.user      { justify-content: flex-end; }
+  .bubble-row.assistant { justify-content: flex-start; }
+  .bubble {
+    max-width: 72%; padding: 10px 14px; border-radius: 16px;
+    font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  }
+  .bubble-row.user .bubble {
+    background: var(--primary); color: #fff; border-bottom-right-radius: 4px;
+  }
+  .bubble-row.assistant .bubble {
+    background: var(--bg); color: var(--text); border-bottom-left-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .bubble-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .bubble-row.user .bubble-time { text-align: right; }
+
+  .no-logs-notice {
+    background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px;
+    padding: 12px 16px; font-size: 13px; color: #92400e;
+  }
+
+  /* ── PROMPT ── */
+  .prompt-wrapper { max-width: 800px; margin-top: 20px; }
+  .prompt-info {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+    padding: 12px 16px; font-size: 13px; color: var(--primary); margin-bottom: 16px;
+  }
+  #prompt-textarea {
+    width: 100%; height: 480px; padding: 16px; font-family: 'Consolas', monospace;
+    font-size: 13px; line-height: 1.7; border: 1.5px solid var(--border);
+    border-radius: 8px; resize: vertical; outline: none; background: #fafafa;
+  }
+  #prompt-textarea:focus { border-color: var(--primary-l); background: #fff; }
+  .prompt-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .save-status      { font-size: 13px; color: var(--muted); }
+  .save-status.ok   { color: var(--accent); }
+  .save-status.fail { color: var(--danger); }
+
+  /* spinner */
+  .spinner-dark {
+    width: 24px; height: 24px; border: 3px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin .6s linear infinite; display: inline-block;
+  }
+  .spinner-white {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .6s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(255,255,255,.55);
+    display: none; align-items: center; justify-content: center; z-index: 999;
+  }
+  .loading-overlay.active { display: flex; }
+  .loading-box {
+    background: var(--card); border-radius: 12px; padding: 24px 32px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.15); display: flex; align-items: center; gap: 14px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════ LOGIN ════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">🏥</div>
+      <h1>EDDI 後台系統</h1>
+      <p>急診衛教聊天機器人管理平台</p>
+    </div>
+    <div class="form-group">
+      <label>帳號</label>
+      <input type="text" id="login-user" placeholder="account_name" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>密碼</label>
+      <input type="password" id="login-pass" placeholder="password" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="login-btn" onclick="doLogin()">登入</button>
+    <p class="error-msg" id="login-error"></p>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div id="app" style="display:none; flex-direction:column; height:100vh;">
+
+  <header>
+    <span class="header-logo">🏥 EDDI 醫師後台</span>
+    <div class="header-user">
+      <span class="user-badge" id="header-name">—</span>
+      <span class="role-tag"   id="header-role">—</span>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">登出</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="nav-item active" data-sec="stats"  onclick="showSection('stats')">
+        <span class="nav-icon">📊</span> 統計數據
+      </div>
+      <div class="nav-item"        data-sec="chats"  onclick="showSection('chats')">
+        <span class="nav-icon">💬</span> 聊天紀錄
+      </div>
+      <div class="nav-item admin-only" data-sec="prompt" onclick="showSection('prompt')" style="display:none">
+        <span class="nav-icon">✏️</span> Prompt 修改
+      </div>
+    </nav>
+
+    <main>
+
+      <!-- 統計數據 -->
+      <section id="section-stats" class="section active">
+        <div class="section-title">統計數據</div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" id="s-friends">—</div>
+            <div class="stat-label">好友總數</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">🧑‍⚕️</div>
+            <div class="stat-value" id="s-patients">—</div>
+            <div class="stat-label">病患總數</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-icon">📱</div>
+            <div class="stat-value" id="s-usage">—</div>
+            <div class="stat-label">LINE Bot 使用率</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon">🔄</div>
+            <div class="stat-value" id="s-return">—</div>
+            <div class="stat-label">回診總數</div>
+          </div>
+        </div>
+        <div class="last-updated" id="s-updated"></div>
+        <p style="color:var(--danger);font-size:13px;margin-top:8px;" id="s-error"></p>
+      </section>
+
+      <!-- 聊天紀錄 -->
+      <section id="section-chats" class="section">
+        <div class="section-title">聊天紀錄</div>
+        <div class="chat-layout">
+
+          <div class="patient-list">
+            <div class="plist-header">
+              病患列表
+              <span class="badge badge-gray" id="patient-count">0</span>
+            </div>
+            <div id="patient-list-body">
+              <div class="empty-state" style="padding:32px 0;">
+                <div class="empty-icon">👤</div><p>載入中…</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-panel">
+            <div class="chat-panel-header">
+              <div>
+                <div class="chat-panel-title" id="chat-title">請選擇病患</div>
+                <div class="chat-panel-sub"   id="chat-sub">點擊左側病患查看詳情</div>
+              </div>
+            </div>
+            <div class="chat-panel-body" id="chat-body">
+              <div class="empty-state">
+                <div class="empty-icon">💬</div>
+                <p>選擇左側病患以查看表單與聊天紀錄</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Prompt 修改 -->
+      <section id="section-prompt" class="section">
+        <div class="section-title">
+          系統 Prompt 修改
+          <span class="role-tag role-admin" style="margin-left:8px;vertical-align:middle;">管理員</span>
+        </div>
+        <div class="prompt-wrapper">
+          <div class="prompt-info">
+            ℹ️ 修改內容儲存至 <code>assets/prompt.md</code>，直接影響 LINE Bot 回覆邏輯。
+          </div>
+          <textarea id="prompt-textarea" placeholder="載入中…"></textarea>
+          <div class="prompt-actions">
+            <button class="btn btn-accent" onclick="savePrompt()">💾 儲存 Prompt</button>
+            <span class="save-status" id="save-status"></span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- loading -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-box">
+    <div class="spinner-dark"></div>
+    <span>載入中…</span>
+  </div>
+</div>
+
+<script>
+// ── state ──
+const state = { isAdmin: false, currentMrn: null };
+
+// ── api ──
+async function api(method, path, body) {
+  const opts = { method, credentials: 'include', headers: {} };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+function loading(on) {
+  document.getElementById('loading').classList.toggle('active', on);
+}
+
+// ── auth ──
+async function checkAuth() {
+  const me = await api('GET', '/api/me');
+  me.logged_in ? initApp(me) : showLogin();
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function initApp(me) {
+  state.isAdmin = me.is_admin;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  document.getElementById('header-name').textContent = me.doctor_name;
+  const roleEl = document.getElementById('header-role');
+  roleEl.textContent = me.is_admin ? '管理員' : '醫師';
+  roleEl.className   = 'role-tag ' + (me.is_admin ? 'role-admin' : 'role-doctor');
+
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = me.is_admin ? '' : 'none';
+  });
+
+  loadStats();
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const errEl    = document.getElementById('login-error');
+  errEl.textContent = '';
+
+  if (!username || !password) { errEl.textContent = '請填寫帳號和密碼'; return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.innerHTML = '<span class="spinner-white"></span> 登入中…';
+  btn.disabled  = true;
+
+  try {
+    const res = await api('POST', '/api/login', { username, password });
+    if (res.success) {
+      initApp({ doctor_name: res.doctor_name, is_admin: res.is_admin });
+    } else {
+      errEl.textContent = res.error || '登入失敗';
+    }
+  } catch { errEl.textContent = '無法連線至伺服器'; }
+  finally  { btn.innerHTML = '登入'; btn.disabled = false; }
+}
+
+async function doLogout() {
+  await api('POST', '/api/logout');
+  state.currentMrn = null;
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  showLogin();
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── navigation ──
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelector(`[data-sec="${name}"]`).classList.add('active');
+
+  if (name === 'stats')  loadStats();
+  if (name === 'chats')  loadChats();
+  if (name === 'prompt') loadPrompt();
+}
+
+// ── stats ──
+async function loadStats() {
+  document.getElementById('s-error').textContent = '';
+  try {
+    const d = await api('GET', '/api/stats');
+    if (d.error) { document.getElementById('s-error').textContent = d.error; return; }
+    document.getElementById('s-friends').textContent  = d.total_friends  ?? '—';
+    document.getElementById('s-patients').textContent = d.total_patients ?? '—';
+    document.getElementById('s-usage').textContent    = (d.bot_usage_rate ?? '—') + '%';
+    document.getElementById('s-return').textContent   = d.return_visits   ?? '—';
+    document.getElementById('s-updated').textContent  =
+      d.last_updated ? '最後更新：' + d.last_updated : '';
+  } catch {
+    document.getElementById('s-error').textContent = '無法載入統計資料';
+  }
+}
+
+// ── chats list ──
+async function loadChats() {
+  loading(true);
+  try {
+    const list = await api('GET', '/api/chats');
+    renderPatientList(Array.isArray(list) ? list : []);
+  } catch { renderPatientList([]); }
+  finally  { loading(false); }
+}
+
+function renderPatientList(patients) {
+  document.getElementById('patient-count').textContent = patients.length;
+  const body = document.getElementById('patient-list-body');
+  if (!patients.length) {
+    body.innerHTML = `<div class="empty-state" style="padding:32px 0;">
+      <div class="empty-icon">👤</div><p>無病患資料</p></div>`;
+    return;
+  }
+  body.innerHTML = patients.map(p => `
+    <div class="patient-item${p.medical_record_num === state.currentMrn ? ' active' : ''}"
+         onclick="loadDetail('${esc(p.medical_record_num)}', this)">
+      <div class="patient-mrn">${esc(p.medical_record_num)}</div>
+      <div class="patient-meta">
+        ${p.is_return
+          ? '<span class="badge badge-orange">回診</span>'
+          : '<span class="badge badge-blue">首診</span>'}
+        ${p.has_logs
+          ? '<span class="badge badge-green">有紀錄</span>'
+          : '<span class="badge badge-gray">無紀錄</span>'}
+        <span>表單 ${p.form_count} 筆</span>
+      </div>
+      ${p.last_chat
+        ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">最後聊天：${p.last_chat}</div>`
+        : ''}
+    </div>`
+  ).join('');
+}
+
+// ── chat detail ──
+async function loadDetail(mrn, el) {
+  state.currentMrn = mrn;
+  document.querySelectorAll('.patient-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  document.getElementById('chat-body').innerHTML =
+    '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
+  document.getElementById('chat-title').textContent = mrn;
+  document.getElementById('chat-sub').textContent   = '';
+
+  try {
+    const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
+    if (d.error) {
+      document.getElementById('chat-body').innerHTML =
+        `<p style="color:var(--danger)">${esc(d.error)}</p>`;
+      return;
+    }
+    renderDetail(d);
+  } catch {
+    document.getElementById('chat-body').innerHTML =
+      '<p style="color:var(--danger)">載入失敗</p>';
+  }
+}
+
+function renderDetail(d) {
+  const p = d.patient;
+  document.getElementById('chat-title').textContent = p.medical_record_num;
+  document.getElementById('chat-sub').textContent   =
+    `LINE ID：${p.line_id || '未連結'}`;
+
+  let html = '';
+
+  // 表單
+  if (d.forms && d.forms.length) {
+    html += `<p class="subsection-title">📋 表單紀錄（共 ${d.forms.length} 筆）</p>`;
+    d.forms.forEach((f, i) => {
+      html += `
+        <div class="form-card">
+          <div class="form-card-head">
+            <span class="form-card-label">${i > 0 ? '🔄 回診' : '📝 首診'} — ${esc(f.checkout_date)}</span>
+            ${f.is_chatted
+              ? '<span class="chatted-tag">已開始聊天</span>'
+              : '<span class="not-chatted-tag">尚未聊天</span>'}
+          </div>
+          <div class="form-row">主治醫師帳號：<b>${esc(f.doctor_account)}</b></div>
+          <div class="form-topics">
+            ${(f.symptoms || []).map(s => `<span class="topic-tag">${esc(s)}</span>`).join('')}
+          </div>
+        </div>`;
+    });
+    html += '<div class="divider"></div>';
+  }
+
+  // 聊天訊息
+  if (!d.messages || !d.messages.length) {
+    html += '<div class="no-logs-notice">⚠️ 此病患尚無聊天紀錄</div>';
+  } else {
+    html += `<p class="subsection-title">💬 聊天紀錄（共 ${d.messages.length} 則）</p>`;
+    d.messages.forEach(m => {
+      const isUser = m.role === 'user';
+      html += `
+        <div class="bubble-row ${isUser ? 'user' : 'assistant'}">
+          <div>
+            <div class="bubble">${esc(m.content)}</div>
+            <div class="bubble-time">${m.created_at}</div>
+          </div>
+        </div>`;
+    });
+  }
+
+  document.getElementById('chat-body').innerHTML = html;
+  document.getElementById('chat-body').scrollTop = 0;
+}
+
+// ── prompt ──
+async function loadPrompt() {
+  const ta = document.getElementById('prompt-textarea');
+  ta.value = '載入中…'; ta.disabled = true;
+  document.getElementById('save-status').textContent = '';
+  try {
+    const d = await api('GET', '/api/prompt');
+    ta.value    = d.error ? '錯誤：' + d.error : (d.content || '');
+    ta.disabled = !!d.error;
+  } catch { ta.value = '無法連線至伺服器'; }
+}
+
+async function savePrompt() {
+  const content = document.getElementById('prompt-textarea').value;
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = ''; statusEl.className = 'save-status';
+  try {
+    const res = await api('POST', '/api/prompt', { content });
+    if (res.success) {
+      statusEl.textContent = '✅ 已儲存（' + res.saved_at + '）→ ' + (res.path || '');
+      statusEl.className   = 'save-status ok';
+    } else {
+      statusEl.textContent = '❌ ' + (res.error || '儲存失敗');
+      statusEl.className   = 'save-status fail';
+    }
+  } catch {
+    statusEl.textContent = '❌ 無法連線至伺服器';
+    statusEl.className   = 'save-status fail';
+  }
+}
+
+// ── utils ──
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── init ──
+checkAuth();
+</script>
+</body>
+</html>

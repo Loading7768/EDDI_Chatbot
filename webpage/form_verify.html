@@ -14,6 +14,14 @@
         button { width: 100%; padding: 12px; background-color: #06C755; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
         button:hover { background-color: #05A044; }
         #error-msg { color: #d9534f; font-size: 14px; margin-top: 15px; text-align: center; font-weight: bold; }
+    
+        /* 個別輸入框的錯誤訊息樣式 */
+        .field-error { 
+            color: #d9534f; 
+            font-size: 12px; 
+            margin-top: 5px; 
+            display: none; /* 預設隱藏 */
+        }
     </style>
 </head>
 <body>
@@ -24,11 +32,13 @@
     <div class="form-group">
         <label for="code">請輸入 LINE 取得的 6 位數驗證碼：</label>
         <input type="text" id="code" maxlength="6" placeholder="例如：123456" required>
+        <div id="code-error" class="field-error">此處不能空白</div>
     </div>
     
     <div class="form-group">
         <label for="password">請輸入管理員密碼：</label>
         <input type="password" id="password" placeholder="請輸入密碼" required>
+        <div id="password-error" class="field-error">此處不能空白</div>
     </div>
     
     <button onclick="submitVerify()">驗證並進入</button>
@@ -36,10 +46,63 @@
 </div>
 
 <script>
+    // 監聽驗證碼輸入框的 Enter 鍵
+    document.getElementById('code').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // 防止網頁預設行為
+            const codeError = document.getElementById('code-error');
+            if (this.value.trim() === '') {
+                codeError.style.display = 'block'; // 顯示錯誤訊息
+            } else {
+                codeError.style.display = 'none'; // 隱藏錯誤訊息
+                document.getElementById('password').focus(); // 游標跳到密碼框
+            }
+        }
+    });
+
+    // 監聽密碼輸入框的 Enter 鍵
+    document.getElementById('password').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const passwordError = document.getElementById('password-error');
+            if (this.value.trim() === '') {
+                passwordError.style.display = 'block'; // 顯示錯誤訊息
+            } else {
+                passwordError.style.display = 'none'; 
+                submitVerify(); // 觸發登入按鈕的功能
+            }
+        }
+    });
+
+    // 當使用者開始打字時，自動隱藏紅色錯誤訊息，讓體驗更順暢
+    document.getElementById('code').addEventListener('input', function() {
+        document.getElementById('code-error').style.display = 'none';
+    });
+    document.getElementById('password').addEventListener('input', function() {
+        document.getElementById('password-error').style.display = 'none';
+    });
+
     async function submitVerify() {
         const code = document.getElementById('code').value.trim();
         const password = document.getElementById('password').value.trim();
         const errorMsg = document.getElementById('error-msg');
+        const codeError = document.getElementById('code-error');
+        const passwordError = document.getElementById('password-error');
+
+        // 重置全局錯誤訊息
+        errorMsg.innerText = "";
+
+        // 點擊按鈕時，也檢查是否空白並顯示對應的紅字
+        let hasError = false;
+        if (!code) {
+            codeError.style.display = 'block';
+            hasError = true;
+        }
+        if (!password) {
+            passwordError.style.display = 'block';
+            hasError = true;
+        }
+        if (hasError) return; // 如果有空白就中斷送出   
 
         if (!code || !password) {
             errorMsg.innerText = "請填寫驗證碼與密碼";
@@ -47,6 +110,7 @@
         }
 
         if (code.length !== 6 || isNaN(code)) {
+            errorMsg.style.color = "#d9534f";
             errorMsg.innerText = "驗證碼必須是 6 位數字";
             return;
         }
@@ -71,7 +135,6 @@
             if (result.success) {
                 errorMsg.style.color = "#06C755";
                 errorMsg.innerText = "驗證成功！正在導向...";
-                sessionStorage.setItem('isVerified', 'true');
                 window.location.href = result.redirect_url;
             } else {
                 errorMsg.style.color = "#d9534f";

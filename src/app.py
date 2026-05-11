@@ -39,8 +39,10 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 # ============== 修正結束 ==============
 
-# 引入在 bot.py 寫好的介面
+# 引入其他 .py 檔案
 from bot import get_ai_response
+from form_handle import form_bp, verification_codes, cleanup_expired_codes
+from admin_server import admin_bp
 
 
 # ----- 路徑設定 -----
@@ -57,6 +59,14 @@ assets_dir = base_dir / "assets"
 
 # 初始化 Flask，並將 template_folder 指向 webpage 資料夾，將 static_folder 指向 assets/images 資料夾
 app = Flask(__name__, template_folder=str(webpage_dir), static_folder=str(assets_dir), static_url_path='/assets')
+
+# 註冊從其他 .py 引入的網頁路由 Blueprint
+app.register_blueprint(form_bp)
+app.register_blueprint(admin_bp)
+
+# 原在 admin_server.py 中的 config, secret_key
+app.secret_key = 'eddi_admin_2026_secure_key'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 channel_access_token = os.getenv("CHANNEL_ACCESS_TOKEN")
 channel_secret = os.getenv("CHANNEL_SECRET")
@@ -101,17 +111,6 @@ def handle_follow(event):
     print(f'Got {event.type} event, user_id: {user_id}')
 
 
-# --- 驗證碼暫存區 ---
-# 格式: { "123456": {"user_id": "Uxxxx...", "expires_at": 1690000000} }
-verification_codes = {}
-
-# 清理過期驗證碼的輔助函式 (避免記憶體佔用)
-def cleanup_expired_codes():
-    current_time = time.time()
-    expired_keys = [code for code, data in verification_codes.items() if current_time > data["expires_at"]]
-    for k in expired_keys:
-        del verification_codes[k]
-
 # 訊息事件
 @line_handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
@@ -119,6 +118,10 @@ def handle_message(event):
         line_bot_api = MessagingApi(api_client)
         user_message = event.message.text
         user_id = event.source.user_id  # 取得使用者的 LINE User ID
+
+        # 取得 LINE 使用者名字
+        profile = line_bot_api.get_profile(user_id)
+        user_name = profile.display_name
         
         # if user_message == 'postback':
         #     buttons_template = ButtonsTemplate(
@@ -141,7 +144,7 @@ def handle_message(event):
             cleanup_expired_codes() # 順手清理過期的舊驗證碼
             
             # 若同一個 user 重複產生驗證碼，留最新的驗證碼即可
-            for code, data in verification_codes.items():
+            for code, data in list(verification_codes.items()): # 這裡加了 list() 避免字典在迴圈中被修改而報錯
                 if data["user_id"] == user_id:
                     del verification_codes[code]
                     break
@@ -158,6 +161,7 @@ def handle_message(event):
             # 用驗證碼當 Key 存起來
             verification_codes[random_number] = {
                 "user_id": user_id,
+                "user_name": user_name,
                 "expires_at": expires_at
             }
 
@@ -195,48 +199,6 @@ def handle_message(event):
 # def handle_postback(event):
 #     if event.postback.data == 'postback':
 #         print('Postback event is triggered')
-
-
-# ================= 網頁路由 =================
-
-@app.route("/verify", methods=['GET'])
-def verify_page():
-    # 這裡直接對應 webpage/form_verify.html
-    return render_template("form_verify.html")
-
-@app.route("/api/verify_code", methods=['POST'])
-def verify_code():
-    data = request.json
-    code = data.get("code")
-    password = data.get("password")
-
-    # 1. 驗證密碼
-    if password != "12345":
-        return jsonify({"success": False, "message": "密碼錯誤"})
-
-    # 2. 尋找驗證碼記錄
-    record = verification_codes.get(code)
-    if not record:
-        return jsonify({"success": False, "message": "驗證碼錯誤或不存在"})
-
-    # 3. 檢查是否過期
-    if time.time() > record["expires_at"]:
-        del verification_codes[code] # 過期就刪除
-        return jsonify({"success": False, "message": "驗證碼已逾時(超過10分鐘)，請回 LINE 重新取得"})
-
-    # 驗證成功：取得該使用者 ID 並刪除一次性驗證碼
-    user_id = record["user_id"]
-    del verification_codes[code]
-    
-    # [備註] 實務上你可能需要把 user_id 存進 Flask session，這樣導向 form.html 後才知道是誰在操作
-    # session['user_id'] = user_id 
-
-    return jsonify({"success": True, "redirect_url": "/form"})
-
-@app.route("/form")
-def form_page():
-    # 這裡對應 webpage/form.html
-    return render_template("form.html")
 
 if __name__ == "__main__":
     app.run()

@@ -1,5 +1,5 @@
 
-from flask import Flask, request, jsonify, session, send_from_directory
+from flask import Blueprint, Flask, request, jsonify, session, send_from_directory
 import sqlite3
 import hashlib
 import json
@@ -7,9 +7,10 @@ import os
 from datetime import datetime
 from functools import wraps
 
-app = Flask(__name__)
-app.secret_key = 'eddi_admin_2026_secure_key'
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# 建立一個名為 admin_bp 的 Blueprint
+admin_bp = Blueprint('admin_bp', __name__)
+# admin_bp.secret_key = 'eddi_admin_2026_secure_key'
+# admin_bp.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 BASE_DIR    = os.getcwd()
 WEBPAGE_DIR = os.path.join(BASE_DIR, 'webpage')
@@ -56,12 +57,12 @@ def admin_required(f):
 
 # ── routes ────────────────────────────────────────────────────────────────────
 
-@app.route('/')
+@admin_bp.route('/admin')
 def index():
     return send_from_directory(WEBPAGE_DIR, 'admin.html')
 
 
-@app.route('/api/me')
+@admin_bp.route('/api/me')
 def get_me():
     if 'account' not in session:
         return jsonify({'logged_in': False})
@@ -73,7 +74,7 @@ def get_me():
     })
 
 
-@app.route('/api/login', methods=['POST'])
+@admin_bp.route('/api/login', methods=['POST'])
 def login():
     data     = request.get_json() or {}
     account  = data.get('username', '').strip()
@@ -110,7 +111,7 @@ def login():
     })
 
 
-@app.route('/api/logout', methods=['POST'])
+@admin_bp.route('/api/logout', methods=['POST'])
 def logout():
     session.clear()
     return jsonify({'success': True})
@@ -118,7 +119,7 @@ def logout():
 
 # ── 統計數據 ──────────────────────────────────────────────────────────────────
 
-@app.route('/api/stats')
+@admin_bp.route('/api/stats')
 @login_required
 def get_stats():
     stats = {}
@@ -189,7 +190,7 @@ def get_stats():
 
 # ── 聊天紀錄列表 ──────────────────────────────────────────────────────────────
 
-@app.route('/api/chats')
+@admin_bp.route('/api/chats')
 @login_required
 def get_chats():
     account  = session['account']
@@ -253,7 +254,7 @@ def get_chats():
 
 # ── 單一病患詳情 ──────────────────────────────────────────────────────────────
 
-@app.route('/api/chats/<mrn>')
+@admin_bp.route('/api/chats/<mrn>')
 @login_required
 def get_chat_detail(mrn: str):
     account  = session['account']
@@ -327,7 +328,7 @@ def get_chat_detail(mrn: str):
 
 # ── Prompt 修改（僅管理員）────────────────────────────────────────────────────
 
-@app.route('/api/prompt', methods=['GET'])
+@admin_bp.route('/api/prompt', methods=['GET'])
 @admin_required
 def get_prompt():
     try:
@@ -350,7 +351,7 @@ def get_prompt():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/prompt', methods=['POST'])
+@admin_bp.route('/api/prompt', methods=['POST'])
 @admin_required
 def save_prompt():
     data    = request.get_json() or {}
@@ -370,8 +371,8 @@ def save_prompt():
 
 # ── entry point ───────────────────────────────────────────────────────────────
 
-if __name__ == '__main__':
-    print('EDDI 醫師後台系統')
-    print('網址：http://localhost:5001')
-    print('若尚未初始化資料庫，請先執行：python database/init_db.py\n')
-    app.run(debug=True, port=5001, host='0.0.0.0')
+# if __name__ == '__main__':
+    # print('EDDI 醫師後台系統')
+    # print('網址：http://localhost:5001')
+    # print('若尚未初始化資料庫，請先執行：python database/init_db.py\n')
+    # app.run(debug=True, port=5001, host='0.0.0.0')

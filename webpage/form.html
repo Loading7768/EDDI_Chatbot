@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>病患出院衛教表單</title>
     
-    <script>
-        if (sessionStorage.getItem('isVerified') !== 'true') {
-            // alert('尚未驗證或驗證已過期，請重新登入！');
-            // window.location.replace('/verify');
-        }
-    </script>
-    
     <style>
         /* 全局與基本元素設定 */
         body {
@@ -178,7 +171,13 @@
 
 <div class="container">
     <h2>病患衛教表單</h2>
-    
+
+    <div class="form-group">
+        <label for="line_info">驗證來源 LINE 帳號 (名字 (LINE ID))</label>
+        <input type="text" id="line_info" value="{{ line_info }}" readonly 
+               style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
+    </div>
+
     <div class="form-group">
         <label for="record_id">病歷號</label>
         <input type="text" id="record_id" placeholder="請輸入病歷號" required>

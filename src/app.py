@@ -39,8 +39,9 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 # ============== 修正結束 ==============
 
-# 引入在 bot.py 寫好的介面
+# 引入其他 .py 檔案
 from bot import get_ai_response
+from admin_server import admin_bp
 
 
 # ----- 路徑設定 -----
@@ -57,6 +58,13 @@ assets_dir = base_dir / "assets"
 
 # 初始化 Flask，並將 template_folder 指向 webpage 資料夾，將 static_folder 指向 assets/images 資料夾
 app = Flask(__name__, template_folder=str(webpage_dir), static_folder=str(assets_dir), static_url_path='/assets')
+
+# 註冊從其他 .py 引入的網頁路由 Blueprint
+app.register_blueprint(admin_bp)
+
+# 原在 admin_server.py 中的 config, secret_key
+app.secret_key = 'eddi_admin_2026_secure_key'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 channel_access_token = os.getenv("CHANNEL_ACCESS_TOKEN")
 channel_secret = os.getenv("CHANNEL_SECRET")

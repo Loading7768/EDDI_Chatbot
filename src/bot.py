@@ -229,6 +229,63 @@ class OpenAIBot(SmartHealthBotBase):
         return reply
 
 
+# --- 以下為新增的 LINE Bot 整合用程式碼 ---
+
+# 儲存每個使用者的 Bot 實例：{ "user_id": BotInstance }
+user_sessions = {}
+
+# 預先載入所有衛教資料（作為 LINE Bot 的通用預設資料）
+try:
+    # 注意：請確認你的 EDdischarge.json 路徑是否正確，這裡依你原本的設定
+    default_json_path = os.path.join(os.path.dirname(__file__), "../docs/EDdischarge.json")
+    if os.path.exists(default_json_path):
+        _, topic_zh_list, raw_data = load_discharge_data(default_json_path)
+        # 預設載入所有主題作為 context
+        default_context = build_context(list(range(len(raw_data))), topic_zh_list, raw_data)
+    else:
+        default_context = "無外部衛教資料，請依照一般醫療常識回答。"
+except Exception as e:
+    print(f"載入預設資料失敗：{e}")
+    default_context = "無外部衛教資料，請依照一般醫療常識回答。"
+
+
+
+def get_ai_response(user_id: str, user_message: str, ai_type: str = 'gemini') -> str:
+    """
+    接收 LINE user_id 與訊息，取得專屬的 bot 實例並回傳答案
+    """
+    # 處理特殊指令：重置對話
+    if user_message.strip() == '重置':
+        if user_id in user_sessions:
+            del user_sessions[user_id]
+        return "🔄 對話已重置，請開始新的諮詢。"
+
+    # 1. 如果是新使用者，為他建立專屬的 Bot 實例
+    if user_id not in user_sessions:
+        if ai_type == 'openai':
+            bot = OpenAIBot()
+        else:
+            bot = GeminiBot()
+            
+        # 因為是 LINE Bot 直面病患，沒有醫師輸入病患資訊，設定為預設值
+        bot.set_patient_context("一般病患（由 LINE Bot 諮詢）")
+        
+        # 啟動對話 (傳入預先組合好的所有衛教知識)
+        try:
+            bot.start(default_context)
+            user_sessions[user_id] = bot
+        except Exception as e:
+            return f"系統初始化失敗：{e}"
+            
+    # 2. 取得該使用者的機器人，並進行對話
+    bot = user_sessions[user_id]
+    try:
+        response_text = bot.ask(user_message)
+        return response_text
+    except Exception as e:
+        return f"AI 回覆發生錯誤：{e}"
+
+
 # ── 主程式 ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:

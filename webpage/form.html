@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>病患出院衛教表單</title>
+    
+    <script>
+        if (sessionStorage.getItem('isVerified') !== 'true') {
+            // alert('尚未驗證或驗證已過期，請重新登入！');
+            // window.location.replace('/verify');
+        }
+    </script>
+    
+    <style>
+        /* 全局與基本元素設定 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px 10px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 25px;
+            width: 100%;
+            max-width: 600px; /* 電腦版最大寬度 */
+            box-sizing: border-box;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+        }
+        
+        /* 表單輸入區域 */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        /* 人體圖片與互動區塊設定 */
+        .image-section {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .image-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            max-width: 400px; /* 控制圖片最大尺寸 */
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .image-container img {
+            width: 100%;
+            display: block;
+        }
+        
+        /* 區塊標示圓圈 (橢圓) */
+        .hotspot {
+            position: absolute;
+            border: 2px solid #06C755;
+            background-color: rgba(6, 199, 85, 0.2);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, border-width 0.2s;
+            box-sizing: border-box;
+        }
+        .hotspot:hover, .hotspot.active {
+            background-color: rgba(6, 199, 85, 0.6);
+            border-width: 3px;
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        /* 隱藏的選項面板 */
+        #topic-panel {
+            display: none;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            text-align: left;
+            animation: fadeIn 0.3s;
+        }
+        #topic-panel h4 {
+            margin-top: 0;
+            color: #06C755;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+
+        /* 勾選清單樣式 */
+        .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 5px 0;
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* 確認已選衛教區域 */
+        .confirmation-section {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #ebf8f0;
+            border-radius: 8px;
+            border: 1px solid #bce3c9;
+        }
+        .confirmation-section h3 {
+            margin-top: 0;
+            color: #05883b;
+            font-size: 16px;
+        }
+        #empty-msg {
+            color: #777;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        /* 送出按鈕 */
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #06C755;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: background-color 0.2s;
+        }
+        .submit-btn:hover {
+            background-color: #05A044;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>病患衛教表單</h2>
+    
+    <div class="form-group">
+        <label for="record_id">病歷號</label>
+        <input type="text" id="record_id" placeholder="請輸入病歷號" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="doctor_id">醫師帳號</label>
+        <input type="text" id="doctor_id" placeholder="請輸入醫師帳號" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="discharge_date">出院日期</label>
+        <input type="date" id="discharge_date" required>
+    </div>
+
+    <div class="image-section">
+        <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
+        
+        <div class="image-container" id="body-image-container">
+            <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+            
+            <div class="hotspot" data-region="頭" style="top: 2%; left: 43.7%; width: 13%; height: 11%;" title="頭"></div>
+            
+            <div class="hotspot" data-region="脖子" style="top: 13.5%; left: 46.05%; width: 8%; height: 6%;" title="脖子"></div>
+            
+            <div class="hotspot" data-region="手" style="top: 24%; left: 60%; width: 11%; height: 32%;" title="手"></div>
+            
+            <div class="hotspot" data-region="軀幹上半部" style="top: 20%; left: 40.05%; width: 20%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+            
+            <div class="hotspot" data-region="軀幹下半部" style="top: 38%; left: 39%; width: 22%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+            
+            <div class="hotspot" data-region="腳" style="top: 59%; left: 49%; width: 13%; height: 39%;" title="腳"></div>
+            
+            <div class="hotspot" data-region="皮膚" style="top: 55%; left: 75%; width: 18%; height: 9%; border-radius: 10px;" title="皮膚">
+                <span style="display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; font-weight:bold; color:#06C755; border-radius:8px;">皮膚</span>
+            </div>
+            
+            <div class="hotspot" data-region="精神" style="top: 70%; left: 75%; width: 18%; height: 9%; border-radius: 10px;" title="精神">
+                <span style="display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; font-weight:bold; color:#06C755; border-radius:8px;">精神</span>
+            </div>
+
+            <div class="hotspot" data-region="其他" style="top: 85%; left: 75%; width: 18%; height: 9%; border-radius: 10px;" title="其他">
+                <span style="display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; font-weight:bold; color:#06C755; border-radius:8px;">其他</span>
+            </div>
+        </div>
+
+        <div id="topic-panel">
+            <h4 id="panel-title">選擇衛教資料</h4>
+            <div class="checkbox-list" id="panel-checkboxes">
+                </div>
+        </div>
+    </div>
+
+    <div class="confirmation-section">
+        <h3>已選擇的衛教資料確認清單：</h3>
+        <p id="empty-msg">尚未選擇任何衛教資料</p>
+        <div class="checkbox-list" id="confirmed-list">
+            </div>
+    </div>
+
+    <button class="submit-btn" onclick="submitForm()">送出表單</button>
+</div>
+
+<script>
+    // 預設填入當天日期
+    document.getElementById('discharge_date').value = new Date().toISOString().split('T')[0];
+
+    // 建立 7 大區塊與衛教資料的對應表 (簡化顯示名稱)
+    const topicMapping = {
+        "頭": ["頭暈", "流鼻血", "發燒", "頭痛", "偏頭痛", "噁心嘔吐", "眩暈"],
+        "脖子": ["咳嗽", "咳血", "打嗝"],
+        "手": [],
+        "軀幹上半部": ["胸痛", "心悸", "呼吸急促/呼吸困難", "上背痛"],
+        "軀幹下半部": ["腹痛", "腸胃炎/病毒性腸胃炎", "便秘", "腹瀉", "腰痛", "吐血、解黑便、解血便、胃腸道出血", "血尿", "下背痛", "尿滯留", "懷孕早期陰道出血", "懷孕後期陰道出血", "月經週期間陰道出血"],
+        "腳": [],
+        "皮膚": ["燒燙傷", "水腫", "皮膚疹子(皮疹)"],
+        "精神": ["譫妄、意識混亂", "虛弱", "暈厥、暈倒"],
+        "其他": ["高血壓", "肌肉、關節和骨骼疼痛", "癲癇", "休克", "一般外傷、鈍挫傷、扭傷、拉傷", "傷口處置原則"]
+    };
+
+    // 記錄使用者已勾選的項目 (使用 Set 避免重複)
+    let selectedTopics = new Set();
+    let currentActiveRegion = null;
+
+    // 獲取 DOM 元素
+    const topicPanel = document.getElementById('topic-panel');
+    const panelTitle = document.getElementById('panel-title');
+    const panelCheckboxes = document.getElementById('panel-checkboxes');
+    const confirmedList = document.getElementById('confirmed-list');
+    const emptyMsg = document.getElementById('empty-msg');
+    const hotspots = document.querySelectorAll('.hotspot');
+
+    // 點擊人體圖區塊的事件
+    hotspots.forEach(spot => {
+        spot.addEventListener('click', function(e) {
+            e.stopPropagation(); // 防止點擊事件向外傳遞導致立刻被關閉
+            
+            // 清除其他區塊的 active 狀態
+            hotspots.forEach(s => s.classList.remove('active'));
+            this.classList.add('active');
+
+            currentActiveRegion = this.getAttribute('data-region');
+            showTopicPanel(currentActiveRegion);
+        });
+    });
+
+    // 點擊空白處隱藏選單
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#body-image-container') && !e.target.closest('#topic-panel')) {
+            topicPanel.style.display = 'none';
+            hotspots.forEach(s => s.classList.remove('active'));
+            currentActiveRegion = null;
+        }
+    });
+
+    // 顯示指定區塊的選項面板
+    function showTopicPanel(region) {
+        panelTitle.innerText = `選擇「${region}」相關衛教：`;
+        panelCheckboxes.innerHTML = ''; // 清空舊項目
+
+        const topics = topicMapping[region] || [];
+        
+        if (topics.length === 0) {
+            panelCheckboxes.innerHTML = '<span style="color:#777; font-size:14px;">此區域無相關衛教資料。</span>';
+        } else {
+            topics.forEach(topic => {
+                const label = document.createElement('label');
+                label.className = 'checkbox-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = topic;
+                checkbox.checked = selectedTopics.has(topic); // 若已選過則打勾
+                
+                // 點擊選項時更新 Set 並重新渲染確認清單
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        selectedTopics.add(topic);
+                    } else {
+                        selectedTopics.delete(topic);
+                    }
+                    renderConfirmedList();
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(topic));
+                panelCheckboxes.appendChild(label);
+            });
+        }
+        topicPanel.style.display = 'block';
+    }
+
+    // 渲染下方的「確認已選清單」
+    function renderConfirmedList() {
+        confirmedList.innerHTML = '';
+        
+        if (selectedTopics.size === 0) {
+            emptyMsg.style.display = 'block';
+        } else {
+            emptyMsg.style.display = 'none';
+            
+            selectedTopics.forEach(topic => {
+                const label = document.createElement('label');
+                label.className = 'checkbox-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = topic;
+                checkbox.checked = true; // 這裡預設都是打勾的
+                
+                // 在確認清單取消打勾 = 從 Set 中移除
+                checkbox.addEventListener('change', function() {
+                    selectedTopics.delete(topic);
+                    renderConfirmedList();
+                    // 同步更新展開中的面板
+                    if (topicPanel.style.display === 'block' && currentActiveRegion) {
+                        showTopicPanel(currentActiveRegion);
+                    }
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(topic));
+                confirmedList.appendChild(label);
+            });
+        }
+    }
+
+    // 送出表單資料
+    async function submitForm() {
+        const recordId = document.getElementById('record_id').value.trim();
+        const doctorId = document.getElementById('doctor_id').value.trim();
+        const dischargeDate = document.getElementById('discharge_date').value;
+
+        if (!recordId || !doctorId || !dischargeDate) {
+            alert('請填寫完整的基本資訊 (病歷號、醫師帳號、出院日期)！');
+            return;
+        }
+
+        if (selectedTopics.size === 0) {
+            alert('請至少選擇一項衛教資料！');
+            return;
+        }
+
+        const submitData = {
+            record_id: recordId,
+            doctor_id: doctorId,
+            discharge_date: dischargeDate,
+            topics: Array.from(selectedTopics)
+        };
+
+        // TODO: 將資料傳送至後端
+        console.log("準備送出的資料：", submitData);
+        alert('資料準備送出，已在 Console 印出內容！');
+
+        /* // 實際串接範例：
+        try {
+            const response = await fetch('/api/submit_form', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(submitData)
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('表單送出成功！');
+                window.location.href = '/success';
+            }
+        } catch(e) {
+            alert('傳送失敗，請稍後再試。');
+        }
+        */
+
+        // 成功送出後，建議清除驗證狀態，避免同個瀏覽器被其他人利用
+        // sessionStorage.removeItem('isVerified');
+    }
+</script>
+
+</body>
+</html>

@@ -6,7 +6,6 @@
     <title>病患出院衛教表單</title>
     
     <style>
-        /* 全局與基本元素設定 */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f0f2f5;
@@ -21,7 +20,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             padding: 25px;
             width: 100%;
-            max-width: 600px; /* 電腦版最大寬度 */
+            max-width: 600px;
             box-sizing: border-box;
         }
         h2 {
@@ -29,8 +28,6 @@
             color: #333;
             margin-top: 0;
         }
-        
-        /* 表單輸入區域 */
         .form-group {
             margin-bottom: 15px;
         }
@@ -40,7 +37,8 @@
             font-weight: bold;
             color: #555;
         }
-        .form-group input {
+        .form-group input, 
+        .form-group select { /* ==== 新增註解：將原本 input 的樣式也套用到 select ==== */
             width: 100%;
             padding: 10px;
             border: 1px solid #ccc;
@@ -54,20 +52,37 @@
             margin-top: 30px;
             text-align: center;
         }
+        .image-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            max-width: 400px;
+        }
         .image-container {
             position: relative;
             display: inline-block;
             width: 100%;
-            max-width: 400px; /* 控制圖片最大尺寸 */
-            border-radius: 8px;
-            overflow: hidden;
         }
         .image-container img {
             width: 100%;
             display: block;
+            border-radius: 8px;
         }
         
-        /* 區塊標示圓圈 (橢圓) */
+        /* ==== 新增註解：核心修改 - 用來控制滑動的容器 ==== */
+        .shiftable-container {
+            position: relative;
+            width: 100%;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* 滑順過渡動畫 */
+            transform: translateX(0%);
+            z-index: 2; /* 基礎圖層高於 label */
+        }
+        /* 觸發後的狀態：人體圖與身上熱區往左滑動 30% */
+        .shiftable-container.shifted {
+            transform: translateX(-30%);
+        }
+        
+        /* 熱區圓圈 */
         .hotspot {
             position: absolute;
             border: 2px solid #06C755;
@@ -76,6 +91,7 @@
             cursor: pointer;
             transition: background-color 0.2s, transform 0.1s, border-width 0.2s;
             box-sizing: border-box;
+            z-index: 5; /* 在滑動容器內的基本 z-index */
         }
         .hotspot:hover, .hotspot.active {
             background-color: rgba(6, 199, 85, 0.6);
@@ -84,44 +100,145 @@
             z-index: 10;
         }
 
-        /* 隱藏的選項面板 */
-        #topic-panel {
-            display: none;
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
+        /* 放置在圖下方的按鈕列，同一 Row */
+        .bottom-buttons-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
             margin-top: 15px;
-            text-align: left;
-            animation: fadeIn 0.3s;
+            position: relative;
+            z-index: 3; /* 確保在人體圖滑動時，按鈕圖層在上面 */
         }
-        #topic-panel h4 {
-            margin-top: 0;
-            color: #06C755;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
+        /* 底層類 Chip 型按鈕樣式 */
+        .bottom-btn {
+            position: relative !important;
+            top: auto !important; left: auto !important;
+            width: auto !important; height: auto !important;
+            padding: 8px 24px;
+            border-radius: 20px;
+            background-color: rgba(6, 199, 85, 0.1);
+            color: #05883b;
+            font-weight: bold;
+            font-size: 15px;
+            border: 2px solid #06C755;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .bottom-btn:hover, .bottom-btn.active {
+            background-color: #06C755;
+            color: white;
+            border-width: 2px;
+            transform: translateY(-2px);
         }
 
-        /* 勾選清單樣式 */
-        .checkbox-list {
+        /* =====================
+           浮動彈出框 (Popover)
+           ===================== */
+        #popover {
+            display: none;
+            position: absolute;
+            z-index: 100;
+            width: 215px;
+            animation: popIn 0.18s ease;
+            box-sizing: border-box;
+        }
+        #popover.show { display: block; }
+
+        /* 切分內容區塊以實作標題固定與清單滑動 */
+        .popover-content {
+            background: #fff;
+            border: 1.5px solid #06C755;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            max-height: 250px;
-            overflow-y: auto;
+            max-height: 320px;
+            overflow: hidden; /* 防止內部滑動破壞圓角 */
         }
-        .checkbox-item {
+
+        #popover h4 {
+            margin: 0;
+            padding: 14px 16px 10px 16px;
+            background-color: #fff;
+            color: #06C755;
+            font-size: 14px;
+            border-bottom: 1px solid #e0f5e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0; /* 標題固定不壓縮 */
+        }
+        #popover h4 .close-btn {
+            cursor: pointer;
+            font-size: 18px;
+            color: #aaa;
+            line-height: 1;
+            padding: 0 2px;
+            user-select: none;
+        }
+        #popover h4 .close-btn:hover { color: #555; }
+
+        .pop-checkbox-list {
+            padding: 10px 16px 14px 16px;
+            overflow-y: auto; /* 只讓列表部分滑動 */
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        /* 彈出框箭頭設定 */
+        #popover::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            z-index: 2; /* 浮於邊框上 */
+        }
+        #popover.arrow-left::before {
+            border-left: 1.5px solid #06C755;
+            border-top: 1.5px solid #06C755;
+            left: -7px;
+            top: var(--arrow-top, 18px);
+            transform: rotate(-45deg);
+        }
+        #popover.arrow-right::before {
+            border-left: 1.5px solid #06C755;
+            border-top: 1.5px solid #06C755;
+            right: -7px;
+            top: var(--arrow-top, 18px);
+            transform: rotate(135deg);
+        }
+        /* 指向下方的箭頭，給底部按鈕使用 */
+        #popover.arrow-bottom::before {
+            border-left: 1.5px solid #06C755;
+            border-bottom: 1.5px solid #06C755;
+            border-top: none;
+            bottom: -7px;
+            left: var(--arrow-left, 50%);
+            top: auto;
+            transform: rotate(-45deg);
+        }
+
+        .pop-checkbox-item {
             display: flex;
             align-items: center;
             font-size: 15px;
             cursor: pointer;
-            padding: 5px 0;
+            padding: 4px 2px;
+            border-radius: 6px;
+            transition: background 0.1s;
         }
-        .checkbox-item input[type="checkbox"] {
-            margin-right: 10px;
+        .pop-checkbox-item:hover { background: #f0fbf4; }
+        .pop-checkbox-item input[type="checkbox"] {
+            margin-right: 9px;
             width: 18px;
             height: 18px;
             cursor: pointer;
+            accent-color: #06C755;
+            flex-shrink: 0;
         }
 
         /* 確認已選衛教區域 */
@@ -136,11 +253,49 @@
             margin-top: 0;
             color: #05883b;
             font-size: 16px;
+            margin-bottom: 15px;
         }
         #empty-msg {
             color: #777;
             font-size: 14px;
             font-style: italic;
+        }
+        
+        /* 仿 Android Chips 風格 */
+        .chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 20px; /* 藥丸狀 */
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s, color 0.2s, opacity 0.2s;
+        }
+        .chip .icon {
+            margin-right: 6px;
+            font-weight: bold;
+        }
+        /* 啟用狀態：紫色系 */
+        .chip.active {
+            background-color: #05883b; 
+            color: white;
+            border: 1px solid #05883b;
+        }
+        /* 取消勾選但尚未點擊區塊外的灰色狀態 */
+        .chip.inactive {
+            background-color: #f0f0f0;
+            color: #888;
+            border: 1px solid #ddd;
+        }
+        .chip.inactive .icon {
+            opacity: 0.5;
         }
 
         /* 送出按鈕 */
@@ -157,13 +312,11 @@
             margin-top: 30px;
             transition: background-color 0.2s;
         }
-        .submit-btn:hover {
-            background-color: #05A044;
-        }
+        .submit-btn:hover { background-color: #05A044; }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.92); }
+            to   { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
@@ -174,78 +327,79 @@
 
     <div class="form-group">
         <label for="line_info">驗證來源 LINE 帳號 (名字 (LINE ID))</label>
-        <input type="text" id="line_info" value="{{ line_info }}" readonly 
+        <input type="text" id="line_info" value="{{ uname }} ({{ uid }})" readonly 
+               data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'
                style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
     </div>
 
     <div class="form-group">
-        <label for="record_id">病歷號</label>
-        <input type="text" id="record_id" placeholder="請輸入病歷號" required>
+        <label for="medical_record_num">病歷號</label>
+        <input type="text" id="medical_record_num" placeholder="請輸入病歷號" required value="{{ prefill_record_num | default('') }}">
     </div>
     
     <div class="form-group">
         <label for="doctor_id">醫師帳號</label>
-        <input type="text" id="doctor_id" placeholder="請輸入醫師帳號" required>
+        <select id="doctor_id" required>
+            <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %}>請選擇醫師</option>
+            {% for doc in doctors %}
+                <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
+            {% endfor %}
+        </select>
     </div>
     
     <div class="form-group">
         <label for="discharge_date">出院日期</label>
-        <input type="date" id="discharge_date" required>
+        <input type="date" id="discharge_date" readonly 
+               style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
     </div>
 
     <div class="image-section">
         <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
         
-        <div class="image-container" id="body-image-container">
-            <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+        <div class="image-wrapper" id="image-wrapper">
             
-            <div class="hotspot" data-region="頭" style="top: 2%; left: 43.7%; width: 13%; height: 11%;" title="頭"></div>
-            
-            <div class="hotspot" data-region="脖子" style="top: 13.5%; left: 46.05%; width: 8%; height: 6%;" title="脖子"></div>
-            
-            <div class="hotspot" data-region="手" style="top: 24%; left: 60%; width: 11%; height: 32%;" title="手"></div>
-            
-            <div class="hotspot" data-region="軀幹上半部" style="top: 20%; left: 40.05%; width: 20%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
-            
-            <div class="hotspot" data-region="軀幹下半部" style="top: 38%; left: 39%; width: 22%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
-            
-            <div class="hotspot" data-region="腳" style="top: 59%; left: 49%; width: 13%; height: 39%;" title="腳"></div>
-            
-            <div class="hotspot" data-region="皮膚" style="top: 55%; left: 75%; width: 18%; height: 9%; border-radius: 10px;" title="皮膚">
-                <span style="display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; font-weight:bold; color:#06C755; border-radius:8px;">皮膚</span>
-            </div>
-            
-            <div class="hotspot" data-region="精神" style="top: 70%; left: 75%; width: 18%; height: 9%; border-radius: 10px;" title="精神">
-                <span style="display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; font-weight:bold; color:#06C755; border-radius:8px;">精神</span>
-            </div>
-
-            <div class="hotspot" data-region="其他" style="top: 85%; left: 75%; width: 18%; height: 9%; border-radius: 10px;" title="其他">
-                <span style="display:flex; justify-content:center; align-items:center; height:100%; font-size:14px; font-weight:bold; color:#06C755; border-radius:8px;">其他</span>
-            </div>
-        </div>
-
-        <div id="topic-panel">
-            <h4 id="panel-title">選擇衛教資料</h4>
-            <div class="checkbox-list" id="panel-checkboxes">
+            <div id="body-shift-container" class="shiftable-container">
+                <div class="image-container" id="body-image-container">
+                    <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+                    <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 43.7%; width: 13%; height: 11%;" title="頭"></div>
+                    <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 46.05%; width: 8%; height: 6%;" title="脖子"></div>
+                    <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 60%; width: 11%; height: 32%;" title="手"></div>
+                    <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 40.05%; width: 20%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+                    <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 39%; width: 22%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+                    <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 49%; width: 13%; height: 39%;" title="腳"></div>
                 </div>
+            </div>
+            
+            <div class="bottom-buttons-row">
+                <div class="hotspot bottom-btn" data-region="皮膚" data-position="bottom">皮膚</div>
+                <div class="hotspot bottom-btn" data-region="精神" data-position="bottom">精神</div>
+                <div class="hotspot bottom-btn" data-region="其他" data-position="bottom">其他</div>
+            </div>
+
+            <div id="popover">
+                <div class="popover-content">
+                    <h4>
+                        <span id="popover-title">選擇衛教資料</span>
+                        <span class="close-btn" id="popover-close">✕</span>
+                    </h4>
+                    <div class="pop-checkbox-list" id="popover-checkboxes"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="confirmation-section">
         <h3>已選擇的衛教資料確認清單：</h3>
         <p id="empty-msg">尚未選擇任何衛教資料</p>
-        <div class="checkbox-list" id="confirmed-list">
-            </div>
+        <div class="chip-list" id="confirmed-list"></div>
     </div>
 
     <button class="submit-btn" onclick="submitForm()">送出表單</button>
 </div>
 
 <script>
-    // 預設填入當天日期
     document.getElementById('discharge_date').value = new Date().toISOString().split('T')[0];
 
-    // 建立 7 大區塊與衛教資料的對應表 (簡化顯示名稱)
     const topicMapping = {
         "頭": ["頭暈", "流鼻血", "發燒", "頭痛", "偏頭痛", "噁心嘔吐", "眩暈"],
         "脖子": ["咳嗽", "咳血", "打嗝"],
@@ -258,159 +412,363 @@
         "其他": ["高血壓", "肌肉、關節和骨骼疼痛", "癲癇", "休克", "一般外傷、鈍挫傷、扭傷、拉傷", "傷口處置原則"]
     };
 
-    // 記錄使用者已勾選的項目 (使用 Set 避免重複)
-    let selectedTopics = new Set();
+    /* ==== 新增註解：改為從 HTML 的 data-topics 屬性讀取資料並用 JSON.parse 解析，徹底解決 VS Code 紅字報錯的問題 ==== */
+    const rawTopics = document.getElementById('line_info').getAttribute('data-topics');
+    const prefillTopicsArray = rawTopics ? JSON.parse(rawTopics) : [];
+
+    /* ==== 新增註解：初始化 selectedTopics 時，直接塞入歷史衛教資料 ==== */
+    let selectedTopics = new Set(prefillTopicsArray);
+    
     let currentActiveRegion = null;
 
-    // 獲取 DOM 元素
-    const topicPanel = document.getElementById('topic-panel');
-    const panelTitle = document.getElementById('panel-title');
-    const panelCheckboxes = document.getElementById('panel-checkboxes');
+    const popover = document.getElementById('popover');
+    const popoverTitle = document.getElementById('popover-title');
+    const popoverCheckboxes = document.getElementById('popover-checkboxes');
     const confirmedList = document.getElementById('confirmed-list');
     const emptyMsg = document.getElementById('empty-msg');
     const hotspots = document.querySelectorAll('.hotspot');
+    const imageWrapper = document.getElementById('image-wrapper');
 
-    // 點擊人體圖區塊的事件
+    /* ==== 新增註解：頁面載入完成後，若有歷史預設資料，則觸發一次渲染 Chips 讓使用者看見 ==== */
+    window.addEventListener('DOMContentLoaded', () => {
+        if (selectedTopics.size > 0) {
+            renderConfirmedChips(true);
+        }
+    });
+
+    // 關閉按鈕
+    document.getElementById('popover-close').addEventListener('click', function(e) {
+        e.stopPropagation();
+        closePopover();
+    });
+
     hotspots.forEach(spot => {
         spot.addEventListener('click', function(e) {
-            e.stopPropagation(); // 防止點擊事件向外傳遞導致立刻被關閉
-            
-            // 清除其他區塊的 active 狀態
+            e.stopPropagation();
+
+            const region = this.getAttribute('data-region');
+
+            if (currentActiveRegion === region && popover.classList.contains('show')) {
+                closePopover();
+                return;
+            }
+
             hotspots.forEach(s => s.classList.remove('active'));
             this.classList.add('active');
+            currentActiveRegion = region;
 
-            currentActiveRegion = this.getAttribute('data-region');
-            showTopicPanel(currentActiveRegion);
+            showPopover(this, region);
         });
     });
 
-    // 點擊空白處隱藏選單
+    // 點擊彈出框內部不關閉
+    popover.addEventListener('click', function(e) { e.stopPropagation(); });
+
+    // 全域點擊監聽：處理 Popover 關閉與 Chips 的清理
     document.addEventListener('click', function(e) {
-        if (!e.target.closest('#body-image-container') && !e.target.closest('#topic-panel')) {
-            topicPanel.style.display = 'none';
-            hotspots.forEach(s => s.classList.remove('active'));
-            currentActiveRegion = null;
+        // 點擊圖片/熱區外部則關閉 Popover
+        if (!e.target.closest('#image-wrapper')) {
+            closePopover();
+        }
+
+        // 當使用者點擊確認清單外部時，將灰底(inactive)的衛教項目徹底刪除
+        const hasInactive = document.querySelectorAll('.chip.inactive').length > 0;
+        if (hasInactive && !e.target.closest('.confirmation-section')) {
+            renderConfirmedChips(true); // forceClean = true，強制同步畫面與已選清單
         }
     });
 
-    // 顯示指定區塊的選項面板
-    function showTopicPanel(region) {
-        panelTitle.innerText = `選擇「${region}」相關衛教：`;
-        panelCheckboxes.innerHTML = ''; // 清空舊項目
+    function closePopover() {
+        popover.classList.remove('show');
+        popover.style.display = 'none';
+        hotspots.forEach(s => s.classList.remove('active'));
+        currentActiveRegion = null;
+
+        /* ==== 新增註解：核心修改 - 關閉時人體圖恢復中央位置，並還原層級 ==== */
+        const shiftContainer = document.getElementById('body-shift-container');
+        shiftContainer.classList.remove('shifted');
+        shiftContainer.style.zIndex = '2'; // 恢復預設層級
+
+        // 將 popover 元素歸位至最外層保持整潔
+        imageWrapper.appendChild(popover);
+    }
+
+    function showPopover(hotspotEl, region) {
+        // 填入內容
+        popoverTitle.textContent = `「${region}」相關衛教`;
+        popoverCheckboxes.innerHTML = '';
 
         const topics = topicMapping[region] || [];
-        
         if (topics.length === 0) {
-            panelCheckboxes.innerHTML = '<span style="color:#777; font-size:14px;">此區域無相關衛教資料。</span>';
+            popoverCheckboxes.innerHTML = '<span style="color:#777; font-size:14px; padding: 10px;">此區域無相關衛教資料。</span>';
         } else {
             topics.forEach(topic => {
                 const label = document.createElement('label');
-                label.className = 'checkbox-item';
-                
+                label.className = 'pop-checkbox-item';
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.value = topic;
-                checkbox.checked = selectedTopics.has(topic); // 若已選過則打勾
-                
-                // 點擊選項時更新 Set 並重新渲染確認清單
+                checkbox.checked = selectedTopics.has(topic);
                 checkbox.addEventListener('change', function() {
-                    if (this.checked) {
-                        selectedTopics.add(topic);
-                    } else {
-                        selectedTopics.delete(topic);
-                    }
-                    renderConfirmedList();
+                    if (this.checked) selectedTopics.add(topic);
+                    else selectedTopics.delete(topic);
+                    renderConfirmedChips(); // 同步 Chips
                 });
 
                 label.appendChild(checkbox);
                 label.appendChild(document.createTextNode(topic));
-                panelCheckboxes.appendChild(label);
+                popoverCheckboxes.appendChild(label);
             });
         }
-        topicPanel.style.display = 'block';
+
+        popover.style.display = 'block';
+        popover.classList.add('show');
+
+        /* ==== 新增註解：核心修改 - 呼叫定位與動畫控制 ==== */
+        positionPopoverAndTriggerShift(hotspotEl, region);
     }
 
-    // 渲染下方的「確認已選清單」
-    function renderConfirmedList() {
-        confirmedList.innerHTML = '';
+    // 將原本的定位功能加上動畫控制
+    function positionPopoverAndTriggerShift(hotspotEl, region) {
+        // 動態移動 popover 確保定位準確
+        const shiftContainer = document.getElementById('body-shift-container');
+        const parentEl = hotspotEl.parentElement;
         
-        if (selectedTopics.size === 0) {
+        // 為了讓 popover 與熱區能同時往左偏移，若點擊身上熱區，需將 popover 放入滑動容器內
+        if (popover.parentElement !== parentEl) {
+            parentEl.appendChild(popover);
+        }
+
+        // ---- 動畫控制與層級設定 ----
+        const posType = hotspotEl.getAttribute('data-position');
+        
+        if (posType === 'body') {
+            /* ==== 新增註解：核心修改 - 點擊身上熱區，觸發滑動，並拉高滑動容器層級以免 popover 被蓋住 ==== */
+            shiftContainer.classList.add('shifted');
+            shiftContainer.style.zIndex = '101'; // 拉到最上層
+        } else {
+            /* ==== 新增註解：核心修改 - 點擊底部按鈕，還原滑動容器層級，以免滑動列蓋住下方按鈕的 popover ==== */
+            shiftContainer.classList.remove('shifted');
+            shiftContainer.style.zIndex = '2'; // 恢復原本層級
+        }
+        // ---------------------------
+
+        const spotLeft   = hotspotEl.offsetLeft;
+        const spotTop    = hotspotEl.offsetTop;
+        const spotW      = hotspotEl.offsetWidth;
+        const spotH      = hotspotEl.offsetHeight;
+
+        const popW = popover.offsetWidth  || 215;
+        const popH = popover.offsetHeight || 200;
+        const gap  = 10; 
+
+        const spotRight   = spotLeft + spotW;
+        const spotCenterY = spotTop + spotH / 2;
+
+        const parentW = parentEl.offsetWidth;
+        const parentH = parentEl.offsetHeight || imageWrapper.offsetHeight;
+
+        let left, top, arrowClass;
+
+        // 判斷是否為底部獨立按鈕，若是則將 popover 定位於其正上方
+        if (posType === 'bottom') {
+            top = spotTop - popH - gap;
+            left = spotLeft + (spotW / 2) - (popW / 2);
+            
+            // 邊界防護，避免超出版面
+            if (left < 0) left = 0;
+            if (left + popW > parentW) left = parentW - popW;
+
+            // 動態計算下方箭頭要對準的位置
+            let arrowOffset = spotLeft + (spotW / 2) - left;
+            popover.style.setProperty('--arrow-left', arrowOffset + 'px');
+            arrowClass = 'arrow-bottom';
+        } else {
+            /* ==== 核心修改：修正電腦版「手」等偏右熱區的位置問題 ==== */
+            // 因為點擊身上熱區時，整體會向左位移 30% (-30%)，
+            // 代表畫面的右側「視覺上」會多出相對應的空間。
+            // 我們把這 30% 補償給空間計算邏輯，這樣電腦版就不會因為判定原本空間不夠而亂塞到左邊了！
+            let availableSpaceRight = parentW - spotRight;
+            if (posType === 'body') {
+                availableSpaceRight += parentW * 0.3;
+            }
+            
+            const spaceLeft = spotLeft;
+
+            // 用補償後的空間來判斷右邊夠不夠放
+            if (availableSpaceRight >= popW + gap) {
+                left = spotRight + gap;
+                arrowClass = 'arrow-left';
+            } else if (spaceLeft >= popW + gap) {
+                left = spotLeft - popW - gap;
+                arrowClass = 'arrow-right';
+            } else {
+                // 如果兩邊都不夠（如手機版），預設塞在右邊
+                left = spotRight + gap;
+                arrowClass = 'arrow-left';
+            }
+
+            top = spotCenterY - popH / 2;
+            top = Math.max(0, top);
+            if (top + popH > parentH) top = parentH - popH;
+            top = Math.max(0, top);
+
+            const arrowOffset = spotCenterY - top - 6; 
+            const clampedArrow = Math.max(20, Math.min(arrowOffset, popH - 30));
+            popover.style.setProperty('--arrow-top', clampedArrow + 'px');
+        }
+
+        popover.style.left = left + 'px';
+        popover.style.top  = top  + 'px';
+        popover.className  = 'show ' + arrowClass;
+    }
+
+    // 讓箭頭位置可由 JS 控制
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `#popover::before { top: var(--arrow-top, 18px); }`;
+    document.head.appendChild(styleTag);
+
+    // 同步更新打開中的 Popover Checkbox 勾選狀態
+    function syncPopoverCheckboxes() {
+        document.querySelectorAll('.pop-checkbox-item input').forEach(cb => {
+            cb.checked = selectedTopics.has(cb.value);
+        });
+    }
+
+    // 產生與管理 Android Chips 風格清單
+    function renderConfirmedChips(forceClean = false) {
+        if (forceClean) {
+            // 強制清理：只保留真實存在的 selectedTopics
+            confirmedList.innerHTML = '';
+            selectedTopics.forEach(topic => {
+                confirmedList.appendChild(createChipElement(topic, true));
+            });
+        } else {
+            // 軟性更新：加入新增的，並把取消的項目轉為灰色 (inactive)
+            const currentChips = Array.from(confirmedList.querySelectorAll('.chip'));
+            const currentTopicNames = currentChips.map(c => c.dataset.topic);
+            
+            // 1. 加入新的項目
+            selectedTopics.forEach(topic => {
+                if (!currentTopicNames.includes(topic)) {
+                    confirmedList.appendChild(createChipElement(topic, true));
+                } else {
+                    // 若已存在，確保它亮起
+                    const chip = currentChips.find(c => c.dataset.topic === topic);
+                    if (chip) {
+                        chip.classList.add('active');
+                        chip.classList.remove('inactive');
+                        chip.querySelector('.icon').textContent = '✓';
+                    }
+                }
+            });
+            
+            // 2. 將不再 selectedTopics 內的項目設為灰色，直到下次點擊外部
+            currentChips.forEach(chip => {
+                const topic = chip.dataset.topic;
+                if (!selectedTopics.has(topic)) {
+                    chip.classList.remove('active');
+                    chip.classList.add('inactive');
+                    chip.querySelector('.icon').textContent = '✕';
+                }
+            });
+        }
+
+        if (confirmedList.children.length === 0) {
             emptyMsg.style.display = 'block';
         } else {
             emptyMsg.style.display = 'none';
-            
-            selectedTopics.forEach(topic => {
-                const label = document.createElement('label');
-                label.className = 'checkbox-item';
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = topic;
-                checkbox.checked = true; // 這裡預設都是打勾的
-                
-                // 在確認清單取消打勾 = 從 Set 中移除
-                checkbox.addEventListener('change', function() {
-                    selectedTopics.delete(topic);
-                    renderConfirmedList();
-                    // 同步更新展開中的面板
-                    if (topicPanel.style.display === 'block' && currentActiveRegion) {
-                        showTopicPanel(currentActiveRegion);
-                    }
-                });
-
-                label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(topic));
-                confirmedList.appendChild(label);
-            });
         }
     }
 
-    // 送出表單資料
+    function createChipElement(topic, isActive) {
+        const div = document.createElement('div');
+        div.className = `chip ${isActive ? 'active' : 'inactive'}`;
+        div.dataset.topic = topic;
+        
+        const icon = document.createElement('span');
+        icon.className = 'icon';
+        icon.textContent = isActive ? '✓' : '✕';
+        
+        const text = document.createElement('span');
+        text.textContent = topic;
+        
+        div.appendChild(icon);
+        div.appendChild(text);
+        
+        // 點擊 Chip 時切換狀態
+        div.addEventListener('click', function(e) {
+            e.stopPropagation(); // 阻止冒泡到 Document 引發清除動作
+            
+            if (selectedTopics.has(topic)) {
+                // 取消選擇：後台立即刪除
+                selectedTopics.delete(topic);
+                div.classList.remove('active');
+                div.classList.add('inactive');
+                icon.textContent = '✕';
+            } else {
+                // 再次勾選：加回後台
+                selectedTopics.add(topic);
+                div.classList.add('active');
+                div.classList.remove('inactive');
+                icon.textContent = '✓';
+            }
+            syncPopoverCheckboxes(); // 同步打勾清單 UI
+        });
+        
+        return div;
+    }
+
     async function submitForm() {
-        const recordId = document.getElementById('record_id').value.trim();
+        const userName = document.getElementById('line_info').dataset.uname;
+        const lineId = document.getElementById('line_info').dataset.uid;
+        const medicalRecordNum = document.getElementById('medical_record_num').value.trim();
         const doctorId = document.getElementById('doctor_id').value.trim();
         const dischargeDate = document.getElementById('discharge_date').value;
 
-        if (!recordId || !doctorId || !dischargeDate) {
+        if (!medicalRecordNum || !doctorId || !dischargeDate) {
             alert('請填寫完整的基本資訊 (病歷號、醫師帳號、出院日期)！');
             return;
         }
-
         if (selectedTopics.size === 0) {
             alert('請至少選擇一項衛教資料！');
             return;
         }
 
+        // 送出的資料絕對是實時、正確的，不受畫面上殘存灰色項目的影響
         const submitData = {
-            record_id: recordId,
+            user_name: userName,
+            line_id: lineId,
+            medical_record_num: medicalRecordNum,
             doctor_id: doctorId,
             discharge_date: dischargeDate,
-            topics: Array.from(selectedTopics)
+            topics: Array.from(selectedTopics) 
         };
 
-        // TODO: 將資料傳送至後端
         console.log("準備送出的資料：", submitData);
-        alert('資料準備送出，已在 Console 印出內容！');
 
-        /* // 實際串接範例：
+        /* ==== 新增註解：透過 Fetch API 將資料以 POST 送往後端處理並寫入資料庫 ==== */
         try {
             const response = await fetch('/api/submit_form', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(submitData)
             });
-            const result = await response.json();
-            if (result.success) {
-                alert('表單送出成功！');
-                window.location.href = '/success';
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('表單送出成功並已儲存至資料庫！');
+                window.location.reload(); // 送出成功後重整頁面，清空表單
+            } else {
+                alert('表單送出失敗：' + data.message);
             }
-        } catch(e) {
-            alert('傳送失敗，請稍後再試。');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('系統發生錯誤，無法連線至伺服器送出表單。');
         }
-        */
-
-        // 成功送出後，建議清除驗證狀態，避免同個瀏覽器被其他人利用
-        // sessionStorage.removeItem('isVerified');
     }
 </script>
 

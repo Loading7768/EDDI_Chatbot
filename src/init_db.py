@@ -51,17 +51,19 @@ def init_patient_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS PATIENT (
             medical_record_num TEXT PRIMARY KEY,
-            line_id            TEXT UNIQUE
+            line_id            TEXT UNIQUE,
+            patient_name       TEXT NOT NULL,
+            is_chatted         INTEGER NOT NULL DEFAULT 0
         )
     ''')
     patients = [
-        ('P2026001', 'U1a2b3c4d5'),
-        ('P2026002', 'U2e3f4g5h6'),
-        ('P2026003', 'U3i4j5k6l7'),
-        ('P2026004', 'U4m5n6o7p8'),
+        ('P2026001', 'U1a2b3c4d5', '劉一', 1),
+        ('P2026002', 'U2e3f4g5h6', '陳二', 0),
+        ('P2026003', 'U3i4j5k6l7', '張三', 0),
+        ('P2026004', 'U4m5n6o7p8', '李四', 0)
     ]
     c.executemany(
-        'INSERT OR IGNORE INTO PATIENT (medical_record_num, line_id) VALUES (?,?)',
+        'INSERT OR IGNORE INTO PATIENT (medical_record_num, line_id, patient_name, is_chatted) VALUES (?,?,?,?)',
         patients
     )
     conn.commit()
@@ -79,25 +81,24 @@ def init_form_db():
             doctor_account     TEXT    NOT NULL,
             checkout_date      DATE    NOT NULL,
             symptoms           TEXT,
-            is_chatted         INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (medical_record_num, checkout_date)
         )
     ''')
     forms = [
         ('P2026001', 'dr_wang', '2026-05-01',
-         json.dumps(['腹痛', '腸胃炎'], ensure_ascii=False), 1),
+         json.dumps(['腹痛', '腸胃炎'], ensure_ascii=False)),
         ('P2026001', 'dr_wang', '2026-05-08',
-         json.dumps(['腹痛'], ensure_ascii=False), 1),
+         json.dumps(['腹痛'], ensure_ascii=False)),
         ('P2026002', 'dr_wang', '2026-05-05',
-         json.dumps(['胸痛', '頭暈'], ensure_ascii=False), 0),
+         json.dumps(['胸痛', '頭暈'], ensure_ascii=False)),
         ('P2026003', 'dr_li',   '2026-05-07',
-         json.dumps(['便秘', '腹瀉'], ensure_ascii=False), 0),
+         json.dumps(['便秘', '腹瀉'], ensure_ascii=False)),
         ('P2026004', 'dr_wang', '2026-05-09',
-         json.dumps(['頭暈', '水腫'], ensure_ascii=False), 0),
+         json.dumps(['頭暈', '水腫'], ensure_ascii=False)),
     ]
     c.executemany(
         'INSERT OR IGNORE INTO FORM '
-        '(medical_record_num, doctor_account, checkout_date, symptoms, is_chatted) VALUES (?,?,?,?,?)',
+        '(medical_record_num, doctor_account, checkout_date, symptoms) VALUES (?,?,?,?)',
         forms
     )
     conn.commit()

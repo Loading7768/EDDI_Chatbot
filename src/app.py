@@ -43,6 +43,7 @@ if current_dir not in sys.path:
 from bot import get_ai_response
 from form_handle import form_bp, verification_codes, cleanup_expired_codes
 from admin_server import admin_bp
+from chat_logs import save_chat_to_json
 
 
 # ----- 路徑設定 -----
@@ -123,23 +124,6 @@ def handle_message(event):
         profile = line_bot_api.get_profile(user_id)
         user_name = profile.display_name
         
-        # if user_message == 'postback':
-        #     buttons_template = ButtonsTemplate(
-        #         title='Postback Sample',
-        #         text='Postback Action',
-        #         actions=[
-        #             PostbackAction(label='Postback Action', text='Postback Action Button Clicked!', data='postback'),
-        #         ])
-        #     template_message = TemplateMessage(
-        #         alt_text='Postback Sample',
-        #         template=buttons_template
-        #     )
-        #     line_bot_api.reply_message(
-        #         ReplyMessageRequest(
-        #             reply_token=event.reply_token,
-        #             messages=[template_message]
-        #         )
-        #     )
         if user_message == '修改病患表單': 
             cleanup_expired_codes() # 順手清理過期的舊驗證碼
             
@@ -181,9 +165,16 @@ def handle_message(event):
         else:
             # 呼叫 bot.py 的函數產生回覆
             try:
+                # 紀錄「使用者」說的話
+                save_chat_to_json(user_id, "user", user_message)
+
                 # 這裡預設使用 gemini，如果你想換成 openai 可以改成 get_ai_response(user_id, user_message, ai_type='openai')
                 reply_msg = get_ai_response(user_id, user_message, ai_type='gemini')
                 print(f"回覆內容: {reply_msg}")
+
+                # 紀錄「系統/AI」的回覆
+                save_chat_to_json(user_id, "assistant", reply_msg)
+
             except Exception as e:
                 app.logger.error(f"系統整合錯誤: {e}")
                 reply_msg = "抱歉，我目前無法回應，請稍後再試。"
@@ -194,11 +185,6 @@ def handle_message(event):
                     messages=[TextMessage(text=reply_msg)]
                 )
             )
-        
-# @line_handler.add(PostbackEvent)
-# def handle_postback(event):
-#     if event.postback.data == 'postback':
-#         print('Postback event is triggered')
 
 if __name__ == "__main__":
     app.run()

@@ -272,21 +272,82 @@ WantedBy=multi-user.target
 sudo systemctl enable --now eddichatbot
 ```
 ## 3. 設定 nginx
-```nginx
-server {
-    server_name yourdomain.com;
+### 準備 nginx 資料夾
+建立資料夾。
+```bash
+sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+```
 
-    # ADD THIS NEW BLOCK for the webhook
-    location /eddichatbot {
-        include proxy_params;
-        proxy_pass http://unix:/var/www/EDDI_Chatbot/webhook.sock;
-    }
+在 `/etc/nginx/nginx.conf` 的 `http` 加入以下：
+```nginx
+http {
+    ...
+    include /etc/nginx/sites-enabled/*;
 }
 ```
 
-啟動。
+### 建立不同分頁的設定
 ```bash
-sudo ln -s /etc/nginx/sites-available/eddichatbot /etc/nginx/sites-enabled
+sudo mkdir -p /etc/nginx/snippets
+```
+
+- 網頁
+`/etc/nginx/snippets/admin.conf`
+```nginx
+location /admin {
+    alias /var/www/EDDI_Chatbot/webpage/admin;
+    try_files /admin.html =404;
+}
+```
+
+`/etc/nginx/snippets/form.conf`
+```nginx
+location /form {
+    alias /var/www/EDDI_Chatbot/webpage/form;
+    try_files /form.html =404;
+}
+```
+
+`/etc/nginx/snippets/form_verify.conf`
+```nginx
+location /form_verify {
+    alias /var/www/EDDI_Chatbot/webpage/form_verify;
+    try_files /form_verify.html =404;
+}
+```
+- Webhook
+`/etc/nginx/snippets/webhook.conf`
+```nginx
+location /webhook {
+    proxy_pass http://unix:/var/www/EDDI_Chatbot/webhook.sock;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+### 主要設定
+將所有分頁綁定至同一個網域。
+`/etc/nginx/sites-available/EDDI_Chatbot.conf`
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    # Include the separated configuration files
+    include /etc/nginx/snippets/admin.conf;
+    include /etc/nginx/snippets/form.conf;
+    include /etc/nginx/snippets/form_verify.conf;
+    include /etc/nginx/snippets/webhook.conf;
+}
+```
+
+
+### 啟動
+```bash
+# 啟動網頁
+sudo ln -s /etc/nginx/sites-available/eddichatbot.conf /etc/nginx/sites-enabled/
 # 確認語法
 sudo nginx -t
 sudo systemctl restart nginx

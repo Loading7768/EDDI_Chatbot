@@ -45,11 +45,14 @@
   .form-group { margin-bottom: 18px; }
   .form-group label { display: block; font-size: 13px; font-weight: 600;
                       color: var(--text); margin-bottom: 6px; }
-  .form-group input {
+  .form-group input, .form-group select, .form-group textarea {
     width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
     border-radius: 8px; font-size: 15px; outline: none; transition: border .2s;
+    font-family: inherit;
   }
-  .form-group input:focus { border-color: var(--primary-l); }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--primary-l);
+  }
 
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -60,10 +63,19 @@
   .btn-primary { background: var(--primary); color: #fff; width: 100%; padding: 12px; }
   .btn-primary:hover { opacity: .9; }
   .btn-sm      { padding: 6px 14px; font-size: 13px; }
+  .btn-xs      { padding: 4px 10px; font-size: 12px; }
   .btn-accent  { background: var(--accent); color: #fff; }
+  .btn-accent:hover  { opacity: .9; }
+  .btn-warn    { background: var(--warn); color: #fff; }
+  .btn-warn:hover    { opacity: .9; }
+  .btn-danger  { background: var(--danger); color: #fff; }
+  .btn-danger:hover  { opacity: .9; }
   .btn-outline { background: transparent; border: 1.5px solid rgba(255,255,255,.5);
                  color: #fff; }
   .btn-outline:hover { background: rgba(255,255,255,.1); }
+  .btn-gray    { background: var(--bg); color: var(--text);
+                 border: 1.5px solid var(--border); }
+  .btn-gray:hover { background: var(--border); }
 
   .error-msg { color: var(--danger); font-size: 13px; margin-top: 8px;
                text-align: center; min-height: 20px; }
@@ -87,14 +99,37 @@
 
   .layout { display: flex; flex: 1; overflow: hidden; }
 
-  /* ── SIDEBAR ── */
-  .sidebar {
-    width: 220px; background: var(--card); border-right: 1px solid var(--border);
-    padding: 16px 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
+  /* ── HAMBURGER SIDEBAR ── */
+  .sidebar-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35);
+    z-index: 199;
   }
+  .sidebar-overlay.open { display: block; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 240px;
+    background: var(--card); border-right: 1px solid var(--border);
+    padding: 0; display: flex; flex-direction: column;
+    z-index: 200; transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    box-shadow: 4px 0 20px rgba(0,0,0,.12);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-header {
+    height: 56px; background: var(--primary); color: #fff;
+    display: flex; align-items: center; padding: 0 16px; gap: 12px;
+    font-weight: 700; font-size: 15px; flex-shrink: 0;
+  }
+  .sidebar-close {
+    margin-left: auto; background: none; border: none; color: #fff;
+    font-size: 22px; cursor: pointer; line-height: 1; padding: 4px;
+  }
+
+  .nav-items { flex: 1; padding: 12px 0; overflow-y: auto; }
   .nav-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500;
+    padding: 12px 20px; cursor: pointer; font-size: 14px; font-weight: 500;
     color: var(--muted); border-left: 3px solid transparent; transition: all .15s;
     user-select: none;
   }
@@ -102,6 +137,19 @@
   .nav-item.active { color: var(--primary); background: #eff6ff;
                      border-left-color: var(--primary); font-weight: 700; }
   .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+
+  /* hamburger button */
+  .hamburger {
+    background: none; border: none; color: #fff; cursor: pointer;
+    padding: 8px; margin-right: 12px; border-radius: 6px;
+    display: flex; flex-direction: column; gap: 5px; align-items: center;
+    transition: background .15s;
+  }
+  .hamburger:hover { background: rgba(255,255,255,.15); }
+  .hamburger span {
+    display: block; width: 22px; height: 2px; background: #fff;
+    border-radius: 2px; transition: all .25s;
+  }
 
   /* ── MAIN ── */
   main { flex: 1; overflow-y: auto; padding: 28px; }
@@ -242,6 +290,32 @@
   .save-status.ok   { color: var(--accent); }
   .save-status.fail { color: var(--danger); }
 
+  /* ── DOCTORS ── */
+  .doctor-table-wrap { margin-top: 20px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+          border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  th { background: var(--bg); font-size: 12px; font-weight: 700; color: var(--muted);
+       padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border);
+       vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    z-index: 500; align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 16px; padding: 28px 32px;
+    width: 480px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 20px;
+                 display: flex; align-items: center; gap: 8px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
   /* spinner */
   .spinner-dark {
     width: 24px; height: 24px; border: 3px solid var(--border);
@@ -265,6 +339,17 @@
     box-shadow: 0 8px 32px rgba(0,0,0,.15); display: flex; align-items: center; gap: 14px;
     font-weight: 600;
   }
+
+  .toast {
+    position: fixed; bottom: 28px; right: 28px; z-index: 800;
+    background: #1f2937; color: #fff; padding: 12px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+    opacity: 0; transform: translateY(8px); transition: all .2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.ok   { background: var(--accent); }
+  .toast.fail { background: var(--danger); }
 </style>
 </head>
 <body>
@@ -294,6 +379,9 @@
 <div id="app" style="display:none; flex-direction:column; height:100vh;">
 
   <header>
+    <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="選單">
+      <span></span><span></span><span></span>
+    </button>
     <span class="header-logo">🏥 EDDI 醫師後台</span>
     <div class="header-user">
       <span class="user-badge" id="header-name">—</span>
@@ -302,19 +390,35 @@
     </div>
   </header>
 
-  <div class="layout">
-    <nav class="sidebar">
-      <div class="nav-item active" data-sec="stats"  onclick="showSection('stats')">
+  <!-- sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- sidebar drawer -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span>🏥 功能選單</span>
+      <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+    </div>
+    <div class="nav-items">
+      <div class="nav-item active" data-sec="stats"   onclick="showSection('stats')">
         <span class="nav-icon">📊</span> 統計數據
       </div>
-      <div class="nav-item"        data-sec="chats"  onclick="showSection('chats')">
+      <div class="nav-item"        data-sec="chats"   onclick="showSection('chats')">
         <span class="nav-icon">💬</span> 聊天紀錄
       </div>
-      <div class="nav-item admin-only" data-sec="prompt" onclick="showSection('prompt')" style="display:none">
+      <div class="nav-item"        data-sec="forms"   onclick="showSection('forms')">
+        <span class="nav-icon">📋</span> 修改表單
+      </div>
+      <div class="nav-item admin-only" data-sec="doctors" onclick="showSection('doctors')" style="display:none">
+        <span class="nav-icon">👨‍⚕️</span> 醫師帳號管理
+      </div>
+      <div class="nav-item admin-only" data-sec="prompt"  onclick="showSection('prompt')"  style="display:none">
         <span class="nav-icon">✏️</span> Prompt 修改
       </div>
-    </nav>
+    </div>
+  </nav>
 
+  <div class="layout">
     <main>
 
       <!-- 統計數據 -->
@@ -350,7 +454,6 @@
       <section id="section-chats" class="section">
         <div class="section-title">聊天紀錄</div>
         <div class="chat-layout">
-
           <div class="patient-list">
             <div class="plist-header">
               病患列表
@@ -377,6 +480,66 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- 修改表單 -->
+      <section id="section-forms" class="section">
+        <div class="section-title">修改表單</div>
+        <div class="chat-layout">
+          <div class="patient-list">
+            <div class="plist-header">
+              病患列表
+              <span class="badge badge-gray" id="form-patient-count">0</span>
+            </div>
+            <div id="form-patient-list-body">
+              <div class="empty-state" style="padding:32px 0;">
+                <div class="empty-icon">👤</div><p>載入中…</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-panel">
+            <div class="chat-panel-header">
+              <div>
+                <div class="chat-panel-title" id="form-edit-title">請選擇病患</div>
+                <div class="chat-panel-sub"   id="form-edit-sub">點擊左側病患以修改表單</div>
+              </div>
+            </div>
+            <div class="chat-panel-body" id="form-edit-body">
+              <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <p>選擇左側病患以查看並修改表單</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 醫師帳號管理（管理員）-->
+      <section id="section-doctors" class="section">
+        <div class="section-title">
+          醫師帳號管理
+          <span class="role-tag role-admin" style="margin-left:8px;vertical-align:middle;">管理員</span>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-top:6px;">
+          可修改醫師姓名、啟用狀態，以及幫醫師重設密碼。
+        </p>
+        <div class="doctor-table-wrap">
+          <table id="doctor-table">
+            <thead>
+              <tr>
+                <th>帳號</th>
+                <th>姓名</th>
+                <th>狀態</th>
+                <th>角色</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="doctor-tbody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -410,9 +573,81 @@
   </div>
 </div>
 
+<!-- ── Modal：修改醫師 ── -->
+<div class="modal-backdrop" id="modal-doctor">
+  <div class="modal">
+    <div class="modal-title">✏️ 修改醫師資料</div>
+    <input type="hidden" id="edit-doctor-account">
+    <div class="form-group">
+      <label>帳號（不可修改）</label>
+      <input type="text" id="edit-doctor-account-show" disabled style="background:#f3f4f6;color:var(--muted)">
+    </div>
+    <div class="form-group">
+      <label>姓名</label>
+      <input type="text" id="edit-doctor-name" placeholder="醫師姓名">
+    </div>
+    <div class="form-group">
+      <label>新密碼（留空則不修改）</label>
+      <input type="password" id="edit-doctor-pw" placeholder="輸入新密碼">
+    </div>
+    <div class="form-group">
+      <label>帳號狀態</label>
+      <select id="edit-doctor-active">
+        <option value="1">啟用</option>
+        <option value="0">停用</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>角色</label>
+      <select id="edit-doctor-admin">
+        <option value="0">醫師</option>
+        <option value="1">管理員</option>
+      </select>
+    </div>
+    <p class="error-msg" id="doctor-modal-error" style="text-align:left"></p>
+    <div class="modal-actions">
+      <button class="btn btn-gray btn-sm" onclick="closeModal('modal-doctor')">取消</button>
+      <button class="btn btn-accent btn-sm" onclick="saveDoctorEdit()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：修改表單 ── -->
+<div class="modal-backdrop" id="modal-form">
+  <div class="modal">
+    <div class="modal-title">✏️ 修改表單</div>
+    <input type="hidden" id="edit-form-mrn">
+    <input type="hidden" id="edit-form-orig-date">
+    <div class="form-group">
+      <label>病歷號</label>
+      <input type="text" id="edit-form-mrn-show" disabled style="background:#f3f4f6;color:var(--muted)">
+    </div>
+    <div class="form-group">
+      <label>出院日期</label>
+      <input type="date" id="edit-form-date">
+    </div>
+    <div class="form-group" id="edit-form-doctor-group">
+      <label>主治醫師帳號</label>
+      <select id="edit-form-doctor"></select>
+    </div>
+    <div class="form-group">
+      <label>症狀（逗號分隔，例如：腹痛, 頭暈）</label>
+      <input type="text" id="edit-form-symptoms" placeholder="症狀1, 症狀2, …">
+    </div>
+    <p class="error-msg" id="form-modal-error" style="text-align:left"></p>
+    <div class="modal-actions">
+      <button class="btn btn-gray btn-sm" onclick="closeModal('modal-form')">取消</button>
+      <button class="btn btn-accent btn-sm" onclick="saveFormEdit()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toast" id="toast"></div>
+
 <script>
 // ── state ──
-const state = { isAdmin: false, currentMrn: null };
+const state = { isAdmin: false, currentMrn: null, formCurrentMrn: null, doctors: [], currentForms: [] };
 
 // ── api ──
 async function api(method, path, body) {
@@ -427,6 +662,30 @@ async function api(method, path, body) {
 
 function loading(on) {
   document.getElementById('loading').classList.toggle('active', on);
+}
+
+// ── toast ──
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── modal ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── sidebar ──
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  if (sb.classList.contains('open')) { closeSidebar(); }
+  else { sb.classList.add('open'); ov.classList.add('open'); }
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
 // ── auth ──
@@ -498,10 +757,13 @@ function showSection(name) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
   document.querySelector(`[data-sec="${name}"]`).classList.add('active');
+  closeSidebar();
 
-  if (name === 'stats')  loadStats();
-  if (name === 'chats')  loadChats();
-  if (name === 'prompt') loadPrompt();
+  if (name === 'stats')   loadStats();
+  if (name === 'chats')   loadChats();
+  if (name === 'forms')   loadFormsPatientList();
+  if (name === 'prompt')  loadPrompt();
+  if (name === 'doctors') loadDoctors();
 }
 
 // ── stats ──
@@ -562,7 +824,7 @@ function renderPatientList(patients) {
 // ── chat detail ──
 async function loadDetail(mrn, el) {
   state.currentMrn = mrn;
-  document.querySelectorAll('.patient-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('#patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
 
   document.getElementById('chat-body').innerHTML =
@@ -592,7 +854,6 @@ function renderDetail(d) {
 
   let html = '';
 
-  // 表單
   if (d.forms && d.forms.length) {
     html += `<p class="subsection-title">📋 表單紀錄（共 ${d.forms.length} 筆）</p>`;
     d.forms.forEach((f, i) => {
@@ -613,7 +874,6 @@ function renderDetail(d) {
     html += '<div class="divider"></div>';
   }
 
-  // 聊天訊息
   if (!d.messages || !d.messages.length) {
     html += '<div class="no-logs-notice">⚠️ 此病患尚無聊天紀錄</div>';
   } else {
@@ -632,6 +892,225 @@ function renderDetail(d) {
 
   document.getElementById('chat-body').innerHTML = html;
   document.getElementById('chat-body').scrollTop = 0;
+}
+
+// ── forms section ──
+async function loadFormsPatientList() {
+  loading(true);
+  try {
+    const list = await api('GET', '/api/chats');
+    renderFormPatientList(Array.isArray(list) ? list : []);
+  } catch { renderFormPatientList([]); }
+  finally  { loading(false); }
+}
+
+function renderFormPatientList(patients) {
+  document.getElementById('form-patient-count').textContent = patients.length;
+  const body = document.getElementById('form-patient-list-body');
+  if (!patients.length) {
+    body.innerHTML = `<div class="empty-state" style="padding:32px 0;">
+      <div class="empty-icon">👤</div><p>無病患資料</p></div>`;
+    return;
+  }
+  body.innerHTML = patients.map(p => `
+    <div class="patient-item${p.medical_record_num === state.formCurrentMrn ? ' active' : ''}"
+         onclick="loadFormDetail('${esc(p.medical_record_num)}', this)">
+      <div class="patient-mrn">${esc(p.medical_record_num)}</div>
+      <div class="patient-meta">
+        ${p.is_return
+          ? '<span class="badge badge-orange">回診</span>'
+          : '<span class="badge badge-blue">首診</span>'}
+        <span>表單 ${p.form_count} 筆</span>
+      </div>
+    </div>`
+  ).join('');
+}
+
+async function loadFormDetail(mrn, el) {
+  state.formCurrentMrn = mrn;
+  document.querySelectorAll('#form-patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const body = document.getElementById('form-edit-body');
+  body.innerHTML = '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
+  document.getElementById('form-edit-title').textContent = mrn;
+  document.getElementById('form-edit-sub').textContent   = '';
+
+  try {
+    const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
+    if (d.error) {
+      body.innerHTML = `<p style="color:var(--danger)">${esc(d.error)}</p>`; return;
+    }
+    renderFormEdit(d);
+  } catch {
+    body.innerHTML = '<p style="color:var(--danger)">載入失敗</p>';
+  }
+}
+
+function renderFormEdit(d) {
+  const p = d.patient;
+  document.getElementById('form-edit-title').textContent = p.medical_record_num;
+  document.getElementById('form-edit-sub').textContent   = `LINE ID：${p.line_id || '未連結'}`;
+
+  // 把表單資料存進 state，onclick 只傳 index，避免引號問題
+  state.currentForms = d.forms || [];
+
+  let html = '';
+  if (!state.currentForms.length) {
+    html = '<div class="no-logs-notice">⚠️ 此病患尚無表單資料</div>';
+  } else {
+    html += `<p class="subsection-title">📋 表單列表（共 ${state.currentForms.length} 筆）</p>`;
+    state.currentForms.forEach((f, i) => {
+      html += `
+        <div class="form-card">
+          <div class="form-card-head">
+            <span class="form-card-label">${i > 0 ? '🔄 回診' : '📝 首診'} — ${esc(f.checkout_date)}</span>
+            <button class="btn btn-warn btn-xs" onclick="openFormEditModal(${i})">
+              ✏️ 修改
+            </button>
+          </div>
+          <div class="form-row">主治醫師帳號：<b>${esc(f.doctor_account)}</b></div>
+          <div class="form-topics">
+            ${(f.symptoms || []).map(s => `<span class="topic-tag">${esc(s)}</span>`).join('')}
+          </div>
+        </div>`;
+    });
+  }
+  document.getElementById('form-edit-body').innerHTML = html;
+  document.getElementById('form-edit-body').scrollTop = 0;
+}
+
+async function openFormEditModal(idx) {
+  const f   = state.currentForms[idx];
+  const mrn = state.formCurrentMrn;
+  if (!f || !mrn) return;
+
+  document.getElementById('edit-form-mrn').value          = mrn;
+  document.getElementById('edit-form-orig-date').value    = f.checkout_date;
+  document.getElementById('edit-form-mrn-show').value     = mrn;
+  document.getElementById('edit-form-date').value         = f.checkout_date;
+  document.getElementById('edit-form-symptoms').value     = (f.symptoms || []).join(', ');
+  document.getElementById('form-modal-error').textContent = '';
+
+  // 填充醫師下拉選單（管理員才顯示）
+  const docGroup = document.getElementById('edit-form-doctor-group');
+  if (state.isAdmin) {
+    docGroup.style.display = '';
+    const sel = document.getElementById('edit-form-doctor');
+    if (!state.doctors.length) {
+      const list = await api('GET', '/api/doctors');
+      state.doctors = Array.isArray(list) ? list : [];
+    }
+    sel.innerHTML = state.doctors.map(dr =>
+      `<option value="${esc(dr.account_name)}" ${dr.account_name === f.doctor_account ? 'selected' : ''}>
+        ${esc(dr.account_name)} — ${esc(dr.doctor_name)}
+      </option>`
+    ).join('');
+  } else {
+    docGroup.style.display = 'none';
+  }
+
+  openModal('modal-form');
+}
+
+async function saveFormEdit() {
+  const mrn      = document.getElementById('edit-form-mrn').value;
+  const origDate = document.getElementById('edit-form-orig-date').value;
+  const newDate  = document.getElementById('edit-form-date').value;
+  const doctor   = state.isAdmin ? document.getElementById('edit-form-doctor').value : undefined;
+  const sympStr  = document.getElementById('edit-form-symptoms').value;
+  const symptoms = sympStr.split(',').map(s => s.trim()).filter(Boolean);
+  const errEl    = document.getElementById('form-modal-error');
+  errEl.textContent = '';
+
+  if (!newDate) { errEl.textContent = '請填寫出院日期'; return; }
+
+  const payload = { checkout_date: newDate, symptoms };
+  if (doctor) payload.doctor_account = doctor;
+
+  const res = await api('PUT', `/api/forms/${encodeURIComponent(mrn)}/${encodeURIComponent(origDate)}`, payload);
+  if (res.success) {
+    closeModal('modal-form');
+    showToast('✅ 表單已儲存', 'ok');
+    loadFormDetail(mrn, null);
+    // 同步更新聊天紀錄列表
+    if (state.currentMrn === mrn) loadDetail(mrn, null);
+  } else {
+    errEl.textContent = res.error || '儲存失敗';
+  }
+}
+
+// ── doctors ──
+async function loadDoctors() {
+  const tbody = document.getElementById('doctor-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>';
+  try {
+    const list = await api('GET', '/api/doctors');
+    state.doctors = Array.isArray(list) ? list : [];
+    if (!state.doctors.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">無資料</td></tr>';
+      return;
+    }
+    tbody.innerHTML = state.doctors.map(dr => `
+      <tr>
+        <td><code>${esc(dr.account_name)}</code></td>
+        <td>${esc(dr.doctor_name)}</td>
+        <td>
+          <span class="badge ${dr.is_active ? 'badge-green' : 'badge-gray'}">
+            ${dr.is_active ? '啟用' : '停用'}
+          </span>
+        </td>
+        <td>
+          <span class="badge ${dr.is_admin ? 'badge-orange' : 'badge-blue'}">
+            ${dr.is_admin ? '管理員' : '醫師'}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-warn btn-xs"
+            onclick="openDoctorEditModal('${esc(dr.account_name)}','${esc(dr.doctor_name)}',${dr.is_active},${dr.is_admin})">
+            ✏️ 修改
+          </button>
+        </td>
+      </tr>`
+    ).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);padding:16px">載入失敗：${esc(String(e))}</td></tr>`;
+  }
+}
+
+function openDoctorEditModal(account, name, isActive, isAdmin) {
+  document.getElementById('edit-doctor-account').value       = account;
+  document.getElementById('edit-doctor-account-show').value  = account;
+  document.getElementById('edit-doctor-name').value          = name;
+  document.getElementById('edit-doctor-pw').value            = '';
+  document.getElementById('edit-doctor-active').value        = String(isActive);
+  document.getElementById('edit-doctor-admin').value         = String(isAdmin);
+  document.getElementById('doctor-modal-error').textContent  = '';
+  openModal('modal-doctor');
+}
+
+async function saveDoctorEdit() {
+  const account  = document.getElementById('edit-doctor-account').value;
+  const name     = document.getElementById('edit-doctor-name').value.trim();
+  const pw       = document.getElementById('edit-doctor-pw').value;
+  const isActive = parseInt(document.getElementById('edit-doctor-active').value);
+  const isAdmin  = parseInt(document.getElementById('edit-doctor-admin').value);
+  const errEl    = document.getElementById('doctor-modal-error');
+  errEl.textContent = '';
+
+  if (!name) { errEl.textContent = '姓名不可空白'; return; }
+
+  const payload = { doctor_name: name, is_active: isActive, is_admin: isAdmin };
+  if (pw) payload.new_password = pw;
+
+  const res = await api('PUT', `/api/doctors/${encodeURIComponent(account)}`, payload);
+  if (res.success) {
+    closeModal('modal-doctor');
+    showToast('✅ 醫師資料已更新', 'ok');
+    loadDoctors();
+  } else {
+    errEl.textContent = res.error || '儲存失敗';
+  }
 }
 
 // ── prompt ──

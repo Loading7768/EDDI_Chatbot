@@ -1,26 +1,27 @@
-
-from flask import Blueprint, Flask, request, jsonify, session, send_from_directory
+from flask import Blueprint, request, jsonify, session, send_from_directory
 import sqlite3
 import hashlib
 import json
 import os
+import glob
 from datetime import datetime
 from functools import wraps
 
-# 建立一個名為 admin_bp 的 Blueprint
 admin_bp = Blueprint('admin_bp', __name__)
-# admin_bp.secret_key = 'eddi_admin_2026_secure_key'
-# admin_bp.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-BASE_DIR    = os.getcwd()
-WEBPAGE_DIR = os.path.join(BASE_DIR, 'webpage')
-PROMPT_FILE = os.path.join(BASE_DIR, 'assets', 'prompt.md')
-STATS_CACHE = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
+# ── 路徑設定 ──────────────────────────────────────────────────────────────────
+# admin_server.py 放在 src/，所以專案根目錄是上一層
+SRC_DIR      = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR     = os.path.dirname(SRC_DIR)
+
+WEBPAGE_DIR   = os.path.join(BASE_DIR, 'webpage')
+PROMPT_FILE   = os.path.join(BASE_DIR, 'assets', 'prompt.md')
+STATS_CACHE   = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
+CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
 
 DB_DOCTOR  = os.path.join(BASE_DIR, 'database', 'doctor.db')
 DB_PATIENT = os.path.join(BASE_DIR, 'database', 'patient.db')
 DB_FORM    = os.path.join(BASE_DIR, 'database', 'form.db')
-DB_CHAT    = os.path.join(BASE_DIR, 'database', 'chatlog.db')
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -53,6 +54,90 @@ def admin_required(f):
             return jsonify({'error': '此功能僅限管理員'}), 403
         return f(*args, **kwargs)
     return wrapper
+
+
+# ── chat_logs JSON 讀取工具 ────────────────────────────────────────────────────
+
+def _parse_timestamp(ts: str) -> str:
+    """把 ISO 8601 timestamp 轉成 'YYYY-MM-DD HH:MM:SS' 字串。"""
+    if not ts:
+        return ''
+    ts = ts.strip()
+    for sep in ('+', 'Z'):
+        idx = ts.find(sep, 10)   # 避免誤切日期裡的 '-'
+        if idx != -1:
+            ts = ts[:idx]
+    return ts.replace('T', ' ')
+
+
+def load_messages_for_mrn(mrn: str) -> list:
+    """
+    讀取 chat_logs/<mrn>/ 下所有 *.json，
+    依 timestamp 排序後回傳 message list。
+    active_session.json 也會被讀入。
+    """
+    mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
+    if not os.path.isdir(mrn_dir):
+        return []
+
+    all_messages = []
+    for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            for msg in data.get('messages', []):
+                all_messages.append({
+                    'role':       msg.get('role', ''),
+                    'content':    msg.get('content', ''),
+                    'created_at': _parse_timestamp(msg.get('timestamp', '')),
+                })
+        except Exception as e:
+            print(f'[chat_logs] 讀取失敗 {os.path.basename(filepath)}: {e}')
+
+    all_messages.sort(key=lambda m: m['created_at'])
+
+    for i, m in enumerate(all_messages):
+        m['id'] = i + 1
+
+    return all_messages
+
+
+def get_chat_stats_for_mrn(mrn: str) -> dict:
+    """回傳 {msg_count, last_chat} 給病患列表使用，輕量掃描。"""
+    mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
+    if not os.path.isdir(mrn_dir):
+        return {'msg_count': 0, 'last_chat': None}
+
+    msg_count = 0
+    latest_ts = ''
+    for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            msg_count += len(data.get('messages', []))
+            meta_end = data.get('metadata', {}).get('end_time', '')
+            if meta_end:
+                ts = _parse_timestamp(meta_end)
+                if ts > latest_ts:
+                    latest_ts = ts
+        except Exception:
+            pass
+
+    return {
+        'msg_count': msg_count,
+        'last_chat': latest_ts[:10] if latest_ts else None,
+    }
+
+
+def list_mrns_with_logs() -> set:
+    """回傳 chat_logs/ 下有 json 檔的 MRN 集合。"""
+    if not os.path.isdir(CHAT_LOGS_DIR):
+        return set()
+    result = set()
+    for entry in os.scandir(CHAT_LOGS_DIR):
+        if entry.is_dir() and glob.glob(os.path.join(entry.path, '*.json')):
+            result.add(entry.name)
+    return result
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -124,62 +209,47 @@ def logout():
 def get_stats():
     stats = {}
 
-    # 好友總數 — PATIENT 表筆數（LINE 好友代理值）
     try:
         conn = get_db(DB_PATIENT)
-        stats['total_friends'] = conn.execute(
-            'SELECT COUNT(*) FROM PATIENT'
-        ).fetchone()[0]
+        stats['total_friends'] = conn.execute('SELECT COUNT(*) FROM PATIENT').fetchone()[0]
         conn.close()
     except Exception:
         stats['total_friends'] = 0
 
-    # 病患總數（有填過表單的不重複病患數）& 表單總數
     try:
         conn = get_db(DB_FORM)
         stats['total_patients'] = conn.execute(
-            'SELECT COUNT(DISTINCT medical_record_num) FROM FORM'
-        ).fetchone()[0]
-        stats['total_forms'] = conn.execute(
-            'SELECT COUNT(*) FROM FORM'
-        ).fetchone()[0]
+            'SELECT COUNT(DISTINCT medical_record_num) FROM FORM').fetchone()[0]
+        stats['total_forms'] = conn.execute('SELECT COUNT(*) FROM FORM').fetchone()[0]
         conn.close()
     except Exception:
         stats['total_patients'] = 0
         stats['total_forms']    = 0
 
-    # LINE bot 使用率 — CHAT_LOG 中不重複病患數 / PATIENT 總數
+    # LINE Bot 使用率：有 chat_logs 資料夾的 MRN 數 / 好友總數
     try:
-        conn = get_db(DB_CHAT)
-        chatted = conn.execute(
-            'SELECT COUNT(DISTINCT medical_record_num) FROM CHAT_LOG'
-        ).fetchone()[0]
-        conn.close()
-        total = stats['total_friends'] or 1
-        stats['patients_chatted']  = chatted
-        stats['bot_usage_rate']    = round(chatted / total * 100, 1)
+        chatted = len(list_mrns_with_logs())
+        total   = stats['total_friends'] or 1
+        stats['patients_chatted'] = chatted
+        stats['bot_usage_rate']   = round(chatted / total * 100, 1)
     except Exception:
         stats['patients_chatted'] = 0
         stats['bot_usage_rate']   = 0
 
-    # 回診總數 = 表單總數 - 不重複病患數（相差的就是重複就診次數）
     stats['return_visits'] = max(0, stats['total_forms'] - stats['total_patients'])
 
-    # 快取：數字有變才更新檔案
     try:
         os.makedirs(os.path.dirname(STATS_CACHE), exist_ok=True)
         cached = {}
         if os.path.exists(STATS_CACHE):
             with open(STATS_CACHE, 'r', encoding='utf-8') as f:
                 cached = json.load(f)
-
         snapshot = {k: v for k, v in stats.items()}
         if cached.get('data') != snapshot:
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             stats['last_updated'] = now
             with open(STATS_CACHE, 'w', encoding='utf-8') as f:
-                json.dump({'data': snapshot, 'last_updated': now},
-                          f, ensure_ascii=False, indent=2)
+                json.dump({'data': snapshot, 'last_updated': now}, f, ensure_ascii=False, indent=2)
         else:
             stats['last_updated'] = cached.get('last_updated', '')
     except Exception:
@@ -199,7 +269,6 @@ def get_chats():
     try:
         conn_f = get_db(DB_FORM)
         conn_p = get_db(DB_PATIENT)
-        conn_c = get_db(DB_CHAT)
 
         if is_admin:
             rows = conn_f.execute(
@@ -219,33 +288,22 @@ def get_chats():
         result = []
         for row in rows:
             mrn = row['medical_record_num']
-
             patient = conn_p.execute(
                 'SELECT line_id FROM PATIENT WHERE medical_record_num = ?', (mrn,)
             ).fetchone()
-
-            msg_count = conn_c.execute(
-                'SELECT COUNT(*) FROM CHAT_LOG WHERE medical_record_num = ?', (mrn,)
-            ).fetchone()[0]
-
-            last_chat = conn_c.execute(
-                'SELECT created_at FROM CHAT_LOG WHERE medical_record_num = ? '
-                'ORDER BY created_at DESC LIMIT 1', (mrn,)
-            ).fetchone()
-
+            chat_stats = get_chat_stats_for_mrn(mrn)
             result.append({
                 'medical_record_num': mrn,
                 'line_id':            patient['line_id'] if patient else None,
                 'form_count':         row['form_count'],
                 'is_return':          row['form_count'] > 1,
-                'msg_count':          msg_count,
-                'has_logs':           msg_count > 0,
-                'last_chat':          last_chat['created_at'][:10] if last_chat else None,
+                'msg_count':          chat_stats['msg_count'],
+                'has_logs':           chat_stats['msg_count'] > 0,
+                'last_chat':          chat_stats['last_chat'],
             })
 
         conn_f.close()
         conn_p.close()
-        conn_c.close()
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -260,7 +318,6 @@ def get_chat_detail(mrn: str):
     account  = session['account']
     is_admin = session['is_admin']
 
-    # 非管理員只能看自己填過表單的病患
     if not is_admin:
         conn = get_db(DB_FORM)
         allowed = conn.execute(
@@ -271,7 +328,6 @@ def get_chat_detail(mrn: str):
         if not allowed:
             return jsonify({'error': '無查看權限'}), 403
 
-    # PATIENT
     conn_p  = get_db(DB_PATIENT)
     patient = conn_p.execute(
         'SELECT * FROM PATIENT WHERE medical_record_num = ?', (mrn,)
@@ -280,20 +336,14 @@ def get_chat_detail(mrn: str):
     if not patient:
         return jsonify({'error': '找不到此病患'}), 404
 
-    # FORMs
     conn_f = get_db(DB_FORM)
     forms  = conn_f.execute(
         'SELECT * FROM FORM WHERE medical_record_num = ? ORDER BY checkout_date ASC', (mrn,)
     ).fetchall()
     conn_f.close()
 
-    # CHAT_LOG
-    conn_c   = get_db(DB_CHAT)
-    messages = conn_c.execute(
-        'SELECT id, role, content, created_at FROM CHAT_LOG '
-        'WHERE medical_record_num = ? ORDER BY created_at ASC', (mrn,)
-    ).fetchall()
-    conn_c.close()
+    # 從 JSON 檔讀取聊天訊息（不再查 chatlog.db）
+    messages_list = load_messages_for_mrn(mrn)
 
     forms_list = [
         {
@@ -301,19 +351,9 @@ def get_chat_detail(mrn: str):
             'doctor_account':     r['doctor_account'],
             'checkout_date':      r['checkout_date'],
             'symptoms':           json.loads(r['symptoms']) if r['symptoms'] else [],
-            'is_chatted':         bool(r['is_chatted']),
+            'is_chatted':         bool(r['is_chatted']) if 'is_chatted' in r.keys() else False,
         }
         for r in forms
-    ]
-
-    messages_list = [
-        {
-            'id':         m['id'],
-            'role':       m['role'],
-            'content':    m['content'],
-            'created_at': m['created_at'],
-        }
-        for m in messages
     ]
 
     return jsonify({
@@ -326,7 +366,125 @@ def get_chat_detail(mrn: str):
     })
 
 
-# ── Prompt 修改（僅管理員）────────────────────────────────────────────────────
+# ── 修改表單 ──────────────────────────────────────────────────────────────────
+
+@admin_bp.route('/api/forms/<mrn>/<checkout_date>', methods=['PUT'])
+@login_required
+def update_form(mrn: str, checkout_date: str):
+    account  = session['account']
+    is_admin = session['is_admin']
+
+    conn = get_db(DB_FORM)
+
+    if not is_admin:
+        allowed = conn.execute(
+            'SELECT 1 FROM FORM WHERE medical_record_num = ? AND checkout_date = ? AND doctor_account = ?',
+            (mrn, checkout_date, account)
+        ).fetchone()
+        if not allowed:
+            conn.close()
+            return jsonify({'error': '無修改權限'}), 403
+
+    row = conn.execute(
+        'SELECT * FROM FORM WHERE medical_record_num = ? AND checkout_date = ?',
+        (mrn, checkout_date)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': '找不到此表單'}), 404
+
+    data               = request.get_json() or {}
+    new_checkout_date  = data.get('checkout_date', checkout_date)
+    new_doctor_account = data.get('doctor_account', row['doctor_account'])
+    symptoms_raw       = data.get('symptoms', None)
+
+    if symptoms_raw is not None:
+        if isinstance(symptoms_raw, list):
+            new_symptoms = json.dumps(symptoms_raw, ensure_ascii=False)
+        else:
+            parts = [s.strip() for s in str(symptoms_raw).split(',') if s.strip()]
+            new_symptoms = json.dumps(parts, ensure_ascii=False)
+    else:
+        new_symptoms = row['symptoms']
+
+    try:
+        if new_checkout_date != checkout_date:
+            conn.execute(
+                'INSERT INTO FORM (medical_record_num, doctor_account, checkout_date, symptoms, is_chatted) '
+                'VALUES (?,?,?,?,?)',
+                (mrn, new_doctor_account, new_checkout_date, new_symptoms, row['is_chatted'])
+            )
+            conn.execute(
+                'DELETE FROM FORM WHERE medical_record_num = ? AND checkout_date = ?',
+                (mrn, checkout_date)
+            )
+        else:
+            conn.execute(
+                'UPDATE FORM SET doctor_account = ?, symptoms = ? '
+                'WHERE medical_record_num = ? AND checkout_date = ?',
+                (new_doctor_account, new_symptoms, mrn, checkout_date)
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'saved_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+# ── 醫師帳號管理（管理員）────────────────────────────────────────────────────
+
+@admin_bp.route('/api/doctors', methods=['GET'])
+@admin_required
+def list_doctors():
+    try:
+        conn = get_db(DB_DOCTOR)
+        rows = conn.execute(
+            'SELECT account_name, doctor_name, is_active, is_admin FROM DOCTOR '
+            'ORDER BY is_admin DESC, account_name'
+        ).fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/doctors/<account>', methods=['PUT'])
+@admin_required
+def update_doctor(account: str):
+    data = request.get_json() or {}
+    conn = get_db(DB_DOCTOR)
+    row  = conn.execute('SELECT * FROM DOCTOR WHERE account_name = ?', (account,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': '找不到此帳號'}), 404
+
+    new_doctor_name = data.get('doctor_name', row['doctor_name'])
+    new_is_active   = int(data.get('is_active', row['is_active']))
+    new_is_admin    = int(data.get('is_admin',  row['is_admin']))
+    new_password    = data.get('new_password', '').strip()
+
+    try:
+        if new_password:
+            conn.execute(
+                'UPDATE DOCTOR SET doctor_name=?, is_active=?, is_admin=?, password_hash=? '
+                'WHERE account_name=?',
+                (new_doctor_name, new_is_active, new_is_admin, hash_pw(new_password), account)
+            )
+        else:
+            conn.execute(
+                'UPDATE DOCTOR SET doctor_name=?, is_active=?, is_admin=? WHERE account_name=?',
+                (new_doctor_name, new_is_active, new_is_admin, account)
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Prompt 修改（管理員）────────────────────────────────────────────────────
 
 @admin_bp.route('/api/prompt', methods=['GET'])
 @admin_required
@@ -334,7 +492,6 @@ def get_prompt():
     try:
         content = ''
         if os.path.exists(PROMPT_FILE):
-            # 嘗試各種編碼，用 errors='strict' 確保真正解碼成功才停止
             for enc in ('utf-8', 'big5', 'cp950'):
                 try:
                     with open(PROMPT_FILE, 'r', encoding=enc, errors='strict') as f:
@@ -343,7 +500,6 @@ def get_prompt():
                 except (UnicodeDecodeError, ValueError):
                     continue
             else:
-                # 全部失敗才用 latin-1 fallback（不會拋錯但可能顯示亂碼）
                 with open(PROMPT_FILE, 'r', encoding='latin-1') as f:
                     content = f.read()
         return jsonify({'content': content, 'path': PROMPT_FILE})
@@ -357,9 +513,9 @@ def save_prompt():
     data    = request.get_json() or {}
     content = data.get('content', '')
     try:
+        os.makedirs(os.path.dirname(PROMPT_FILE), exist_ok=True)
         with open(PROMPT_FILE, 'w', encoding='utf-8') as f:
             f.write(content)
-        print(f'[Prompt] 已寫入：{PROMPT_FILE}  ({len(content)} 字元)')
         return jsonify({
             'success':  True,
             'saved_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -367,12 +523,3 @@ def save_prompt():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
-# ── entry point ───────────────────────────────────────────────────────────────
-
-# if __name__ == '__main__':
-    # print('EDDI 醫師後台系統')
-    # print('網址：http://localhost:5001')
-    # print('若尚未初始化資料庫，請先執行：python database/init_db.py\n')
-    # app.run(debug=True, port=5001, host='0.0.0.0')

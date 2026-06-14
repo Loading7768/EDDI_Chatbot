@@ -70,6 +70,15 @@
   .btn-warn:hover    { opacity: .9; }
   .btn-danger  { background: var(--danger); color: #fff; }
   .btn-danger:hover  { opacity: .9; }
+  .btn[disabled] {
+    background: var(--bg) !important;
+    color: var(--muted) !important;
+    border: 1.5px solid var(--border) !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+    opacity: 0.65;
+  }
   .btn-outline { background: transparent; border: 1.5px solid rgba(255,255,255,.5);
                  color: #fff; }
   .btn-outline:hover { background: rgba(255,255,255,.1); }
@@ -818,6 +827,11 @@
         <p style="font-size:13px;color:var(--muted);margin-top:6px;">
           可修改醫師姓名、啟用狀態，以及幫醫師重設密碼。
         </p>
+        <div style="margin-top: 14px; margin-bottom: 14px; display: flex; justify-content: flex-end;">
+          <button class="btn btn-accent btn-sm" onclick="openAddDoctorModal()">
+            ➕ 新增醫師帳號
+          </button>
+        </div>
         <div class="doctor-table-wrap">
           <table id="doctor-table">
             <thead>
@@ -901,6 +915,65 @@
     <div class="modal-actions">
       <button class="btn btn-gray btn-sm" onclick="closeModal('modal-doctor')">取消</button>
       <button class="btn btn-accent btn-sm" onclick="saveDoctorEdit()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：新增醫師 ── -->
+<div class="modal-backdrop" id="modal-add-doctor">
+  <div class="modal">
+    <div id="add-doctor-form-container">
+      <div class="modal-title">➕ 新增醫師帳號</div>
+      <div class="form-group">
+        <label>帳號名稱（僅限英文、數字、底線，新增後無法修改）</label>
+        <input type="text" id="add-doctor-account" placeholder="例如: dr_wang">
+      </div>
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" id="add-doctor-name" placeholder="例如: 王大明 醫師">
+      </div>
+      <div class="form-group">
+        <label>狀態</label>
+        <select id="add-doctor-active">
+          <option value="1">啟用</option>
+          <option value="0">停用</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>角色</label>
+        <select id="add-doctor-admin">
+          <option value="0">醫師</option>
+          <option value="1">管理員</option>
+        </select>
+      </div>
+      <p class="error-msg" id="add-doctor-modal-error" style="text-align:left"></p>
+      <div class="modal-actions">
+        <button class="btn btn-gray btn-sm" onclick="closeAddDoctorModal()">取消</button>
+        <button class="btn btn-accent btn-sm" onclick="submitAddDoctor()">建立帳號</button>
+      </div>
+    </div>
+    
+    <!-- 建立成功後顯示的密碼資訊面板 -->
+    <div id="add-doctor-success-container" style="display: none; text-align: center;">
+      <div class="modal-title" style="color: var(--accent);">🎉 帳號建立成功</div>
+      <p style="font-size: 14px; margin-bottom: 16px;">帳號已成功建立，系統已自動為此醫師生成隨機密碼：</p>
+      
+      <div style="background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">登入帳號</div>
+        <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 14px;" id="success-doctor-account">—</div>
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">自動生成密碼</div>
+        <div style="font-size: 20px; font-weight: 800; color: var(--primary); font-family: monospace; letter-spacing: 1px;" id="success-doctor-password">—</div>
+      </div>
+      
+      <p style="font-size: 12px; color: var(--danger); font-weight: 600; margin-bottom: 20px;">
+        ⚠️ 請複製此密碼並轉交給該醫師。<br>
+        此密碼僅顯示這一次，關閉視窗後將無法再次檢視！
+      </p>
+      
+      <div class="modal-actions" style="justify-content: center; gap: 12px;">
+          <button class="btn btn-primary btn-sm" onclick="copyGeneratedPassword()">📋 複製密碼</button>
+          <button class="btn btn-gray btn-sm" onclick="closeAddDoctorModal(true)" style="min-width: 60px; line-height: 1.4;">關閉<br>視窗</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1448,6 +1521,11 @@ async function loadDoctors() {
             onclick="openDoctorEditModal('${esc(dr.account_name)}','${esc(dr.doctor_name)}',${dr.is_active},${dr.is_admin})">
             ✏️ 修改
           </button>
+          <button class="btn btn-danger btn-xs"
+            ${dr.can_delete ? '' : 'disabled title="已看過病人，無法刪除"'}
+            onclick="deleteDoctor('${esc(dr.account_name)}','${esc(dr.doctor_name)}')">
+            🗑️ 刪除
+          </button>
         </td>
       </tr>`
     ).join('');
@@ -1488,6 +1566,96 @@ async function saveDoctorEdit() {
     loadDoctors();
   } else {
     errEl.textContent = res.error || '儲存失敗';
+  }
+}
+
+function openAddDoctorModal() {
+  document.getElementById('add-doctor-account').value = '';
+  document.getElementById('add-doctor-name').value = '';
+  document.getElementById('add-doctor-active').value = '1';
+  document.getElementById('add-doctor-admin').value = '0';
+  document.getElementById('add-doctor-modal-error').textContent = '';
+  
+  document.getElementById('add-doctor-form-container').style.display = 'block';
+  document.getElementById('add-doctor-success-container').style.display = 'none';
+  
+  openModal('modal-add-doctor');
+}
+
+function closeAddDoctorModal(shouldReload = false) {
+  closeModal('modal-add-doctor');
+  if (shouldReload) {
+    loadDoctors();
+  }
+}
+
+async function submitAddDoctor() {
+  const account = document.getElementById('add-doctor-account').value.trim();
+  const name = document.getElementById('add-doctor-name').value.trim();
+  const active = parseInt(document.getElementById('add-doctor-active').value, 10);
+  const admin = parseInt(document.getElementById('add-doctor-admin').value, 10);
+  const errEl = document.getElementById('add-doctor-modal-error');
+  errEl.textContent = '';
+
+  if (!account || !name) {
+    errEl.textContent = '帳號與姓名不可空白';
+    return;
+  }
+  
+  try {
+    const res = await api('POST', '/api/doctors', {
+      account_name: account,
+      doctor_name: name,
+      is_active: active,
+      is_admin: admin
+    });
+
+    if (res.error) {
+      errEl.textContent = res.error;
+      return;
+    }
+
+    if (res.success && res.password) {
+      document.getElementById('success-doctor-account').textContent = account;
+      document.getElementById('success-doctor-password').textContent = res.password;
+      
+      document.getElementById('add-doctor-form-container').style.display = 'none';
+      document.getElementById('add-doctor-success-container').style.display = 'block';
+    } else {
+      errEl.textContent = '建立失敗';
+    }
+  } catch (e) {
+    errEl.textContent = '連線失敗: ' + e;
+  }
+}
+
+function copyGeneratedPassword() {
+  const account = document.getElementById('success-doctor-account').textContent;
+  const password = document.getElementById('success-doctor-password').textContent;
+  const textToCopy = `${password}`;
+  
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    showToast('📋 密碼已複製到剪貼簿', 'ok');
+  }).catch(() => {
+    showToast('❌ 複製失敗，請手動選取複製', 'fail');
+  });
+}
+
+async function deleteDoctor(account, name) {
+  if (!confirm(`⚠️ 確定要刪除醫師「${name}」(${account}) 嗎？\n刪除後此動作將無法復原！`)) {
+    return;
+  }
+
+  try {
+    const res = await api('DELETE', `/api/doctors/${encodeURIComponent(account)}`);
+    if (res.success) {
+      showToast('🗑️ 醫師帳號已刪除', 'ok');
+      loadDoctors();
+    } else {
+      showToast('❌ 刪除失敗: ' + (res.error || '未知錯誤'), 'fail');
+    }
+  } catch (e) {
+    showToast('❌ 連線失敗: ' + e, 'fail');
   }
 }
 

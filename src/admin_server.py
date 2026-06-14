@@ -503,17 +503,112 @@ def update_form(mrn: str, checkout_date: str):
 
 # ── 醫師帳號管理（管理員）────────────────────────────────────────────────────
 
+import secrets
+import string
+
+def generate_random_password(length=8) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
 @admin_bp.route('/api/doctors', methods=['GET'])
 @admin_required
 def list_doctors():
     try:
+        # 1. 查詢 form.db，取得所有已有表單的醫師帳號
+        conn_f = get_db(DB_FORM)
+        active_accounts = {row['doctor_account'] for row in conn_f.execute(
+            'SELECT DISTINCT doctor_account FROM FORM'
+        ).fetchall()}
+        conn_f.close()
+
+        # 2. 查詢 doctor.db，取得所有醫師資料
         conn = get_db(DB_DOCTOR)
         rows = conn.execute(
             'SELECT account_name, doctor_name, is_active, is_admin FROM DOCTOR '
             'ORDER BY is_admin DESC, account_name'
         ).fetchall()
         conn.close()
-        return jsonify([dict(r) for r in rows])
+
+        result = []
+        for row in rows:
+            d = dict(row)
+            # 不能刪除自己，且如果醫師已看診（在 form.db 中有紀錄），則無法刪除
+            d['can_delete'] = (d['account_name'] not in active_accounts) and (d['account_name'] != session.get('account'))
+            result.append(d)
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/doctors', methods=['POST'])
+@admin_required
+def create_doctor():
+    data = request.get_json() or {}
+    account = data.get('account_name', '').strip()
+    name = data.get('doctor_name', '').strip()
+    active = int(data.get('is_active', 1))
+    admin = int(data.get('is_admin', 0))
+
+    if not account or not name:
+        return jsonify({'error': '請填寫帳號與姓名'}), 400
+
+    # 驗證帳號格式 (僅限英數字與底線)
+    if not all(c.isalnum() or c == '_' for c in account):
+        return jsonify({'error': '帳號只能包含英文、數字及下底線'}), 400
+
+    try:
+        conn = get_db(DB_DOCTOR)
+        exists = conn.execute('SELECT 1 FROM DOCTOR WHERE account_name = ?', (account,)).fetchone()
+        if exists:
+            conn.close()
+            return jsonify({'error': '此帳號已存在'}), 400
+        
+        # 產生 8 碼隨機密碼
+        generated_password = generate_random_password()
+        hashed = hash_pw(generated_password)
+        
+        conn.execute(
+            'INSERT INTO DOCTOR (account_name, password_hash, doctor_name, is_active, is_admin) '
+            'VALUES (?, ?, ?, ?, ?)',
+            (account, hashed, name, active, admin)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'password': generated_password})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/doctors/<account>', methods=['DELETE'])
+@admin_required
+def delete_doctor(account: str):
+    account = account.strip()
+    current_user = session.get('account')
+
+    if account == current_user:
+        return jsonify({'error': '無法刪除自己'}), 400
+
+    try:
+        # 檢查該醫師在 form.db 中是否已有病歷紀錄
+        conn_f = get_db(DB_FORM)
+        has_forms = conn_f.execute('SELECT 1 FROM FORM WHERE doctor_account = ?', (account,)).fetchone()
+        conn_f.close()
+
+        if has_forms:
+            return jsonify({'error': '已看過病人，無法刪除'}), 400
+
+        conn = get_db(DB_DOCTOR)
+        exists = conn.execute('SELECT 1 FROM DOCTOR WHERE account_name = ?', (account,)).fetchone()
+        if not exists:
+            conn.close()
+            return jsonify({'error': '找不到此帳號'}), 404
+
+        conn.execute('DELETE FROM DOCTOR WHERE account_name = ?', (account,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

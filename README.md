@@ -60,6 +60,7 @@
 2. https://nlp.cse.ntou.edu.tw/cjlin/app.py
 3. https://eddichatbot.duckdns.org:8443/eddichatbot
 4. https://nlp.cse.ntou.edu.tw/eddichatbot
+5. https://www.twsigntube.org/eddichatbot
 
 # Ubuntu 模擬器
 

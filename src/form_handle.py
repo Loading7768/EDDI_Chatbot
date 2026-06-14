@@ -30,20 +30,31 @@ def cleanup_expired_codes():
 @form_bp.route("/verify", methods=['GET'])
 def verify_page():
     # 本地測試用 (測試完需刪除)：直接在記憶體塞入一組寫死的代碼，方便本地網頁點擊測試
-    verification_codes["112233"] = {
-        "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
-        "user_name": "曾宇晨",
-        "expires_at": time.time() + 3600
-    }
-    verification_codes["223344"] = {
-        "user_id": "U223344",
-        "user_name": "楚中天",
-        "expires_at": time.time() + 3600
-    }
+    # verification_codes["112233"] = {
+    #     "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
+    #     "user_name": "曾宇晨",
+    #     "expires_at": time.time() + 3600
+    # }
+    # verification_codes["223344"] = {
+    #     "user_id": "U223344",
+    #     "user_name": "楚中天",
+    #     "expires_at": time.time() + 3600
+    # }
     return redirect('/form')
 
 @form_bp.route("/api/verify_code", methods=['POST'])
 def verify_code():
+    # verification_codes["112233"] = {
+    #     "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
+    #     "user_name": "曾宇晨",
+    #     "expires_at": time.time() + 3600
+    # }
+    # verification_codes["223344"] = {
+    #     "user_id": "U223344",
+    #     "user_name": "楚中天",
+    #     "expires_at": time.time() + 3600
+    # }
+
     data = request.json
     code = data.get("code")
     password = data.get("password")

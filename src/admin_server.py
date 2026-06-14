@@ -102,6 +102,75 @@ def load_messages_for_mrn(mrn: str) -> list:
     return all_messages
 
 
+def load_sessions_for_mrn(mrn: str) -> list:
+    """
+    讀取 chat_logs/<mrn>/ 下所有 *.json，
+    依 start_time 降序排序，並回傳 session list。
+    每一個 session 包含:
+      - session_id (檔名)
+      - label (顯示標籤)
+      - messages (訊息清單)
+      - metadata (原 metadata)
+    """
+    mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
+    if not os.path.isdir(mrn_dir):
+        return []
+
+    sessions = []
+    for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
+        try:
+            filename = os.path.basename(filepath)
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            meta = data.get('metadata', {})
+            raw_start = meta.get('start_time', '')
+            parsed_start = _parse_timestamp(raw_start)
+            
+            # 建立易讀的 label
+            if filename == 'active_session.json':
+                label = f"進行中對話 ({parsed_start})" if parsed_start else "進行中對話"
+            else:
+                session_date = meta.get('session_date', '')
+                session_seq = meta.get('session_sequence', '')
+                
+                # 格式化 sequence
+                if isinstance(session_seq, (int, float)):
+                    seq_str = f" #{int(session_seq):02d}"
+                elif session_seq:
+                    seq_str = f" #{session_seq}"
+                else:
+                    seq_str = ""
+                
+                # 取得時間部分，例如 "22:00:00"
+                time_part = parsed_start.split(' ')[1] if ' ' in parsed_start else ""
+                time_str = f" ({time_part})" if time_part else ""
+                
+                label = f"{session_date} 對話{seq_str}{time_str}"
+                
+            messages = []
+            for msg in data.get('messages', []):
+                messages.append({
+                    'role':       msg.get('role', ''),
+                    'content':    msg.get('content', ''),
+                    'created_at': _parse_timestamp(msg.get('timestamp', '')),
+                })
+            
+            sessions.append({
+                'session_id': filename,
+                'label': label,
+                'start_time': parsed_start,
+                'messages': messages,
+                'metadata': meta
+            })
+        except Exception as e:
+            print(f'[chat_logs] 讀取失敗 {os.path.basename(filepath)}: {e}')
+
+    # 依 start_time 降序排序
+    sessions.sort(key=lambda s: s['start_time'], reverse=True)
+    return sessions
+
+
 def get_chat_stats_for_mrn(mrn: str) -> dict:
     """回傳 {msg_count, last_chat} 給病患列表使用，輕量掃描。"""
     mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
@@ -342,8 +411,8 @@ def get_chat_detail(mrn: str):
     ).fetchall()
     conn_f.close()
 
-    # 從 JSON 檔讀取聊天訊息（不再查 chatlog.db）
-    messages_list = load_messages_for_mrn(mrn)
+    # 從 JSON 檔讀取聊天訊息（分開成多個 sessions）
+    sessions_list = load_sessions_for_mrn(mrn)
 
     forms_list = [
         {
@@ -362,7 +431,7 @@ def get_chat_detail(mrn: str):
             'line_id':            patient['line_id'],
         },
         'forms':    forms_list,
-        'messages': messages_list,
+        'sessions': sessions_list,
     })
 
 

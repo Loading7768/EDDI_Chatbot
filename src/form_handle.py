@@ -30,18 +30,17 @@ def cleanup_expired_codes():
 @form_bp.route("/verify", methods=['GET'])
 def verify_page():
     # 本地測試用 (測試完需刪除)：直接在記憶體塞入一組寫死的代碼，方便本地網頁點擊測試
-    # verification_codes["112233"] = {
-    #     "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
-    #     "user_name": "曾宇晨",
-    #     "expires_at": time.time() + 3600
-    # }
-    # verification_codes["223344"] = {
-    #     "user_id": "U223344",
-    #     "user_name": "楚中天",
-    #     "expires_at": time.time() + 3600
-    # }
-    # 這裡直接對應 webpage/form_verify.html
-    return render_template("form_verify.html")
+    verification_codes["112233"] = {
+        "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
+        "user_name": "曾宇晨",
+        "expires_at": time.time() + 3600
+    }
+    verification_codes["223344"] = {
+        "user_id": "U223344",
+        "user_name": "楚中天",
+        "expires_at": time.time() + 3600
+    }
+    return redirect('/form')
 
 @form_bp.route("/api/verify_code", methods=['POST'])
 def verify_code():
@@ -78,16 +77,13 @@ def verify_code():
 @form_bp.route("/form")
 def form_page():
     # --- 新增功能：後端檢查 Session 狀態 ---
-    # 如果 session 裡沒有 verified 標記，代表未經登入流程，直接導向回驗證頁
+    # 如果 session 裡沒有 verified 標記，代表未經登入流程，回傳 login 版面
     if not session.get('form_verified'):
-        return redirect('/verify')
+        return render_template("form.html", verified=False)
     
     # --- 從 session 取得 ID 與名字並組合 ---
     uid = session.get('form_user_id', '未知 ID')
     uname = session.get('form_user_name', '未知名字')
-    # 格式範例：曾宇晨 (U123456...)
-    # display_info = f"{uname} ({uid})"
-    # return render_template("form.html", line_info=display_info, uname=uname, uid=uid)
     
     # --- 新增註解：連接 doctor.db，讀取啟用的醫師名單作為表單下拉選單資料 ---
     conn = get_db('doctor.db')
@@ -136,7 +132,7 @@ def form_page():
 
     # --- 新增註解：將 doctors 傳遞給前端 ---
     # ==== 新增註解：一併將查到的歷史紀錄 (prefill 相關變數) 傳遞給前端 ====
-    return render_template("form.html", uname=uname, uid=uid, doctors=doctors, 
+    return render_template("form.html", verified=True, uname=uname, uid=uid, doctors=doctors, 
                            prefill_record_num=prefill_record_num, 
                            prefill_doctor_id=prefill_doctor_id, 
                            prefill_topics=prefill_topics)
@@ -175,6 +171,9 @@ def submit_form():
         ''', (medical_record_num, doctor_id, discharge_date, symptoms_json))
         conn_form.commit()
         conn_form.close()
+
+        # --- 清除 session ---
+        session.clear()
 
         return jsonify({"success": True, "message": "表單已成功儲存至資料庫"})
     except Exception as e:

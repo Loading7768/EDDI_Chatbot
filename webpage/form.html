@@ -28,6 +28,14 @@
             color: #333;
             margin-top: 0;
         }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 15px;
+        }
         .form-group {
             margin-bottom: 15px;
         }
@@ -54,9 +62,10 @@
         }
         .image-wrapper {
             position: relative;
-            display: inline-block;
+            display: block;
             width: 100%;
-            max-width: 400px;
+            max-width: 550px;
+            margin: 0 auto;
         }
         .image-container {
             position: relative;
@@ -69,17 +78,39 @@
             border-radius: 8px;
         }
         
-        /* ==== 新增註解：核心修改 - 用來控制滑動的容器 ==== */
-        .shiftable-container {
-            position: relative;
+        /* 3-column Interactive Layout */
+        .interactive-layout {
+            display: flex;
+            justify-content: space-between; /* Space out columns to edges */
+            align-items: stretch; /* Make all columns equal height dynamically */
+            margin: 15px auto 0 auto;
+            gap: 10px;
             width: 100%;
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* 滑順過渡動畫 */
-            transform: translateX(0%);
-            z-index: 2; /* 基礎圖層高於 label */
+            max-width: 500px; /* Centered and returned to original spacing scale */
+            position: relative;
+            padding: 0 5px; /* Small margin paced near edges */
+            box-sizing: border-box;
         }
-        /* 觸發後的狀態：人體圖與身上熱區往左滑動 30% */
-        .shiftable-container.shifted {
-            transform: translateX(-30%);
+        .body-column {
+            flex: 0 0 140px; /* Returned to original width to restore height and alignment */
+            position: relative;
+        }
+        .popover-column {
+            /* Now absolute-positioned to display between body and buttons when open */
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 220px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* positioned dynamically in JS */
+            pointer-events: none; /* Let clicks pass through if popover is hidden */
+            z-index: 100;
+            transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .buttons-column {
+            flex: 0 0 75px; /* Increased width by 50% */
+            position: relative;
         }
         
         /* 熱區圓圈 */
@@ -100,36 +131,60 @@
             z-index: 10;
         }
 
-        /* 放置在圖下方的按鈕列，同一 Row */
-        .bottom-buttons-row {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 15px;
-            position: relative;
-            z-index: 3; /* 確保在人體圖滑動時，按鈕圖層在上面 */
-        }
         /* 底層類 Chip 型按鈕樣式 */
         .bottom-btn {
-            position: relative !important;
-            top: auto !important; left: auto !important;
-            width: auto !important; height: auto !important;
-            padding: 8px 24px;
-            border-radius: 20px;
+            position: absolute !important;
+            width: 100% !important; /* stretch to fill buttons-column width */
+            height: auto !important;
+            padding: 7px 9px; /* Increased vertical/horizontal padding by 50% */
+            border-radius: 21px; /* Increased border radius by 50% */
             background-color: rgba(6, 199, 85, 0.1);
             color: #05883b;
             font-weight: bold;
-            font-size: 15px;
-            border: 2px solid #06C755;
+            font-size: 16px; /* Increased font size by ~50% */
+            border: 2px solid #06C755; /* Increased border width */
             display: flex;
             align-items: center;
             justify-content: center;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s;
         }
-        .bottom-btn:hover, .bottom-btn.active {
+        
+        /* Specific vertical alignments */
+        .btn-skin {
+            top: 25% !important;
+            left: 0 !important;
+            transform: translateY(-50%) !important;
+        }
+        .btn-mental {
+            top: 50% !important;
+            left: 0 !important;
+            transform: translateY(-50%) !important;
+        }
+        .btn-other {
+            top: 75% !important;
+            left: 0 !important;
+            transform: translateY(-50%) !important;
+        }
+
+        .btn-skin:hover, .btn-skin.active {
             background-color: #06C755;
             color: white;
             border-width: 2px;
-            transform: translateY(-2px);
+            transform: translateY(-50%) scale(1.05) !important;
+        }
+        .btn-mental:hover, .btn-mental.active {
+            background-color: #06C755;
+            color: white;
+            border-width: 2px;
+            transform: translateY(-50%) scale(1.05) !important;
+        }
+        .btn-other:hover, .btn-other.active {
+            background-color: #06C755;
+            color: white;
+            border-width: 2px;
+            transform: translateY(-50%) scale(1.05) !important;
         }
 
         /* =====================
@@ -137,13 +192,21 @@
            ===================== */
         #popover {
             display: none;
-            position: absolute;
+            position: absolute; /* absolute inside popover-column */
+            left: 0;
+            width: 220px;
             z-index: 100;
-            width: 215px;
-            animation: popIn 0.18s ease;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: scale(0.92);
             box-sizing: border-box;
+            pointer-events: auto; /* Re-enable pointer events for popover content */
         }
-        #popover.show { display: block; }
+        #popover.show {
+            display: block;
+            opacity: 1;
+            transform: scale(1);
+        }
 
         /* 切分內容區塊以實作標題固定與清單滑動 */
         .popover-content {
@@ -195,31 +258,19 @@
             width: 12px;
             height: 12px;
             background: #fff;
-            z-index: 2; /* 浮於邊框上 */
-        }
-        #popover.arrow-left::before {
+            z-index: 2; /* above border */
             border-left: 1.5px solid #06C755;
             border-top: 1.5px solid #06C755;
+        }
+        #popover.arrow-left::before {
             left: -7px;
             top: var(--arrow-top, 18px);
             transform: rotate(-45deg);
         }
         #popover.arrow-right::before {
-            border-left: 1.5px solid #06C755;
-            border-top: 1.5px solid #06C755;
             right: -7px;
             top: var(--arrow-top, 18px);
             transform: rotate(135deg);
-        }
-        /* 指向下方的箭頭，給底部按鈕使用 */
-        #popover.arrow-bottom::before {
-            border-left: 1.5px solid #06C755;
-            border-bottom: 1.5px solid #06C755;
-            border-top: none;
-            bottom: -7px;
-            left: var(--arrow-left, 50%);
-            top: auto;
-            transform: rotate(-45deg);
         }
 
         .pop-checkbox-item {
@@ -250,6 +301,7 @@
             border: 1px solid #bce3c9;
         }
         .confirmation-section h3 {
+            text-align: left;
             margin-top: 0;
             color: #05883b;
             font-size: 16px;
@@ -318,87 +370,537 @@
             from { opacity: 0; transform: scale(0.92); }
             to   { opacity: 1; transform: scale(1); }
         }
+
+        /* =====================
+           確認對話框 (Modal)
+           ===================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(6px);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-sizing: border-box;
+        }
+        .modal-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+        .modal-card {
+            background-color: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-sizing: border-box;
+        }
+        .modal-overlay.show .modal-card {
+            transform: scale(1);
+        }
+        .modal-title {
+            margin-top: 0;
+            margin-bottom: 18px;
+            font-size: 20px;
+            color: #333;
+            text-align: center;
+            font-weight: bold;
+        }
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #eee;
+            font-size: 15px;
+        }
+        .summary-label {
+            color: #666;
+            font-weight: 500;
+        }
+        .summary-value {
+            color: #333;
+            font-weight: 600;
+        }
+        .summary-topics-section {
+            margin-top: 8px;
+        }
+        .summary-topics-title {
+            margin: 0 0 10px 0;
+            font-size: 15px;
+            color: #666;
+            font-weight: 500;
+        }
+        .summary-topics-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .summary-chip {
+            background-color: #ebf8f0;
+            color: #05883b;
+            border: 1px solid #bce3c9;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+        }
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn-cancel {
+            background-color: #f0f2f5;
+            color: #666;
+        }
+        .btn-cancel:hover {
+            background-color: #e4e6eb;
+        }
+        .btn-confirm {
+            background-color: #06C755;
+            color: white;
+        }
+        .btn-confirm:hover {
+            background-color: #05A044;
+            transform: translateY(-1px);
+        }
+        .btn-confirm:active {
+            transform: translateY(0);
+        }
+        
+        /* 驗證欄位與錯誤訊息樣式 */
+        .field-error { 
+            color: #d9534f; 
+            font-size: 12px; 
+            margin-top: 5px; 
+            display: none; /* 預設隱藏 */
+            text-align: left;
+        }
+        #error-msg { 
+            color: #d9534f; 
+            font-size: 14px; 
+            margin-top: 15px; 
+            text-align: center; 
+            font-weight: bold; 
+        }
+        
+        /* 成功畫面動畫 keyframes */
+        @keyframes strokeCircle {
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+        @keyframes strokeCheck {
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        /* Solid meta-box styles for immutable fields */
+        .meta-box {
+            display: flex;
+            justify-content: space-between; /* Align value to the right */
+            align-items: center;
+            background-color: #f5f6f7;
+            border-left: 4px solid #06C755;
+            border-radius: 6px;
+            padding: 6px 16px; /* Reduced vertical padding by 50% */
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .meta-label {
+            font-weight: bold;
+            color: #666;
+            margin-right: 8px;
+            font-size: 13px;
+        }
+        .meta-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* Floating label form control group */
+        .floating-group {
+            position: relative;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+        .floating-group input,
+        .floating-group select {
+            width: 100%;
+            height: 40px; /* Reduced height by 30% */
+            padding: 10px 10px 2px 10px; /* Reduced vertical padding by 50% */
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: #fff;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .floating-group input:focus,
+        .floating-group select:focus {
+            border-color: #06C755;
+            box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.15);
+        }
+        .floating-group label {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 14px;
+            pointer-events: none;
+            transition: 0.2s ease all;
+            background-color: #fff;
+        }
+        /* Float the label when input is focused, placeholder is not shown, or select is valid */
+        .floating-group input:focus ~ label,
+        .floating-group input:not(:placeholder-shown) ~ label,
+        .floating-group select:focus ~ label,
+        .floating-group select:valid ~ label {
+            top: 0px;
+            font-size: 10px;
+            color: #06C755;
+            font-weight: bold;
+        }
+
+        /* Collapsible accordion content styles to prevent any seams when collapsed */
+        .accordion-content {
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, margin-top 0.3s ease-out, padding 0.3s ease-out;
+            margin-top: 10px;
+            padding: 2px;
+        }
+        .accordion-content.collapsed {
+            max-height: 0 !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
     </style>
 </head>
 <body>
 
+{% if not verified %}
+<div class="container" style="max-width: 380px; padding: 30px; margin-top: 50px;">
+    <h2 style="margin-bottom: 25px;">病患表單登入</h2>
+    
+    <div class="form-group">
+        <label for="code">請輸入 LINE 取得的 6 位數驗證碼：</label>
+        <input type="text" id="code" maxlength="6" placeholder="例如：123456" required>
+        <div id="code-error" class="field-error">此處不能空白</div>
+    </div>
+    
+    <div class="form-group">
+        <label for="password">請輸入管理員密碼：</label>
+        <input type="password" id="password" placeholder="請輸入密碼" required>
+        <div id="password-error" class="field-error">此處不能空白</div>
+    </div>
+    
+    <button class="submit-btn" style="margin-top: 10px; font-size: 16px;" onclick="submitVerify()">驗證並進入</button>
+    <div id="error-msg"></div>
+</div>
+{% else %}
 <div class="container">
     <h2>病患衛教表單</h2>
+    <div style="height: 2px; background-color: #333; margin-top: 10px; margin-bottom: 25px; border-radius: 2px;"></div>
 
-    <div class="form-group">
-        <label for="line_info">驗證來源 LINE 帳號 (名字 (LINE ID))</label>
-        <input type="text" id="line_info" value="{{ uname }} ({{ uid }})" readonly 
-               data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'
-               style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
-    </div>
+    <!-- Hidden fields to preserve JS compatibility -->
+    <input type="hidden" id="line_info" value="{{ uname }} ({{ uid }})" data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'>
+    <input type="hidden" id="discharge_date">
 
-    <div class="form-group">
-        <label for="medical_record_num">病歷號</label>
-        <input type="text" id="medical_record_num" placeholder="請輸入病歷號" required value="{{ prefill_record_num | default('') }}">
-    </div>
-    
-    <div class="form-group">
-        <label for="doctor_id">醫師帳號</label>
-        <select id="doctor_id" required>
-            <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %}>請選擇醫師</option>
-            {% for doc in doctors %}
-                <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    
-    <div class="form-group">
-        <label for="discharge_date">出院日期</label>
-        <input type="date" id="discharge_date" readonly 
-               style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
-    </div>
-
-    <div class="image-section">
-        <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
-        
-        <div class="image-wrapper" id="image-wrapper">
-            
-            <div id="body-shift-container" class="shiftable-container">
-                <div class="image-container" id="body-image-container">
-                    <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
-                    <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 43.7%; width: 13%; height: 11%;" title="頭"></div>
-                    <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 46.05%; width: 8%; height: 6%;" title="脖子"></div>
-                    <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 60%; width: 11%; height: 32%;" title="手"></div>
-                    <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 40.05%; width: 20%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
-                    <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 39%; width: 22%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
-                    <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 49%; width: 13%; height: 39%;" title="腳"></div>
+    <!-- Collapsible accordion containing patient info meta-box and text fields -->
+    <div class="accordion-container" style="margin-bottom: 20px;">
+        <div class="accordion-header" id="accordion-toggle" style="display: flex; align-items: center; cursor: pointer; user-select: none; font-weight: bold; color: #333; font-size: 15px; padding: 5px 0;">
+            <span id="accordion-icon" style="margin-right: 6px; font-family: monospace; color: #333;">▼</span>
+            <span>病患基本資料：</span>
+        </div>
+        <div class="accordion-content" id="accordion-content">
+            <!-- Combined Solid meta-box for LINE Name and Date -->
+            <div class="meta-box" style="flex-direction: column; align-items: stretch; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="meta-label">LINE 帳號：</span>
+                    <span class="meta-value">{{ uname }} ({{ uid }})</span>
+                </div>
+                <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="meta-label">出院日期：</span>
+                    <span id="display_discharge_date" class="meta-value"></span>
                 </div>
             </div>
-            
-            <div class="bottom-buttons-row">
-                <div class="hotspot bottom-btn" data-region="皮膚" data-position="bottom">皮膚</div>
-                <div class="hotspot bottom-btn" data-region="精神" data-position="bottom">精神</div>
-                <div class="hotspot bottom-btn" data-region="其他" data-position="bottom">其他</div>
+
+            <!-- User inputs with floating labels -->
+            <div class="floating-group">
+                <input type="text" id="medical_record_num" placeholder=" " required value="{{ prefill_record_num | default('') }}">
+                <label for="medical_record_num">病歷號</label>
             </div>
 
-            <div id="popover">
-                <div class="popover-content">
-                    <h4>
-                        <span id="popover-title">選擇衛教資料</span>
-                        <span class="close-btn" id="popover-close">✕</span>
-                    </h4>
-                    <div class="pop-checkbox-list" id="popover-checkboxes"></div>
+            <div class="floating-group" style="margin-bottom: 5px;">
+                <select id="doctor_id" required>
+                    <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %} hidden></option>
+                    {% for doc in doctors %}
+                        <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
+                    {% endfor %}
+                </select>
+                <label for="doctor_id">醫師帳號</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Divider between patient info and image section -->
+    <div style="height: 1px; background-color: #333; margin: 20px 0; opacity: 0.15;"></div>
+
+    
+    <div class="image-section" style="margin-bottom: 5px;">
+        <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
+        
+        <div class="confirmation-section" style="display: none; margin-bottom: 20px;">
+            <h3>已選擇的衛教資料確認清單：</h3>
+            <p id="empty-msg" style="display: none;">尚未選擇任何衛教資料</p>
+            <div class="chip-list" id="confirmed-list"></div>
+        </div>
+        
+        <div class="image-wrapper" id="image-wrapper">
+            <div class="interactive-layout">
+                <!-- Left Column: Human Body -->
+                <div class="body-column">
+                    <div class="image-container" id="body-image-container">
+                        <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+                        <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 15.97%; width: 38.27%; height: 11%;" title="頭"></div>
+                        <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 22.88%; width: 23.55%; height: 6%;" title="脖子"></div>
+                        <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 63.94%; width: 32.38%; height: 32%;" title="手"></div>
+                        <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 5.22%; width: 58.88%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+                        <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 2.13%; width: 64.77%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+                        <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 31.56%; width: 38.27%; height: 39%;" title="腳"></div>
+                    </div>
+                </div>
+
+                <!-- Middle Column: Popover -->
+                <div class="popover-column">
+                    <div id="popover">
+                        <div class="popover-content">
+                            <h4>
+                                <span id="popover-title">選擇衛教資料</span>
+                                <span class="close-btn" id="popover-close">✕</span>
+                            </h4>
+                            <div class="pop-checkbox-list" id="popover-checkboxes"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: 3 Buttons -->
+                <div class="buttons-column">
+                    <div class="hotspot bottom-btn btn-skin" data-region="皮膚" data-position="bottom">皮膚</div>
+                    <div class="hotspot bottom-btn btn-mental" data-region="精神" data-position="bottom">精神</div>
+                    <div class="hotspot bottom-btn btn-other" data-region="其他" data-position="bottom">其他</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="confirmation-section">
-        <h3>已選擇的衛教資料確認清單：</h3>
-        <p id="empty-msg">尚未選擇任何衛教資料</p>
-        <div class="chip-list" id="confirmed-list"></div>
-    </div>
-
     <button class="submit-btn" onclick="submitForm()">送出表單</button>
+
+    <!-- Confirmation Dialog Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3 class="modal-title">確認送出衛教表單</h3>
+            <div class="modal-body">
+                <div class="summary-item">
+                    <span class="summary-label">LINE 帳號</span>
+                    <span class="summary-value" id="summary-line-info"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">出院日期</span>
+                    <span class="summary-value" id="summary-discharge-date"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">病歷號</span>
+                    <span class="summary-value" id="summary-record-num"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">醫師帳號</span>
+                    <span class="summary-value" id="summary-doctor-id"></span>
+                </div>
+                <div class="summary-topics-section">
+                    <h4 class="summary-topics-title">已選衛教項目：</h4>
+                    <div class="summary-topics-list" id="summary-topics-list"></div>
+                </div>
+            </div>
+            <div style="color: #d9534f; font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 14px;">請確認資料無誤，送出後必須至後台修改。</div>
+            <div class="modal-footer">
+                <button class="modal-btn btn-cancel" onclick="closeConfirmModal()">取消</button>
+                <button class="modal-btn btn-confirm" onclick="executeSubmit()">確認送出</button>
+            </div>
+        </div>
+    </div>
 </div>
+{% endif %}
 
 <script>
-    document.getElementById('discharge_date').value = new Date().toISOString().split('T')[0];
+{% if not verified %}
+    // 監聽驗證碼輸入框的 Enter 鍵
+    document.getElementById('code').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // 防止網頁預設行為
+            const codeError = document.getElementById('code-error');
+            if (this.value.trim() === '') {
+                codeError.style.display = 'block'; // 顯示錯誤訊息
+            } else {
+                codeError.style.display = 'none'; // 隱藏錯誤訊息
+                document.getElementById('password').focus(); // 游標跳到密碼框
+            }
+        }
+    });
+
+    // 監聽密碼輸入框的 Enter 鍵
+    document.getElementById('password').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const passwordError = document.getElementById('password-error');
+            if (this.value.trim() === '') {
+                passwordError.style.display = 'block'; // 顯示錯誤訊息
+            } else {
+                passwordError.style.display = 'none'; 
+                submitVerify(); // 觸發登入按鈕的功能
+            }
+        }
+    });
+
+    // 當使用者開始打字時，自動隱藏紅色錯誤訊息，讓體驗更順暢
+    document.getElementById('code').addEventListener('input', function() {
+        document.getElementById('code-error').style.display = 'none';
+    });
+    document.getElementById('password').addEventListener('input', function() {
+        document.getElementById('password-error').style.display = 'none';
+    });
+
+    async function submitVerify() {
+        const code = document.getElementById('code').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const errorMsg = document.getElementById('error-msg');
+        const codeError = document.getElementById('code-error');
+        const passwordError = document.getElementById('password-error');
+
+        // 重置全局錯誤訊息
+        errorMsg.innerText = "";
+
+        // 點擊按鈕時，也檢查是否空白並顯示對應的紅字
+        let hasError = false;
+        if (!code) {
+            codeError.style.display = 'block';
+            hasError = true;
+        }
+        if (!password) {
+            passwordError.style.display = 'block';
+            hasError = true;
+        }
+        if (hasError) return; // 如果有空白就中斷送出   
+
+        if (!code || !password) {
+            errorMsg.innerText = "請填寫驗證碼與密碼";
+            return;
+        }
+
+        if (code.length !== 6 || isNaN(code)) {
+            errorMsg.style.color = "#d9534f";
+            errorMsg.innerText = "驗證碼必須是 6 位數字";
+            return;
+        }
+
+        errorMsg.style.color = "#333";
+        errorMsg.innerText = "驗證中，請稍候...";
+
+        try {
+            const response = await fetch('/api/verify_code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code: code,
+                    password: password
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                errorMsg.style.color = "#06C755";
+                errorMsg.innerText = "驗證成功！正在導向...";
+                window.location.href = result.redirect_url;
+            } else {
+                errorMsg.style.color = "#d9534f";
+                errorMsg.innerText = result.message;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            errorMsg.style.color = "#d9534f";
+            errorMsg.innerText = "系統連線錯誤，請檢查網路狀態";
+        }
+    }
+{% else %}
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('discharge_date').value = todayStr;
+    const displayDateEl = document.getElementById('display_discharge_date');
+    if (displayDateEl) {
+        displayDateEl.textContent = todayStr;
+    }
+
+    // Accordion Toggle Implementation
+    const accordionToggle = document.getElementById('accordion-toggle');
+    const accordionContent = document.getElementById('accordion-content');
+    const accordionIcon = document.getElementById('accordion-icon');
+    let accordionExpanded = true;
+
+    function toggleAccordion(expand) {
+        if (expand !== undefined) {
+            accordionExpanded = expand;
+        } else {
+            accordionExpanded = !accordionExpanded;
+        }
+        
+        if (accordionExpanded) {
+            accordionContent.classList.remove('collapsed');
+            accordionIcon.textContent = "▼";
+        } else {
+            accordionContent.classList.add('collapsed');
+            accordionIcon.textContent = "▶";
+        }
+    }
+
+    if (accordionToggle) {
+        accordionToggle.addEventListener('click', () => toggleAccordion());
+    }
 
     const topicMapping = {
         "頭": ["頭暈", "流鼻血", "發燒", "頭痛", "偏頭痛", "噁心嘔吐", "眩暈"],
@@ -433,6 +935,8 @@
     window.addEventListener('DOMContentLoaded', () => {
         if (selectedTopics.size > 0) {
             renderConfirmedChips(true);
+        } else {
+            document.querySelector('.confirmation-section').style.display = 'none';
         }
     });
 
@@ -445,6 +949,9 @@
     hotspots.forEach(spot => {
         spot.addEventListener('click', function(e) {
             e.stopPropagation();
+
+            // Auto collapse the patient basic info accordion on interaction below
+            toggleAccordion(false);
 
             const region = this.getAttribute('data-region');
 
@@ -481,16 +988,11 @@
     function closePopover() {
         popover.classList.remove('show');
         popover.style.display = 'none';
+        document.querySelector('.interactive-layout').classList.remove('popover-open');
+        document.querySelector('.interactive-layout').classList.remove('trigger-body');
+        document.querySelector('.interactive-layout').classList.remove('trigger-button');
         hotspots.forEach(s => s.classList.remove('active'));
         currentActiveRegion = null;
-
-        /* ==== 新增註解：核心修改 - 關閉時人體圖恢復中央位置，並還原層級 ==== */
-        const shiftContainer = document.getElementById('body-shift-container');
-        shiftContainer.classList.remove('shifted');
-        shiftContainer.style.zIndex = '2'; // 恢復預設層級
-
-        // 將 popover 元素歸位至最外層保持整潔
-        imageWrapper.appendChild(popover);
     }
 
     function showPopover(hotspotEl, region) {
@@ -523,111 +1025,61 @@
         }
 
         popover.style.display = 'block';
+        popover.offsetHeight; // Force reflow
         popover.classList.add('show');
-
-        /* ==== 新增註解：核心修改 - 呼叫定位與動畫控制 ==== */
-        positionPopoverAndTriggerShift(hotspotEl, region);
-    }
-
-    // 將原本的定位功能加上動畫控制
-    function positionPopoverAndTriggerShift(hotspotEl, region) {
-        // 動態移動 popover 確保定位準確
-        const shiftContainer = document.getElementById('body-shift-container');
-        const parentEl = hotspotEl.parentElement;
         
-        // 為了讓 popover 與熱區能同時往左偏移，若點擊身上熱區，需將 popover 放入滑動容器內
-        if (popover.parentElement !== parentEl) {
-            parentEl.appendChild(popover);
-        }
+        const layoutEl = document.querySelector('.interactive-layout');
+        const posType = hotspotEl.getAttribute('data-position'); // 'body' or 'bottom'
+        const isAlreadyOpen = layoutEl.classList.contains('popover-open');
+        const currentTriggerType = layoutEl.classList.contains('trigger-body') ? 'body' : (layoutEl.classList.contains('trigger-button') ? 'bottom' : null);
 
-        // ---- 動畫控制與層級設定 ----
-        const posType = hotspotEl.getAttribute('data-position');
-        
+        // Apply shift class and arrow direction based on trigger position
         if (posType === 'body') {
-            /* ==== 新增註解：核心修改 - 點擊身上熱區，觸發滑動，並拉高滑動容器層級以免 popover 被蓋住 ==== */
-            shiftContainer.classList.add('shifted');
-            shiftContainer.style.zIndex = '101'; // 拉到最上層
+            layoutEl.classList.add('trigger-body');
+            layoutEl.classList.remove('trigger-button');
+            popover.className = 'arrow-left show';
         } else {
-            /* ==== 新增註解：核心修改 - 點擊底部按鈕，還原滑動容器層級，以免滑動列蓋住下方按鈕的 popover ==== */
-            shiftContainer.classList.remove('shifted');
-            shiftContainer.style.zIndex = '2'; // 恢復原本層級
+            layoutEl.classList.add('trigger-button');
+            layoutEl.classList.remove('trigger-body');
+            popover.className = 'arrow-right show';
         }
-        // ---------------------------
+        layoutEl.classList.add('popover-open');
 
-        const spotLeft   = hotspotEl.offsetLeft;
-        const spotTop    = hotspotEl.offsetTop;
-        const spotW      = hotspotEl.offsetWidth;
-        const spotH      = hotspotEl.offsetHeight;
+        // Dynamically compute the arrow's top position and popover top alignment
+        const layoutRect = layoutEl.getBoundingClientRect();
+        const spotRect = hotspotEl.getBoundingClientRect();
+        const popoverRect = popover.getBoundingClientRect();
 
-        const popW = popover.offsetWidth  || 215;
-        const popH = popover.offsetHeight || 200;
-        const gap  = 10; 
+        const spotCenterY = (spotRect.top + spotRect.bottom) / 2 - layoutRect.top;
 
-        const spotRight   = spotLeft + spotW;
-        const spotCenterY = spotTop + spotH / 2;
+        // Vertically position the popover so its center aligns with target hotspot/button center
+        let popoverTop = spotCenterY - popoverRect.height / 2;
+        // Keep popover Top within layouts, leaving a 15px margin at the bottom to avoid closeness to submit button
+        const maxTop = layoutRect.height - popoverRect.height - 15;
+        popoverTop = Math.max(0, Math.min(popoverTop, maxTop));
+        
+        popover.style.position = 'absolute';
+        popover.style.top = popoverTop + 'px';
 
-        const parentW = parentEl.offsetWidth;
-        const parentH = parentEl.offsetHeight || imageWrapper.offsetHeight;
+        // Calculate and apply arrow vertical offset relative to popover
+        let arrowTop = spotCenterY - popoverTop;
+        arrowTop = Math.max(20, Math.min(arrowTop, popoverRect.height - 20));
+        popover.style.setProperty('--arrow-top', arrowTop + 'px');
 
-        let left, top, arrowClass;
+        // Calculate the left/right of the hotspot/button relative to layout (fully stationary)
+        let spotLeft = spotRect.left - layoutRect.left;
+        let spotRight = spotRect.right - layoutRect.left;
 
-        // 判斷是否為底部獨立按鈕，若是則將 popover 定位於其正上方
-        if (posType === 'bottom') {
-            top = spotTop - popH - gap;
-            left = spotLeft + (spotW / 2) - (popW / 2);
-            
-            // 邊界防護，避免超出版面
-            if (left < 0) left = 0;
-            if (left + popW > parentW) left = parentW - popW;
-
-            // 動態計算下方箭頭要對準的位置
-            let arrowOffset = spotLeft + (spotW / 2) - left;
-            popover.style.setProperty('--arrow-left', arrowOffset + 'px');
-            arrowClass = 'arrow-bottom';
+        // Dynamically position the popover horizontally to align arrow tip to hotspot/button edge
+        const popoverColumn = document.querySelector('.popover-column');
+        let popoverLeft = 0;
+        if (posType === 'body') {
+            popoverLeft = spotRight + 6;
         } else {
-            /* ==== 核心修改：修正電腦版「手」等偏右熱區的位置問題 ==== */
-            // 因為點擊身上熱區時，整體會向左位移 30% (-30%)，
-            // 代表畫面的右側「視覺上」會多出相對應的空間。
-            // 我們把這 30% 補償給空間計算邏輯，這樣電腦版就不會因為判定原本空間不夠而亂塞到左邊了！
-            let availableSpaceRight = parentW - spotRight;
-            if (posType === 'body') {
-                availableSpaceRight += parentW * 0.3;
-            }
-            
-            const spaceLeft = spotLeft;
-
-            // 用補償後的空間來判斷右邊夠不夠放
-            if (availableSpaceRight >= popW + gap) {
-                left = spotRight + gap;
-                arrowClass = 'arrow-left';
-            } else if (spaceLeft >= popW + gap) {
-                left = spotLeft - popW - gap;
-                arrowClass = 'arrow-right';
-            } else {
-                // 如果兩邊都不夠（如手機版），預設塞在右邊
-                left = spotRight + gap;
-                arrowClass = 'arrow-left';
-            }
-
-            top = spotCenterY - popH / 2;
-            top = Math.max(0, top);
-            if (top + popH > parentH) top = parentH - popH;
-            top = Math.max(0, top);
-
-            const arrowOffset = spotCenterY - top - 6; 
-            const clampedArrow = Math.max(20, Math.min(arrowOffset, popH - 30));
-            popover.style.setProperty('--arrow-top', clampedArrow + 'px');
+            popoverLeft = spotLeft - 226;
         }
-
-        popover.style.left = left + 'px';
-        popover.style.top  = top  + 'px';
-        popover.className  = 'show ' + arrowClass;
+        popoverColumn.style.left = popoverLeft + 'px';
     }
-
-    // 讓箭頭位置可由 JS 控制
-    const styleTag = document.createElement('style');
-    styleTag.textContent = `#popover::before { top: var(--arrow-top, 18px); }`;
-    document.head.appendChild(styleTag);
 
     // 同步更新打開中的 Popover Checkbox 勾選狀態
     function syncPopoverCheckboxes() {
@@ -675,6 +1127,13 @@
             });
         }
 
+        const confirmationSection = document.querySelector('.confirmation-section');
+        if (selectedTopics.size > 0) {
+            confirmationSection.style.display = 'block';
+        } else {
+            confirmationSection.style.display = 'none';
+        }
+
         if (confirmedList.children.length === 0) {
             emptyMsg.style.display = 'block';
         } else {
@@ -720,11 +1179,15 @@
         return div;
     }
 
-    async function submitForm() {
+    function submitForm() {
         const userName = document.getElementById('line_info').dataset.uname;
         const lineId = document.getElementById('line_info').dataset.uid;
         const medicalRecordNum = document.getElementById('medical_record_num').value.trim();
-        const doctorId = document.getElementById('doctor_id').value.trim();
+        
+        const doctorSelect = document.getElementById('doctor_id');
+        const doctorId = doctorSelect.value.trim();
+        const doctorName = doctorSelect.options[doctorSelect.selectedIndex].text;
+        
         const dischargeDate = document.getElementById('discharge_date').value;
 
         if (!medicalRecordNum || !doctorId || !dischargeDate) {
@@ -736,7 +1199,48 @@
             return;
         }
 
-        // 送出的資料絕對是實時、正確的，不受畫面上殘存灰色項目的影響
+        // Populate summary modal text values
+        document.getElementById('summary-line-info').textContent = `${userName} (${lineId})`;
+        document.getElementById('summary-discharge-date').textContent = dischargeDate;
+        document.getElementById('summary-record-num').textContent = medicalRecordNum;
+        document.getElementById('summary-doctor-id').textContent = doctorName;
+
+        // Populate summary topics list as chips
+        const topicsListEl = document.getElementById('summary-topics-list');
+        topicsListEl.innerHTML = '';
+        selectedTopics.forEach(topic => {
+            const chip = document.createElement('span');
+            chip.className = 'summary-chip';
+            chip.textContent = topic;
+            topicsListEl.appendChild(chip);
+        });
+
+        // Show confirmation modal
+        const modal = document.getElementById('confirm-modal');
+        modal.style.display = 'flex';
+        modal.offsetHeight; // Force reflow
+        modal.classList.add('show');
+    }
+
+    function closeConfirmModal() {
+        const modal = document.getElementById('confirm-modal');
+        modal.classList.remove('show');
+        setTimeout(() => {
+            if (!modal.classList.contains('show')) {
+                modal.style.display = 'none';
+            }
+        }, 300);
+    }
+
+    async function executeSubmit() {
+        closeConfirmModal();
+
+        const userName = document.getElementById('line_info').dataset.uname;
+        const lineId = document.getElementById('line_info').dataset.uid;
+        const medicalRecordNum = document.getElementById('medical_record_num').value.trim();
+        const doctorId = document.getElementById('doctor_id').value.trim();
+        const dischargeDate = document.getElementById('discharge_date').value;
+
         const submitData = {
             user_name: userName,
             line_id: lineId,
@@ -760,8 +1264,21 @@
             const data = await response.json();
             
             if (data.success) {
-                alert('表單送出成功並已儲存至資料庫！');
-                window.location.reload(); // 送出成功後重整頁面，清空表單
+                // 用動畫顯示送出成功畫面
+                document.querySelector('.container').innerHTML = `
+                    <div class="success-card" style="text-align: center; padding: 40px 20px; animation: popIn 0.5s ease-out;">
+                        <div class="success-icon-wrapper" style="margin-bottom: 25px;">
+                            <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" style="width: 80px; height: 80px; display: block; margin: 0 auto;">
+                                <circle cx="26" cy="26" r="25" fill="none" stroke="#06C755" stroke-width="3" style="stroke-dasharray: 166; stroke-dashoffset: 166; animation: strokeCircle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;"/>
+                                <path fill="none" stroke="#06C755" stroke-width="4" stroke-linecap="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" style="stroke-dasharray: 48; stroke-dashoffset: 48; animation: strokeCheck 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;"/>
+                            </svg>
+                        </div>
+                        <h3 style="color: #333; font-size: 22px; margin-bottom: 12px; font-weight: bold;">送出成功！</h3>
+                        <p style="color: #666; font-size: 16px; margin: 0; line-height: 1.5; font-weight: 500;">
+                            表單送出成功！請關閉此頁面。
+                        </p>
+                    </div>
+                `;
             } else {
                 alert('表單送出失敗：' + data.message);
             }
@@ -770,6 +1287,7 @@
             alert('系統發生錯誤，無法連線至伺服器送出表單。');
         }
     }
+{% endif %}
 </script>
 
 </body>

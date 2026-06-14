@@ -83,15 +83,16 @@
             display: flex;
             justify-content: space-between; /* Space out columns to edges */
             align-items: stretch; /* Make all columns equal height dynamically */
-            margin-top: 15px;
+            margin: 15px auto 0 auto;
             gap: 10px;
             width: 100%;
+            max-width: 500px; /* Centered and returned to original spacing scale */
             position: relative;
             padding: 0 5px; /* Small margin paced near edges */
             box-sizing: border-box;
         }
         .body-column {
-            flex: 0 0 180px; /* Fixed width for the human body image container */
+            flex: 0 0 140px; /* Returned to original width to restore height and alignment */
             position: relative;
         }
         .popover-column {
@@ -108,7 +109,7 @@
             transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .buttons-column {
-            flex: 0 0 100px; /* Spaced side buttons */
+            flex: 0 0 75px; /* Increased width by 50% */
             position: relative;
         }
         
@@ -135,13 +136,13 @@
             position: absolute !important;
             width: 100% !important; /* stretch to fill buttons-column width */
             height: auto !important;
-            padding: 8px 12px;
-            border-radius: 20px;
+            padding: 7px 9px; /* Increased vertical/horizontal padding by 50% */
+            border-radius: 21px; /* Increased border radius by 50% */
             background-color: rgba(6, 199, 85, 0.1);
             color: #05883b;
             font-weight: bold;
-            font-size: 15px;
-            border: 2px solid #06C755;
+            font-size: 16px; /* Increased font size by ~50% */
+            border: 2px solid #06C755; /* Increased border width */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -530,36 +531,36 @@
             background-color: #f5f6f7;
             border-left: 4px solid #06C755;
             border-radius: 6px;
-            padding: 12px 16px;
-            margin-bottom: 12px;
+            padding: 6px 16px; /* Reduced vertical padding by 50% */
+            margin-bottom: 10px;
             box-sizing: border-box;
         }
         .meta-label {
             font-weight: bold;
             color: #666;
             margin-right: 8px;
-            font-size: 14px;
+            font-size: 13px;
         }
         .meta-value {
             color: #333;
             font-weight: 600;
-            font-size: 15px;
+            font-size: 13px;
         }
 
         /* Floating label form control group */
         .floating-group {
             position: relative;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
             width: 100%;
         }
         .floating-group input,
         .floating-group select {
             width: 100%;
-            height: 52px;
-            padding: 20px 12px 6px 12px;
+            height: 40px; /* Reduced height by 30% */
+            padding: 10px 10px 2px 10px; /* Reduced vertical padding by 50% */
             border: 1px solid #ccc;
             border-radius: 6px;
-            font-size: 16px;
+            font-size: 14px;
             outline: none;
             background: #fff;
             box-sizing: border-box;
@@ -572,24 +573,39 @@
         }
         .floating-group label {
             position: absolute;
-            left: 12px;
+            left: 10px;
             top: 50%;
             transform: translateY(-50%);
             color: #999;
-            font-size: 16px;
+            font-size: 14px;
             pointer-events: none;
             transition: 0.2s ease all;
-            background-color: transparent;
+            background-color: #fff;
         }
         /* Float the label when input is focused, placeholder is not shown, or select is valid */
         .floating-group input:focus ~ label,
         .floating-group input:not(:placeholder-shown) ~ label,
         .floating-group select:focus ~ label,
         .floating-group select:valid ~ label {
-            top: 14px;
-            font-size: 11px;
+            top: 0px;
+            font-size: 10px;
             color: #06C755;
             font-weight: bold;
+        }
+
+        /* Collapsible accordion content styles to prevent any seams when collapsed */
+        .accordion-content {
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, margin-top 0.3s ease-out, padding 0.3s ease-out;
+            margin-top: 10px;
+            padding: 2px;
+        }
+        .accordion-content.collapsed {
+            max-height: 0 !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
         }
     </style>
 </head>
@@ -617,40 +633,55 @@
 {% else %}
 <div class="container">
     <h2>病患衛教表單</h2>
-    <div style="height: 2px; background: linear-gradient(to right, #06C755, #bce3c9); margin-top: 10px; margin-bottom: 25px; border-radius: 2px;"></div>
+    <div style="height: 2px; background-color: #333; margin-top: 10px; margin-bottom: 25px; border-radius: 2px;"></div>
 
     <!-- Hidden fields to preserve JS compatibility -->
     <input type="hidden" id="line_info" value="{{ uname }} ({{ uid }})" data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'>
     <input type="hidden" id="discharge_date">
 
-    <!-- Solid meta-boxes for display of immutable fields -->
-    <div class="meta-box">
-        <span class="meta-label">LINE 帳號：</span>
-        <span class="meta-value">{{ uname }} ({{ uid }})</span>
-    </div>
-    <div class="meta-box" style="margin-bottom: 20px;">
-        <span class="meta-label">出院日期：</span>
-        <span id="display_discharge_date" class="meta-value"></span>
+    <!-- Collapsible accordion containing patient info meta-box and text fields -->
+    <div class="accordion-container" style="margin-bottom: 20px;">
+        <div class="accordion-header" id="accordion-toggle" style="display: flex; align-items: center; cursor: pointer; user-select: none; font-weight: bold; color: #333; font-size: 15px; padding: 5px 0;">
+            <span id="accordion-icon" style="margin-right: 6px; font-family: monospace; color: #333;">▼</span>
+            <span>病患基本資料：</span>
+        </div>
+        <div class="accordion-content" id="accordion-content">
+            <!-- Combined Solid meta-box for LINE Name and Date -->
+            <div class="meta-box" style="flex-direction: column; align-items: stretch; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="meta-label">LINE 帳號：</span>
+                    <span class="meta-value">{{ uname }} ({{ uid }})</span>
+                </div>
+                <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="meta-label">出院日期：</span>
+                    <span id="display_discharge_date" class="meta-value"></span>
+                </div>
+            </div>
+
+            <!-- User inputs with floating labels -->
+            <div class="floating-group">
+                <input type="text" id="medical_record_num" placeholder=" " required value="{{ prefill_record_num | default('') }}">
+                <label for="medical_record_num">病歷號</label>
+            </div>
+
+            <div class="floating-group" style="margin-bottom: 5px;">
+                <select id="doctor_id" required>
+                    <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %} hidden></option>
+                    {% for doc in doctors %}
+                        <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
+                    {% endfor %}
+                </select>
+                <label for="doctor_id">醫師帳號</label>
+            </div>
+        </div>
     </div>
 
-    <!-- User inputs with floating labels, each on separate lines -->
-    <div class="floating-group">
-        <input type="text" id="medical_record_num" placeholder=" " required value="{{ prefill_record_num | default('') }}">
-        <label for="medical_record_num">病歷號</label>
-    </div>
-
-    <div class="floating-group">
-        <select id="doctor_id" required>
-            <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %} hidden></option>
-            {% for doc in doctors %}
-                <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
-            {% endfor %}
-        </select>
-        <label for="doctor_id">醫師帳號</label>
-    </div>
+    <!-- Divider between patient info and image section -->
+    <div style="height: 1px; background-color: #333; margin: 20px 0; opacity: 0.15;"></div>
 
     
-    <div class="image-section">
+    <div class="image-section" style="margin-bottom: 5px;">
         <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
         
         <div class="confirmation-section" style="display: none; margin-bottom: 20px;">
@@ -665,12 +696,12 @@
                 <div class="body-column">
                     <div class="image-container" id="body-image-container">
                         <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
-                        <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 36.19%; width: 29.06%; height: 11%;" title="頭"></div>
-                        <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 41.44%; width: 17.88%; height: 6%;" title="脖子"></div>
-                        <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 72.62%; width: 24.59%; height: 32%;" title="手"></div>
-                        <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 28.03%; width: 44.71%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
-                        <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 25.68%; width: 49.18%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
-                        <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 48.03%; width: 29.06%; height: 39%;" title="腳"></div>
+                        <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 15.97%; width: 38.27%; height: 11%;" title="頭"></div>
+                        <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 22.88%; width: 23.55%; height: 6%;" title="脖子"></div>
+                        <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 63.94%; width: 32.38%; height: 32%;" title="手"></div>
+                        <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 5.22%; width: 58.88%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+                        <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 2.13%; width: 64.77%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+                        <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 31.56%; width: 38.27%; height: 39%;" title="腳"></div>
                     </div>
                 </div>
 
@@ -845,6 +876,32 @@
         displayDateEl.textContent = todayStr;
     }
 
+    // Accordion Toggle Implementation
+    const accordionToggle = document.getElementById('accordion-toggle');
+    const accordionContent = document.getElementById('accordion-content');
+    const accordionIcon = document.getElementById('accordion-icon');
+    let accordionExpanded = true;
+
+    function toggleAccordion(expand) {
+        if (expand !== undefined) {
+            accordionExpanded = expand;
+        } else {
+            accordionExpanded = !accordionExpanded;
+        }
+        
+        if (accordionExpanded) {
+            accordionContent.classList.remove('collapsed');
+            accordionIcon.textContent = "▼";
+        } else {
+            accordionContent.classList.add('collapsed');
+            accordionIcon.textContent = "▶";
+        }
+    }
+
+    if (accordionToggle) {
+        accordionToggle.addEventListener('click', () => toggleAccordion());
+    }
+
     const topicMapping = {
         "頭": ["頭暈", "流鼻血", "發燒", "頭痛", "偏頭痛", "噁心嘔吐", "眩暈"],
         "脖子": ["咳嗽", "咳血", "打嗝"],
@@ -892,6 +949,9 @@
     hotspots.forEach(spot => {
         spot.addEventListener('click', function(e) {
             e.stopPropagation();
+
+            // Auto collapse the patient basic info accordion on interaction below
+            toggleAccordion(false);
 
             const region = this.getAttribute('data-region');
 

@@ -1,17 +1,17 @@
 {
     "metadata": {
         "medical_record_num": "P2026001",
-        "session_date": "2026-05-21",
+        "session_date": "2026-06-14",
         "session_sequence": null,
         "message_count": 1,
-        "start_time": "2026-05-21T21:58:00+08:00",
-        "end_time": "2026-05-21T21:58:00+08:00"
+        "start_time": "2026-06-14T21:58:00+08:00",
+        "end_time": "2026-06-14T21:58:00+08:00"
     },
     "messages": [
         {
             "role": "user",
             "content": "今天傍晚測試：我的驗證碼好像過期了。",
-            "timestamp": "2026-05-21T21:58:00+08:00"
+            "timestamp": "2026-06-14T21:58:00+08:00"
         }
     ]
 }

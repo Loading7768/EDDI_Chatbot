@@ -81,26 +81,25 @@
         /* 3-column Interactive Layout */
         .interactive-layout {
             display: flex;
-            justify-content: center; /* Center body and buttons when popover is closed */
+            justify-content: space-between; /* Space out columns to edges */
             align-items: stretch; /* Make all columns equal height dynamically */
             margin-top: 15px;
-            gap: 15px;
+            gap: 10px;
             width: 100%;
             position: relative;
+            padding: 0 5px; /* Small margin paced near edges */
+            box-sizing: border-box;
         }
         .body-column {
             flex: 0 0 180px; /* Fixed width for the human body image container */
             position: relative;
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .popover-column {
             /* Now absolute-positioned to display between body and buttons when open */
             position: absolute;
-            left: 50%;
             top: 0;
             bottom: 0;
             width: 220px;
-            transform: translateX(-50%);
             display: flex;
             justify-content: center;
             align-items: flex-start; /* positioned dynamically in JS */
@@ -111,23 +110,6 @@
         .buttons-column {
             flex: 0 0 100px; /* Spaced side buttons */
             position: relative;
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-        
-        /* Shifts when popover is open */
-        .interactive-layout.popover-open .body-column {
-            transform: translateX(-110px);
-        }
-        .interactive-layout.popover-open .buttons-column {
-            transform: translateX(110px);
-        }
-
-        /* Sway direction tweaks to move popover closer to active column */
-        .interactive-layout.trigger-body .popover-column {
-            left: calc(50% - 20px);
-        }
-        .interactive-layout.trigger-button .popover-column {
-            left: calc(50% + 30px);
         }
         
         /* 熱區圓圈 */
@@ -210,6 +192,7 @@
         #popover {
             display: none;
             position: absolute; /* absolute inside popover-column */
+            left: 0;
             width: 220px;
             z-index: 100;
             opacity: 0;
@@ -317,6 +300,7 @@
             border: 1px solid #bce3c9;
         }
         .confirmation-section h3 {
+            text-align: left;
             margin-top: 0;
             color: #05883b;
             font-size: 16px;
@@ -537,6 +521,76 @@
                 stroke-dashoffset: 0;
             }
         }
+
+        /* Solid meta-box styles for immutable fields */
+        .meta-box {
+            display: flex;
+            justify-content: space-between; /* Align value to the right */
+            align-items: center;
+            background-color: #f5f6f7;
+            border-left: 4px solid #06C755;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+        .meta-label {
+            font-weight: bold;
+            color: #666;
+            margin-right: 8px;
+            font-size: 14px;
+        }
+        .meta-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        /* Floating label form control group */
+        .floating-group {
+            position: relative;
+            margin-bottom: 18px;
+            width: 100%;
+        }
+        .floating-group input,
+        .floating-group select {
+            width: 100%;
+            height: 52px;
+            padding: 20px 12px 6px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            outline: none;
+            background: #fff;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .floating-group input:focus,
+        .floating-group select:focus {
+            border-color: #06C755;
+            box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.15);
+        }
+        .floating-group label {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 16px;
+            pointer-events: none;
+            transition: 0.2s ease all;
+            background-color: transparent;
+        }
+        /* Float the label when input is focused, placeholder is not shown, or select is valid */
+        .floating-group input:focus ~ label,
+        .floating-group input:not(:placeholder-shown) ~ label,
+        .floating-group select:focus ~ label,
+        .floating-group select:valid ~ label {
+            top: 14px;
+            font-size: 11px;
+            color: #06C755;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -563,35 +617,36 @@
 {% else %}
 <div class="container">
     <h2>病患衛教表單</h2>
+    <div style="height: 2px; background: linear-gradient(to right, #06C755, #bce3c9); margin-top: 10px; margin-bottom: 25px; border-radius: 2px;"></div>
 
-    <div class="form-row">
-        <div class="form-group">
-            <label for="line_info">LINE 帳號</label>
-            <input type="text" id="line_info" value="{{ uname }} ({{ uid }})" readonly 
-                   data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'
-                   style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
-        </div>
-        <div class="form-group">
-            <label for="discharge_date">出院日期</label>
-            <input type="date" id="discharge_date" readonly 
-                   style="background-color: #f0f0f0; color: #555; cursor: not-allowed; border: 1px solid #ddd;">
-        </div>
+    <!-- Hidden fields to preserve JS compatibility -->
+    <input type="hidden" id="line_info" value="{{ uname }} ({{ uid }})" data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'>
+    <input type="hidden" id="discharge_date">
+
+    <!-- Solid meta-boxes for display of immutable fields -->
+    <div class="meta-box">
+        <span class="meta-label">LINE 帳號：</span>
+        <span class="meta-value">{{ uname }} ({{ uid }})</span>
+    </div>
+    <div class="meta-box" style="margin-bottom: 20px;">
+        <span class="meta-label">出院日期：</span>
+        <span id="display_discharge_date" class="meta-value"></span>
     </div>
 
-    <div class="form-row">
-        <div class="form-group">
-            <label for="medical_record_num">病歷號</label>
-            <input type="text" id="medical_record_num" placeholder="請輸入病歷號" required value="{{ prefill_record_num | default('') }}">
-        </div>
-        <div class="form-group">
-            <label for="doctor_id">醫師帳號</label>
-            <select id="doctor_id" required>
-                <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %}>請選擇醫師</option>
-                {% for doc in doctors %}
-                    <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+    <!-- User inputs with floating labels, each on separate lines -->
+    <div class="floating-group">
+        <input type="text" id="medical_record_num" placeholder=" " required value="{{ prefill_record_num | default('') }}">
+        <label for="medical_record_num">病歷號</label>
+    </div>
+
+    <div class="floating-group">
+        <select id="doctor_id" required>
+            <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %} hidden></option>
+            {% for doc in doctors %}
+                <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
+            {% endfor %}
+        </select>
+        <label for="doctor_id">醫師帳號</label>
     </div>
 
     
@@ -783,7 +838,12 @@
         }
     }
 {% else %}
-    document.getElementById('discharge_date').value = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('discharge_date').value = todayStr;
+    const displayDateEl = document.getElementById('display_discharge_date');
+    if (displayDateEl) {
+        displayDateEl.textContent = todayStr;
+    }
 
     const topicMapping = {
         "頭": ["頭暈", "流鼻血", "發燒", "頭痛", "偏頭痛", "噁心嘔吐", "眩暈"],
@@ -909,6 +969,20 @@
         popover.classList.add('show');
         
         const layoutEl = document.querySelector('.interactive-layout');
+        const posType = hotspotEl.getAttribute('data-position'); // 'body' or 'bottom'
+        const isAlreadyOpen = layoutEl.classList.contains('popover-open');
+        const currentTriggerType = layoutEl.classList.contains('trigger-body') ? 'body' : (layoutEl.classList.contains('trigger-button') ? 'bottom' : null);
+
+        // Apply shift class and arrow direction based on trigger position
+        if (posType === 'body') {
+            layoutEl.classList.add('trigger-body');
+            layoutEl.classList.remove('trigger-button');
+            popover.className = 'arrow-left show';
+        } else {
+            layoutEl.classList.add('trigger-button');
+            layoutEl.classList.remove('trigger-body');
+            popover.className = 'arrow-right show';
+        }
         layoutEl.classList.add('popover-open');
 
         // Dynamically compute the arrow's top position and popover top alignment
@@ -920,7 +994,8 @@
 
         // Vertically position the popover so its center aligns with target hotspot/button center
         let popoverTop = spotCenterY - popoverRect.height / 2;
-        const maxTop = layoutRect.height - popoverRect.height;
+        // Keep popover Top within layouts, leaving a 15px margin at the bottom to avoid closeness to submit button
+        const maxTop = layoutRect.height - popoverRect.height - 15;
         popoverTop = Math.max(0, Math.min(popoverTop, maxTop));
         
         popover.style.position = 'absolute';
@@ -931,19 +1006,19 @@
         arrowTop = Math.max(20, Math.min(arrowTop, popoverRect.height - 20));
         popover.style.setProperty('--arrow-top', arrowTop + 'px');
 
-        // Apply shift class and arrow direction based on trigger position
-        const posType = hotspotEl.getAttribute('data-position');
+        // Calculate the left/right of the hotspot/button relative to layout (fully stationary)
+        let spotLeft = spotRect.left - layoutRect.left;
+        let spotRight = spotRect.right - layoutRect.left;
+
+        // Dynamically position the popover horizontally to align arrow tip to hotspot/button edge
+        const popoverColumn = document.querySelector('.popover-column');
+        let popoverLeft = 0;
         if (posType === 'body') {
-            layoutEl.classList.add('trigger-body');
-            layoutEl.classList.remove('trigger-button');
-            popover.classList.add('arrow-left');
-            popover.classList.remove('arrow-right');
+            popoverLeft = spotRight + 6;
         } else {
-            layoutEl.classList.add('trigger-button');
-            layoutEl.classList.remove('trigger-body');
-            popover.classList.add('arrow-right');
-            popover.classList.remove('arrow-left');
+            popoverLeft = spotLeft - 226;
         }
+        popoverColumn.style.left = popoverLeft + 'px';
     }
 
     // 同步更新打開中的 Popover Checkbox 勾選狀態

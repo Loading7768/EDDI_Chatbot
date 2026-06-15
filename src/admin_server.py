@@ -24,6 +24,28 @@ DB_PATIENT = os.path.join(BASE_DIR, 'database', 'patient.db')
 DB_FORM    = os.path.join(BASE_DIR, 'database', 'form.db')
 
 
+def migrate_doctor_db():
+    if not os.path.exists(DB_DOCTOR):
+        return
+    try:
+        conn = sqlite3.connect(DB_DOCTOR)
+        c = conn.cursor()
+        # 檢查 DOCTOR 表中是否存在 specialty 欄位
+        c.execute("PRAGMA table_info(DOCTOR)")
+        columns = [col[1] for col in c.fetchall()]
+        if 'specialty' not in columns:
+            print("[Migration] 偵測到舊資料庫，為 DOCTOR 資料表新增 specialty 欄位...")
+            c.execute("ALTER TABLE DOCTOR ADD COLUMN specialty TEXT")
+            c.execute("UPDATE DOCTOR SET specialty = '急診科'")
+            conn.commit()
+            print("[Migration] 資料庫遷移成功！")
+        conn.close()
+    except Exception as e:
+        print(f"[Migration] doctor.db 自動遷移失敗: {e}")
+
+migrate_doctor_db()
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def hash_pw(pw: str) -> str:
@@ -129,7 +151,7 @@ def load_sessions_for_mrn(mrn: str) -> list:
             
             # 建立易讀的 label
             if filename == 'active_session.json':
-                label = f"進行中對話 ({parsed_start})" if parsed_start else "進行中對話"
+                label = f"最後一次對話 ({parsed_start})" if parsed_start else "最後一次對話"
             else:
                 session_date = meta.get('session_date', '')
                 session_seq = meta.get('session_sequence', '')
@@ -338,19 +360,23 @@ def get_chats():
     try:
         conn_f = get_db(DB_FORM)
         conn_p = get_db(DB_PATIENT)
+        conn_d = get_db(DB_DOCTOR)
+
+        # 取得所有醫生帳號與科別的對照表
+        doctor_rows = conn_d.execute('SELECT account_name, specialty FROM DOCTOR').fetchall()
+        doc_specialties = {row['account_name']: row['specialty'] for row in doctor_rows}
+        conn_d.close()
 
         if is_admin:
             rows = conn_f.execute(
-                'SELECT medical_record_num, MIN(checkout_date) AS first_visit, '
-                'COUNT(*) AS form_count FROM FORM '
-                'GROUP BY medical_record_num ORDER BY first_visit DESC'
+                'SELECT medical_record_num, COUNT(*) AS form_count FROM FORM '
+                'GROUP BY medical_record_num'
             ).fetchall()
         else:
             rows = conn_f.execute(
-                'SELECT medical_record_num, MIN(checkout_date) AS first_visit, '
-                'COUNT(*) AS form_count FROM FORM '
+                'SELECT medical_record_num, COUNT(*) AS form_count FROM FORM '
                 'WHERE doctor_account = ? '
-                'GROUP BY medical_record_num ORDER BY first_visit DESC',
+                'GROUP BY medical_record_num',
                 (account,)
             ).fetchall()
 
@@ -360,15 +386,27 @@ def get_chats():
             patient = conn_p.execute(
                 'SELECT line_id FROM PATIENT WHERE medical_record_num = ?', (mrn,)
             ).fetchone()
+            
+            # 取得最新一筆就診紀錄，獲取出院日期與醫師帳號
+            latest_form = conn_f.execute(
+                'SELECT doctor_account, checkout_date FROM FORM WHERE medical_record_num = ? '
+                'ORDER BY checkout_date DESC LIMIT 1', (mrn,)
+            ).fetchone()
+
             chat_stats = get_chat_stats_for_mrn(mrn)
+            
+            doctor_account = latest_form['doctor_account'] if latest_form else None
+            specialty = doc_specialties.get(doctor_account, '急診科')
+
             result.append({
                 'medical_record_num': mrn,
                 'line_id':            patient['line_id'] if patient else None,
                 'form_count':         row['form_count'],
-                'is_return':          row['form_count'] > 1,
                 'msg_count':          chat_stats['msg_count'],
                 'has_logs':           chat_stats['msg_count'] > 0,
                 'last_chat':          chat_stats['last_chat'],
+                'latest_checkout':    latest_form['checkout_date'] if latest_form else None,
+                'specialty':          specialty,
             })
 
         conn_f.close()
@@ -411,6 +449,12 @@ def get_chat_detail(mrn: str):
     ).fetchall()
     conn_f.close()
 
+    # 取得醫生科別對照表
+    conn_d = get_db(DB_DOCTOR)
+    doctor_rows = conn_d.execute('SELECT account_name, specialty FROM DOCTOR').fetchall()
+    doc_specialties = {row['account_name']: row['specialty'] for row in doctor_rows}
+    conn_d.close()
+
     # 從 JSON 檔讀取聊天訊息（分開成多個 sessions）
     sessions_list = load_sessions_for_mrn(mrn)
 
@@ -418,6 +462,7 @@ def get_chat_detail(mrn: str):
         {
             'medical_record_num': r['medical_record_num'],
             'doctor_account':     r['doctor_account'],
+            'specialty':          doc_specialties.get(r['doctor_account'], '急診科'),
             'checkout_date':      r['checkout_date'],
             'symptoms':           json.loads(r['symptoms']) if r['symptoms'] else [],
             'is_chatted':         bool(r['is_chatted']) if 'is_chatted' in r.keys() else False,
@@ -525,7 +570,7 @@ def list_doctors():
         # 2. 查詢 doctor.db，取得所有醫師資料
         conn = get_db(DB_DOCTOR)
         rows = conn.execute(
-            'SELECT account_name, doctor_name, is_active, is_admin FROM DOCTOR '
+            'SELECT account_name, doctor_name, is_active, is_admin, specialty FROM DOCTOR '
             'ORDER BY is_admin DESC, account_name'
         ).fetchall()
         conn.close()
@@ -550,9 +595,13 @@ def create_doctor():
     name = data.get('doctor_name', '').strip()
     active = int(data.get('is_active', 1))
     admin = int(data.get('is_admin', 0))
+    specialty = data.get('specialty', '').strip()
 
     if not account or not name:
         return jsonify({'error': '請填寫帳號與姓名'}), 400
+
+    if not specialty:
+        specialty = '急診科'
 
     # 驗證帳號格式 (僅限英數字與底線)
     if not all(c.isalnum() or c == '_' for c in account):
@@ -570,9 +619,9 @@ def create_doctor():
         hashed = hash_pw(generated_password)
         
         conn.execute(
-            'INSERT INTO DOCTOR (account_name, password_hash, doctor_name, is_active, is_admin) '
-            'VALUES (?, ?, ?, ?, ?)',
-            (account, hashed, name, active, admin)
+            'INSERT INTO DOCTOR (account_name, password_hash, doctor_name, is_active, is_admin, specialty) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            (account, hashed, name, active, admin, specialty)
         )
         conn.commit()
         conn.close()
@@ -626,19 +675,20 @@ def update_doctor(account: str):
     new_doctor_name = data.get('doctor_name', row['doctor_name'])
     new_is_active   = int(data.get('is_active', row['is_active']))
     new_is_admin    = int(data.get('is_admin',  row['is_admin']))
+    new_specialty   = data.get('specialty', row['specialty'])
     new_password    = data.get('new_password', '').strip()
 
     try:
         if new_password:
             conn.execute(
-                'UPDATE DOCTOR SET doctor_name=?, is_active=?, is_admin=?, password_hash=? '
+                'UPDATE DOCTOR SET doctor_name=?, is_active=?, is_admin=?, specialty=?, password_hash=? '
                 'WHERE account_name=?',
-                (new_doctor_name, new_is_active, new_is_admin, hash_pw(new_password), account)
+                (new_doctor_name, new_is_active, new_is_admin, new_specialty, hash_pw(new_password), account)
             )
         else:
             conn.execute(
-                'UPDATE DOCTOR SET doctor_name=?, is_active=?, is_admin=? WHERE account_name=?',
-                (new_doctor_name, new_is_active, new_is_admin, account)
+                'UPDATE DOCTOR SET doctor_name=?, is_active=?, is_admin=?, specialty=? WHERE account_name=?',
+                (new_doctor_name, new_is_active, new_is_admin, new_specialty, account)
             )
         conn.commit()
         conn.close()

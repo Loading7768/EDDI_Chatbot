@@ -28,17 +28,18 @@ def init_doctor_db():
             password_hash TEXT    NOT NULL,
             doctor_name   TEXT    NOT NULL,
             is_active     INTEGER NOT NULL DEFAULT 1,
-            is_admin      INTEGER NOT NULL DEFAULT 0
+            is_admin      INTEGER NOT NULL DEFAULT 0,
+            specialty     TEXT    NOT NULL
         )
     ''')
     doctors = [
-        ('admin',   hash_pw('admin123'), '管理員',      1, 1),
-        ('dr_wang', hash_pw('wang123'),  '王大明 醫師', 1, 0),
-        ('dr_li',   hash_pw('li123'),    '李小華 醫師', 1, 0),
+        ('admin',   hash_pw('admin123'), '管理員',      1, 1, '急診科'),
+        ('dr_wang', hash_pw('wang123'),  '王大明 醫師', 1, 0, '急診科'),
+        ('dr_li',   hash_pw('li123'),    '李小華 醫師', 1, 0, '急診科'),
     ]
     c.executemany(
         'INSERT INTO DOCTOR '
-        '(account_name, password_hash, doctor_name, is_active, is_admin) VALUES (?,?,?,?,?)',
+        '(account_name, password_hash, doctor_name, is_active, is_admin, specialty) VALUES (?,?,?,?,?,?)',
         doctors
     )
     conn.commit()

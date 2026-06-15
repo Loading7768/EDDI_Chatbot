@@ -16,6 +16,7 @@ BASE_DIR     = os.path.dirname(SRC_DIR)
 
 WEBPAGE_DIR   = os.path.join(BASE_DIR, 'webpage')
 PROMPT_FILE   = os.path.join(BASE_DIR, 'assets', 'prompt.md')
+PROMPT_BACKUP_FILE = os.path.join(BASE_DIR, 'assets', 'prompt_backup.md')
 STATS_CACHE   = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
 CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
 
@@ -716,7 +717,11 @@ def get_prompt():
             else:
                 with open(PROMPT_FILE, 'r', encoding='latin-1') as f:
                     content = f.read()
-        return jsonify({'content': content, 'path': PROMPT_FILE})
+        return jsonify({
+            'content': content,
+            'path': PROMPT_FILE,
+            'has_prev': os.path.exists(PROMPT_BACKUP_FILE)
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -728,12 +733,50 @@ def save_prompt():
     content = data.get('content', '')
     try:
         os.makedirs(os.path.dirname(PROMPT_FILE), exist_ok=True)
+        # 如果舊 prompt 存在，先將其讀出備份
+        if os.path.exists(PROMPT_FILE):
+            try:
+                # 嘗試以 utf-8 讀取
+                with open(PROMPT_FILE, 'r', encoding='utf-8') as f:
+                    old_content = f.read()
+                # 寫入備份檔
+                with open(PROMPT_BACKUP_FILE, 'w', encoding='utf-8') as f:
+                    f.write(old_content)
+            except Exception as e:
+                print(f"[Backup] 備份舊 prompt.md 失敗: {e}")
+
         with open(PROMPT_FILE, 'w', encoding='utf-8') as f:
             f.write(content)
         return jsonify({
             'success':  True,
             'saved_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'path':     PROMPT_FILE,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/prompt/rollback', methods=['POST'])
+@admin_required
+def rollback_prompt():
+    try:
+        if not os.path.exists(PROMPT_BACKUP_FILE):
+            return jsonify({'error': '找不到上一個版本的 Prompt 備份'}), 404
+        
+        # 讀取備份內容
+        with open(PROMPT_BACKUP_FILE, 'r', encoding='utf-8') as f:
+            backup_content = f.read()
+            
+        # 寫回主要檔案
+        with open(PROMPT_FILE, 'w', encoding='utf-8') as f:
+            f.write(backup_content)
+            
+        # 刪除備份檔
+        os.remove(PROMPT_BACKUP_FILE)
+        
+        return jsonify({
+            'success': True,
+            'saved_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

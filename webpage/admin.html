@@ -431,6 +431,18 @@
       max-width: 320px;
       margin: 0 auto;
   }
+  /* 人體圖片與互動區塊設定 */
+  .image-section {
+      margin-top: 30px;
+      text-align: center;
+  }
+  .image-wrapper {
+      position: relative;
+      display: block;
+      width: 100%;
+      max-width: 550px;
+      margin: 0 auto;
+  }
   .image-container {
       position: relative;
       display: inline-block;
@@ -442,15 +454,38 @@
       border-radius: 8px;
   }
   
-  .shiftable-container {
-      position: relative;
+  /* 3-column Interactive Layout */
+  .interactive-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      margin: 15px auto 0 auto;
+      gap: 10px;
       width: 100%;
-      transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-      transform: translateX(0%);
-      z-index: 2;
+      max-width: 500px;
+      position: relative;
+      padding: 0 5px;
+      box-sizing: border-box;
   }
-  .shiftable-container.shifted {
-      transform: translateX(-20%);
+  .body-column {
+      flex: 0 0 140px;
+      position: relative;
+  }
+  .popover-column {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 220px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 100;
+      transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  .buttons-column {
+      flex: 0 0 75px;
+      position: relative;
   }
   
   /* 熱區圓圈 */
@@ -471,47 +506,82 @@
       z-index: 10;
   }
 
-  .bottom-buttons-row {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 15px;
-      position: relative;
-      z-index: 3;
-  }
+  /* 底層類 Chip 型按鈕樣式 */
   .bottom-btn {
-      position: relative !important;
-      top: auto !important; left: auto !important;
-      width: auto !important; height: auto !important;
-      padding: 6px 16px;
-      border-radius: 20px;
+      position: absolute !important;
+      width: 100% !important;
+      height: auto !important;
+      padding: 7px 9px;
+      border-radius: 21px;
       background-color: rgba(6, 199, 85, 0.1);
       color: #05883b;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 16px;
       border: 2px solid #06C755;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-sizing: border-box;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s, transform 0.2s;
   }
-  .bottom-btn:hover, .bottom-btn.active {
+  
+  /* Specific vertical alignments */
+  .btn-skin {
+      top: 25% !important;
+      left: 0 !important;
+      transform: translateY(-50%) !important;
+  }
+  .btn-mental {
+      top: 50% !important;
+      left: 0 !important;
+      transform: translateY(-50%) !important;
+  }
+  .btn-other {
+      top: 75% !important;
+      left: 0 !important;
+      transform: translateY(-50%) !important;
+  }
+
+  .btn-skin:hover, .btn-skin.active {
       background-color: #06C755;
       color: white;
       border-width: 2px;
-      transform: translateY(-2px);
+      transform: translateY(-50%) scale(1.05) !important;
+  }
+  .btn-mental:hover, .btn-mental.active {
+      background-color: #06C755;
+      color: white;
+      border-width: 2px;
+      transform: translateY(-50%) scale(1.05) !important;
+  }
+  .btn-other:hover, .btn-other.active {
+      background-color: #06C755;
+      color: white;
+      border-width: 2px;
+      transform: translateY(-50%) scale(1.05) !important;
   }
 
-  /* Popover */
+  /* 浮動彈出框 (Popover) */
   #popover {
       display: none;
       position: absolute;
+      left: 0;
+      width: 220px;
       z-index: 100;
-      width: 180px;
-      animation: popIn 0.18s ease;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      transform: scale(0.92);
       box-sizing: border-box;
+      pointer-events: auto;
   }
-  #popover.show { display: block; }
+  #popover.show {
+      display: block;
+      opacity: 1;
+      transform: scale(1);
+  }
 
+  /* 切分內容區塊以實作標題固定與清單滑動 */
   .popover-content {
       background: #fff;
       border: 1.5px solid #06C755;
@@ -519,16 +589,16 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.18);
       display: flex;
       flex-direction: column;
-      max-height: 240px;
+      max-height: 320px;
       overflow: hidden;
   }
 
   #popover h4 {
       margin: 0;
-      padding: 10px 12px 8px 12px;
+      padding: 14px 16px 10px 16px;
       background-color: #fff;
       color: #06C755;
-      font-size: 13px;
+      font-size: 14px;
       border-bottom: 1px solid #e0f5e9;
       display: flex;
       justify-content: space-between;
@@ -537,7 +607,7 @@
   }
   #popover h4 .close-btn {
       cursor: pointer;
-      font-size: 16px;
+      font-size: 18px;
       color: #aaa;
       line-height: 1;
       padding: 0 2px;
@@ -546,61 +616,50 @@
   #popover h4 .close-btn:hover { color: #555; }
 
   .pop-checkbox-list {
-      padding: 8px 12px;
+      padding: 10px 16px 14px 16px;
       overflow-y: auto;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      text-align: left;
+      gap: 8px;
   }
   
+  /* 彈出框箭頭設定 */
   #popover::before {
       content: '';
       position: absolute;
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       background: #fff;
       z-index: 2;
-  }
-  #popover.arrow-left::before {
       border-left: 1.5px solid #06C755;
       border-top: 1.5px solid #06C755;
-      left: -6px;
+  }
+  #popover.arrow-left::before {
+      left: -7px;
       top: var(--arrow-top, 18px);
       transform: rotate(-45deg);
   }
   #popover.arrow-right::before {
-      border-left: 1.5px solid #06C755;
-      border-top: 1.5px solid #06C755;
-      right: -6px;
+      right: -7px;
       top: var(--arrow-top, 18px);
       transform: rotate(135deg);
-  }
-  #popover.arrow-bottom::before {
-      border-left: 1.5px solid #06C755;
-      border-bottom: 1.5px solid #06C755;
-      border-top: none;
-      bottom: -6px;
-      left: var(--arrow-left, 50%);
-      top: auto;
-      transform: rotate(-45deg);
   }
 
   .pop-checkbox-item {
       display: flex;
       align-items: center;
-      font-size: 13px;
+      font-size: 15px;
       cursor: pointer;
-      padding: 3px 2px;
+      padding: 4px 2px;
       border-radius: 6px;
       transition: background 0.1s;
   }
   .pop-checkbox-item:hover { background: #f0fbf4; }
   .pop-checkbox-item input[type="checkbox"] {
-      margin-right: 6px;
-      width: 15px;
-      height: 15px;
+      margin-right: 9px;
+      width: 18px;
+      height: 18px;
       cursor: pointer;
       accent-color: #06C755;
       flex-shrink: 0;
@@ -608,30 +667,37 @@
 
   /* Chips */
   .confirmation-section {
-      margin-top: 20px;
-      padding: 12px;
+      margin-top: 30px;
+      padding: 15px;
       background-color: #ebf8f0;
       border-radius: 8px;
       border: 1px solid #bce3c9;
   }
+  .confirmation-section h3 {
+      text-align: left;
+      margin-top: 0;
+      color: #05883b;
+      font-size: 16px;
+      margin-bottom: 15px;
+  }
   .chip-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
   }
   .chip {
       display: inline-flex;
       align-items: center;
-      padding: 4px 10px;
-      border-radius: 15px;
-      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 14px;
       font-weight: 500;
       cursor: pointer;
       user-select: none;
       transition: background-color 0.2s, color 0.2s, opacity 0.2s;
   }
   .chip .icon {
-      margin-right: 4px;
+      margin-right: 6px;
       font-weight: bold;
   }
   .chip.active {
@@ -707,6 +773,7 @@
 
   #chat-body {
     position: relative;
+    padding-right: 60px;
   }
 
   .visit-list-body {
@@ -715,7 +782,7 @@
   }
 
   .visit-item {
-    padding: 12px 16px;
+    padding: 16px 60px 16px 20px !important;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     transition: background .1s, border-left-color .1s;
@@ -747,17 +814,14 @@
 
   /* Chat timelines */
   .chat-timeline-nav {
-    position: absolute;
-    right: 24px;
-    top: 76px;
-    bottom: 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 10;
-    background: transparent;
-    pointer-events: auto;
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10;
   }
   .timeline-dot-small {
     width: 6px;
@@ -828,6 +892,104 @@
     border-radius: 12px;
     border: 1px solid var(--primary-l);
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  /* ── Alert Modals ── */
+  .modal-backdrop-alert {
+    backdrop-filter: blur(8px);
+    background: rgba(15, 23, 42, 0.45) !important;
+  }
+  .modal-alert {
+    width: 440px;
+    padding: 32px;
+    border-radius: 20px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    background: #ffffff;
+    box-shadow: 0 20px 48px -10px rgba(15, 23, 42, 0.18);
+    text-align: center;
+  }
+  .modal-alert-icon-wrap {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+  }
+  .modal-alert-icon-wrap.warning {
+    background: #fffbe5;
+    color: #d97706;
+  }
+  .modal-alert-icon-wrap.info {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+  .modal-alert-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 12px;
+  }
+  .modal-alert-banner {
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    text-align: left;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .modal-alert-banner.warning {
+    background-color: #fffbeb;
+    border: 1px solid #fef3c7;
+    color: #92400e;
+  }
+  .modal-alert-banner.info {
+    background-color: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #1e40af;
+  }
+  .modal-alert-subtitle {
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 28px;
+  }
+  .modal-alert-actions {
+    display: flex;
+    gap: 12px;
+  }
+  .modal-alert-actions .btn {
+    flex: 1;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    height: 42px;
+    border-radius: 10px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .modal-alert-actions .btn-danger {
+    background: #ef4444;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  }
+  .modal-alert-actions .btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  }
+  .modal-alert-actions .btn-outline {
+    border: 1.5px solid #cbd5e1;
+    color: #475569;
+    background: transparent;
+  }
+  .modal-alert-actions .btn-outline:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #1e293b;
+    transform: translateY(-1px);
   }
 </style>
 </head>
@@ -1041,44 +1203,47 @@
                 </div>
                 
                 <div class="form-group">
-                  <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
-                  
-                  <div class="image-section">
-                    <div class="image-wrapper" id="image-wrapper">
-                      <div id="body-shift-container" class="shiftable-container">
-                        <div class="image-container" id="body-image-container">
-                          <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
-                          <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 43.7%; width: 13%; height: 11%;" title="頭"></div>
-                          <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 46.05%; width: 8%; height: 6%;" title="脖子"></div>
-                          <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 60%; width: 11%; height: 32%;" title="手"></div>
-                          <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 40.05%; width: 20%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
-                          <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 39%; width: 22%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
-                          <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 49%; width: 13%; height: 39%;" title="腳"></div>
-                        </div>
-                      </div>
-                      
-                      <div class="bottom-buttons-row">
-                        <div class="hotspot bottom-btn" data-region="皮膚" data-position="bottom">皮膚</div>
-                        <div class="hotspot bottom-btn" data-region="精神" data-position="bottom">精神</div>
-                        <div class="hotspot bottom-btn" data-region="其他" data-position="bottom">其他</div>
-                      </div>
-            
-                      <div id="popover">
-                        <div class="popover-content">
-                          <h4>
-                            <span id="popover-title">選擇衛教資料</span>
-                            <span class="close-btn" id="popover-close">✕</span>
-                          </h4>
-                          <div class="pop-checkbox-list" id="popover-checkboxes"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-            
-                  <div class="confirmation-section">
+                  <div class="confirmation-section" style="display: none; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #05883b; font-size: 14px; margin-bottom: 10px;">已選擇的衛教資料確認清單：</h3>
                     <p id="empty-msg" style="color: #777; font-size: 13px; font-style: italic;">尚未選擇任何衛教資料</p>
                     <div class="chip-list" id="confirmed-list"></div>
+                  </div>
+
+                  <div class="image-wrapper" id="image-wrapper">
+                    <div class="interactive-layout">
+                      <!-- Left Column: Human Body -->
+                      <div class="body-column">
+                        <div class="image-container" id="body-image-container">
+                          <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+                          <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 15.97%; width: 38.27%; height: 11%;" title="頭"></div>
+                          <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 22.88%; width: 23.55%; height: 6%;" title="脖子"></div>
+                          <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 63.94%; width: 32.38%; height: 32%;" title="手"></div>
+                          <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 5.22%; width: 58.88%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+                          <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 2.13%; width: 64.77%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+                          <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 31.56%; width: 38.27%; height: 39%;" title="腳"></div>
+                        </div>
+                      </div>
+
+                      <!-- Middle Column: Popover -->
+                      <div class="popover-column">
+                        <div id="popover" style="display: none;">
+                          <div class="popover-content">
+                            <h4>
+                              <span id="popover-title">選擇衛教資料</span>
+                              <span class="close-btn" id="popover-close">✕</span>
+                            </h4>
+                            <div class="pop-checkbox-list" id="popover-checkboxes"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Right Column: 3 Buttons -->
+                      <div class="buttons-column">
+                        <div class="hotspot bottom-btn btn-skin" data-region="皮膚" data-position="bottom">皮膚</div>
+                        <div class="hotspot bottom-btn btn-mental" data-region="精神" data-position="bottom">精神</div>
+                        <div class="hotspot bottom-btn btn-other" data-region="其他" data-position="bottom">其他</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
@@ -1139,6 +1304,7 @@
           <textarea id="prompt-textarea" placeholder="載入中…"></textarea>
           <div class="prompt-actions">
             <button class="btn btn-accent" onclick="savePrompt()">💾 儲存 Prompt</button>
+            <button class="btn btn-outline" id="btn-rollback-prompt" onclick="rollbackPrompt()" style="display:none; margin-left: 10px; border-color: var(--danger); color: var(--danger);">↩️ 返回上一個版本</button>
             <span class="save-status" id="save-status"></span>
           </div>
         </div>
@@ -1153,6 +1319,52 @@
   <div class="loading-box">
     <div class="spinner-dark"></div>
     <span>載入中…</span>
+  </div>
+</div>
+
+<!-- ── Modal：確認儲存 Prompt ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-save">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap warning">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認修改 Prompt</div>
+    <div class="modal-alert-banner warning">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">此操作會立即影響 LINE Bot 的回覆邏輯！</div>
+    </div>
+    <div class="modal-alert-subtitle">您確定要儲存目前的 Prompt 修改嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-save')">取消</button>
+      <button class="btn btn-danger" onclick="doSavePrompt()">確認儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：確認還原 Prompt ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-rollback">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap info">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認還原 Prompt</div>
+    <div class="modal-alert-banner info">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">此操作會將系統 Prompt 還原為上一個儲存的版本！</div>
+    </div>
+    <div class="modal-alert-subtitle">這同樣會立即影響 LINE Bot，確定要還原嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-rollback')">取消</button>
+      <button class="btn btn-danger" onclick="doRollbackPrompt()">確認還原</button>
+    </div>
   </div>
 </div>
 
@@ -1644,11 +1856,6 @@ function selectVisit(checkoutDate, el) {
            onclick="scrollToSession(${idx})">
       </div>
     `;
-    if (idx < matchedSessions.length - 1) {
-      for (let k = 0; k < 3; k++) {
-        dotHtml += `<div class="timeline-dot-small"></div>`;
-      }
-    }
   });
   
   chatBody.innerHTML = chatHtml;
@@ -2074,14 +2281,23 @@ async function loadPrompt() {
   const ta = document.getElementById('prompt-textarea');
   ta.value = '載入中…'; ta.disabled = true;
   document.getElementById('save-status').textContent = '';
+  document.getElementById('btn-rollback-prompt').style.display = 'none';
   try {
     const d = await api('GET', '/api/prompt');
     ta.value    = d.error ? '錯誤：' + d.error : (d.content || '');
     ta.disabled = !!d.error;
+    if (d.has_prev) {
+      document.getElementById('btn-rollback-prompt').style.display = 'inline-block';
+    }
   } catch { ta.value = '無法連線至伺服器'; }
 }
 
-async function savePrompt() {
+function savePrompt() {
+  openModal('modal-confirm-save');
+}
+
+async function doSavePrompt() {
+  closeModal('modal-confirm-save');
   const content = document.getElementById('prompt-textarea').value;
   const statusEl = document.getElementById('save-status');
   statusEl.textContent = ''; statusEl.className = 'save-status';
@@ -2090,8 +2306,33 @@ async function savePrompt() {
     if (res.success) {
       statusEl.textContent = '✅ 已儲存（' + res.saved_at + '）→ ' + (res.path || '');
       statusEl.className   = 'save-status ok';
+      loadPrompt();
     } else {
       statusEl.textContent = '❌ ' + (res.error || '儲存失敗');
+      statusEl.className   = 'save-status fail';
+    }
+  } catch {
+    statusEl.textContent = '❌ 無法連線至伺服器';
+    statusEl.className   = 'save-status fail';
+  }
+}
+
+function rollbackPrompt() {
+  openModal('modal-confirm-rollback');
+}
+
+async function doRollbackPrompt() {
+  closeModal('modal-confirm-rollback');
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = ''; statusEl.className = 'save-status';
+  try {
+    const res = await api('POST', '/api/prompt/rollback', {});
+    if (res.success) {
+      statusEl.textContent = '✅ 已還原（' + res.saved_at + '）';
+      statusEl.className   = 'save-status ok';
+      loadPrompt();
+    } else {
+      statusEl.textContent = '❌ ' + (res.error || '還原失敗');
       statusEl.className   = 'save-status fail';
     }
   } catch {
@@ -2116,14 +2357,14 @@ const topicMapping = {
 let selectedTopics = new Set();
 let currentActiveRegion = null;
 
-function getFormModalEl(id) {
-  return document.querySelector(`#modal-form #${id}`) || document.getElementById(id);
+function getFormEl(id) {
+  return document.querySelector(`#form-edit-container #${id}`) || document.getElementById(id);
 }
 
 function initBodyDiagramEvents() {
-  const popover = getFormModalEl('popover');
-  const hotspots = document.querySelectorAll('#modal-form .hotspot');
-  const popoverCloseBtn = getFormModalEl('popover-close');
+  const popover = getFormEl('popover');
+  const hotspots = document.querySelectorAll('#form-edit-container .hotspot');
+  const popoverCloseBtn = getFormEl('popover-close');
 
   if (popoverCloseBtn) {
     popoverCloseBtn.addEventListener('click', function(e) {
@@ -2156,42 +2397,39 @@ function initBodyDiagramEvents() {
   }
 
   document.addEventListener('click', function(e) {
-    if (!e.target.closest('#modal-form #image-wrapper')) {
+    if (!e.target.closest('#form-edit-container #image-wrapper')) {
       closePopover();
     }
 
-    const hasInactive = document.querySelectorAll('#modal-form .chip.inactive').length > 0;
-    if (hasInactive && !e.target.closest('#modal-form .confirmation-section')) {
+    const hasInactive = document.querySelectorAll('#form-edit-container .chip.inactive').length > 0;
+    if (hasInactive && !e.target.closest('#form-edit-container .confirmation-section')) {
       renderConfirmedChips(true);
     }
   });
 }
 
 function closePopover() {
-  const popover = getFormModalEl('popover');
+  const popover = getFormEl('popover');
   if (!popover) return;
   popover.classList.remove('show');
   popover.style.display = 'none';
-  const hotspots = document.querySelectorAll('#modal-form .hotspot');
+  
+  const layout = document.querySelector('#form-edit-container .interactive-layout');
+  if (layout) {
+    layout.classList.remove('popover-open');
+    layout.classList.remove('trigger-body');
+    layout.classList.remove('trigger-button');
+  }
+  
+  const hotspots = document.querySelectorAll('#form-edit-container .hotspot');
   hotspots.forEach(s => s.classList.remove('active'));
   currentActiveRegion = null;
-
-  const shiftContainer = getFormModalEl('body-shift-container');
-  if (shiftContainer) {
-    shiftContainer.classList.remove('shifted');
-    shiftContainer.style.zIndex = '2';
-  }
-
-  const imageWrapper = getFormModalEl('image-wrapper');
-  if (imageWrapper && popover.parentElement !== imageWrapper) {
-    imageWrapper.appendChild(popover);
-  }
 }
 
 function showPopover(hotspotEl, region) {
-  const popover = getFormModalEl('popover');
-  const popoverTitle = getFormModalEl('popover-title');
-  const popoverCheckboxes = getFormModalEl('popover-checkboxes');
+  const popover = getFormEl('popover');
+  const popoverTitle = getFormEl('popover-title');
+  const popoverCheckboxes = getFormEl('popover-checkboxes');
   if (!popover || !popoverTitle || !popoverCheckboxes) return;
 
   popoverTitle.textContent = `「${region}」相關衛教`;
@@ -2199,7 +2437,7 @@ function showPopover(hotspotEl, region) {
 
   const topics = topicMapping[region] || [];
   if (topics.length === 0) {
-    popoverCheckboxes.innerHTML = '<span style="color:#777; font-size:13px; padding: 10px; display: block;">此區域無相關衛教資料。</span>';
+    popoverCheckboxes.innerHTML = '<span style="color:#777; font-size:14px; padding: 10px; display: block;">此區域無相關衛教資料。</span>';
   } else {
     topics.forEach(topic => {
       const label = document.createElement('label');
@@ -2222,103 +2460,65 @@ function showPopover(hotspotEl, region) {
   }
 
   popover.style.display = 'block';
+  popover.offsetHeight; // Force reflow
   popover.classList.add('show');
 
-  positionPopoverAndTriggerShift(hotspotEl, region);
-}
-
-function positionPopoverAndTriggerShift(hotspotEl, region) {
-  const popover = getFormModalEl('popover');
-  const shiftContainer = getFormModalEl('body-shift-container');
-  const imageWrapper = getFormModalEl('image-wrapper');
-  if (!popover || !shiftContainer || !imageWrapper) return;
-
-  const parentEl = hotspotEl.parentElement;
-  
-  if (popover.parentElement !== parentEl) {
-    parentEl.appendChild(popover);
-  }
-
+  const layoutEl = document.querySelector('#form-edit-container .interactive-layout');
+  if (!layoutEl) return;
   const posType = hotspotEl.getAttribute('data-position');
   
   if (posType === 'body') {
-    shiftContainer.classList.add('shifted');
-    shiftContainer.style.zIndex = '101';
+    layoutEl.classList.add('trigger-body');
+    layoutEl.classList.remove('trigger-button');
+    popover.className = 'arrow-left show';
   } else {
-    shiftContainer.classList.remove('shifted');
-    shiftContainer.style.zIndex = '2';
+    layoutEl.classList.add('trigger-button');
+    layoutEl.classList.remove('trigger-body');
+    popover.className = 'arrow-right show';
   }
+  layoutEl.classList.add('popover-open');
 
-  const spotLeft   = hotspotEl.offsetLeft;
-  const spotTop    = hotspotEl.offsetTop;
-  const spotW      = hotspotEl.offsetWidth;
-  const spotH      = hotspotEl.offsetHeight;
+  const layoutRect = layoutEl.getBoundingClientRect();
+  const spotRect = hotspotEl.getBoundingClientRect();
+  const popoverRect = popover.getBoundingClientRect();
 
-  const popW = popover.offsetWidth  || 180;
-  const popH = popover.offsetHeight || 180;
-  const gap  = 8; 
+  const spotCenterY = (spotRect.top + spotRect.bottom) / 2 - layoutRect.top;
 
-  const spotRight   = spotLeft + spotW;
-  const spotCenterY = spotTop + spotH / 2;
+  let popoverTop = spotCenterY - popoverRect.height / 2;
+  const maxTop = layoutRect.height - popoverRect.height - 15;
+  popoverTop = Math.max(0, Math.min(popoverTop, maxTop));
 
-  const parentW = parentEl.offsetWidth;
-  const parentH = parentEl.offsetHeight || imageWrapper.offsetHeight;
+  popover.style.position = 'absolute';
+  popover.style.top = popoverTop + 'px';
 
-  let left, top, arrowClass;
+  let arrowTop = spotCenterY - popoverTop;
+  arrowTop = Math.max(20, Math.min(arrowTop, popoverRect.height - 20));
+  popover.style.setProperty('--arrow-top', arrowTop + 'px');
 
-  if (posType === 'bottom') {
-    top = spotTop - popH - gap;
-    left = spotLeft + (spotW / 2) - (popW / 2);
-    
-    if (left < 0) left = 0;
-    if (left + popW > parentW) left = parentW - popW;
+  let spotLeft = spotRect.left - layoutRect.left;
+  let spotRight = spotRect.right - layoutRect.left;
 
-    let arrowOffset = spotLeft + (spotW / 2) - left;
-    popover.style.setProperty('--arrow-left', arrowOffset + 'px');
-    arrowClass = 'arrow-bottom';
-  } else {
-    let availableSpaceRight = parentW - spotRight;
+  const popoverColumn = document.querySelector('#form-edit-container .popover-column');
+  if (popoverColumn) {
+    let popoverLeft = 0;
     if (posType === 'body') {
-      availableSpaceRight += parentW * 0.2;
-    }
-    
-    const spaceLeft = spotLeft;
-
-    if (availableSpaceRight >= popW + gap) {
-      left = spotRight + gap;
-      arrowClass = 'arrow-left';
-    } else if (spaceLeft >= popW + gap) {
-      left = spotLeft - popW - gap;
-      arrowClass = 'arrow-right';
+      popoverLeft = spotRight + 6;
     } else {
-      left = spotRight + gap;
-      arrowClass = 'arrow-left';
+      popoverLeft = spotLeft - 226;
     }
-
-    top = spotCenterY - popH / 2;
-    top = Math.max(0, top);
-    if (top + popH > parentH) top = parentH - popH;
-    top = Math.max(0, top);
-
-    const arrowOffset = spotCenterY - top - 6; 
-    const clampedArrow = Math.max(15, Math.min(arrowOffset, popH - 25));
-    popover.style.setProperty('--arrow-top', clampedArrow + 'px');
+    popoverColumn.style.left = popoverLeft + 'px';
   }
-
-  popover.style.left = left + 'px';
-  popover.style.top  = top  + 'px';
-  popover.className  = 'show ' + arrowClass;
 }
 
 function syncPopoverCheckboxes() {
-  document.querySelectorAll('#modal-form .pop-checkbox-item input').forEach(cb => {
+  document.querySelectorAll('#form-edit-container .pop-checkbox-item input').forEach(cb => {
     cb.checked = selectedTopics.has(cb.value);
   });
 }
 
 function renderConfirmedChips(forceClean = false) {
-  const confirmedList = getFormModalEl('confirmed-list');
-  const emptyMsg = getFormModalEl('empty-msg');
+  const confirmedList = getFormEl('confirmed-list');
+  const emptyMsg = getFormEl('empty-msg');
   if (!confirmedList || !emptyMsg) return;
 
   if (forceClean) {
@@ -2351,6 +2551,15 @@ function renderConfirmedChips(forceClean = false) {
         chip.querySelector('.icon').textContent = '✕';
       }
     });
+  }
+
+  const confirmationSection = document.querySelector('#form-edit-container .confirmation-section');
+  if (confirmationSection) {
+    if (selectedTopics.size > 0) {
+      confirmationSection.style.display = 'block';
+    } else {
+      confirmationSection.style.display = 'none';
+    }
   }
 
   if (confirmedList.children.length === 0) {

@@ -15,100 +15,119 @@ def get_db(name: str) -> sqlite3.Connection:
     path = os.path.join(BASE_DIR, 'database', name)
     return sqlite3.connect(path)
 
-
-# ── DOCTOR ───────────────────────────────────────────────────────────────────
-def init_doctor_db():
-    conn = get_db('doctor.db')
+# ── HOSPITAL DB ──────────────────────────────────────────────────────────────
+def init_hospital_db():
+    conn = get_db('hospital.db')
     c = conn.cursor()
-    # 刷新：先刪再建
-    c.execute('DROP TABLE IF EXISTS DOCTOR')
+    
+    # 啟用外鍵約束
+    c.execute('PRAGMA foreign_keys = ON')
+    
+    # 刪除舊表
+    c.execute('DROP TABLE IF EXISTS record')
+    c.execute('DROP TABLE IF EXISTS line_patient_pairs')
+    c.execute('DROP TABLE IF EXISTS patients')
+    c.execute('DROP TABLE IF EXISTS doctors')
+    
+    # 1. doctors 表格
     c.execute('''
-        CREATE TABLE DOCTOR (
-            account_name  TEXT    PRIMARY KEY,
+        CREATE TABLE doctors (
+            doctor_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_name  TEXT    UNIQUE NOT NULL,
             password_hash TEXT    NOT NULL,
             doctor_name   TEXT    NOT NULL,
+            department    TEXT    NOT NULL,
             is_active     INTEGER NOT NULL DEFAULT 1,
             is_admin      INTEGER NOT NULL DEFAULT 0
         )
     ''')
+    
+    # 2. patients 表格
+    c.execute('''
+        CREATE TABLE patients (
+            patient_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            medical_record_number TEXT    UNIQUE NOT NULL,
+            has_chatted           INTEGER NOT NULL DEFAULT 0
+        )
+    ''')
+    
+    # 3. line_patient_pairs 表格
+    c.execute('''
+        CREATE TABLE line_patient_pairs (
+            line_patient_pairs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            line_uuid             TEXT    NOT NULL,
+            medical_record_number TEXT    NOT NULL,
+            relation              TEXT,
+            latest_record_id     TEXT, -- 存 JSON 字串
+            FOREIGN KEY (medical_record_number) REFERENCES patients (medical_record_number)
+        )
+    ''')
+    
+    # 4. record 表格
+    c.execute('''
+        CREATE TABLE record (
+            record_id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            line_patient_pairs_id INTEGER NOT NULL,
+            checkout_date         DATETIME NOT NULL,
+            doctor_id             INTEGER NOT NULL,
+            symptoms             TEXT,    -- 存 JSON 字串
+            FOREIGN KEY (line_patient_pairs_id) REFERENCES line_patient_pairs (line_patient_pairs_id),
+            FOREIGN KEY (doctor_id) REFERENCES doctors (doctor_id)
+        )
+    ''')
+    
+    # 插入測試資料
     doctors = [
-        ('admin',   hash_pw('admin123'), '管理員',      1, 1),
-        ('dr_wang', hash_pw('wang123'),  '王大明 醫師', 1, 0),
-        ('dr_li',   hash_pw('li123'),    '李小華 醫師', 1, 0),
+        (1, 'admin',   hash_pw('admin123'), '張大亮 醫師', '急診科', 1, 1),
+        (2, 'dr_wang', hash_pw('wang123'),  '王大明 醫師', '內科',   1, 0),
+        (3, 'dr_li',   hash_pw('li123'),    '李小華 醫師', '小兒科', 1, 0),
     ]
+    
+    patients_data = [
+        (1, 'P2026001', 1),
+        (2, 'P2026002', 0),
+        (3, 'P2026003', 0),
+        (4, 'P2026004', 0)
+    ]
+    
+    line_pairs_data = [
+        (1, 'U1a2b3c4d5', 'P2026001', '本人', json.dumps([1, 4])),
+        (2, 'U2e3f4g5h6', 'P2026002', '本人', json.dumps([2])),
+        (3, 'U3i4j5k6l7', 'P2026003', '媽媽', json.dumps([3])),
+        (4, 'U4m5n6o7p8', 'P2026004', '丈夫', json.dumps([5]))
+    ]
+    
+    records_data = [
+        (1, 1, '2026-05-01 10:00:00.000', 1, json.dumps(['腹痛', '腸胃炎'], ensure_ascii=False)),
+        (2, 2, '2026-05-05 09:15:30.456', 2, json.dumps(['胸痛', '頭暈'], ensure_ascii=False)),
+        (3, 3, '2026-05-07 16:45:00.789', 3, json.dumps(['便秘', '腹瀉'], ensure_ascii=False)),
+        (4, 1, '2026-05-08 14:30:15.123', 2, json.dumps(['腹痛'], ensure_ascii=False)),
+        (5, 4, '2026-05-09 11:20:10.012', 2, json.dumps(['頭暈', '水腫'], ensure_ascii=False))
+    ]
+    
     c.executemany(
-        'INSERT INTO DOCTOR '
-        '(account_name, password_hash, doctor_name, is_active, is_admin) VALUES (?,?,?,?,?)',
+        'INSERT INTO doctors (doctor_id, account_name, password_hash, doctor_name, department, is_active, is_admin) VALUES (?,?,?,?,?,?,?)',
         doctors
     )
-    conn.commit()
-    conn.close()
-    print('doctor.db 初始化完成')
-
-
-# ── PATIENT ──────────────────────────────────────────────────────────────────
-def init_patient_db():
-    conn = get_db('patient.db')
-    c = conn.cursor()
-    c.execute('DROP TABLE IF EXISTS PATIENT')
-    c.execute('''
-        CREATE TABLE PATIENT (
-            medical_record_num TEXT PRIMARY KEY,
-            line_id            TEXT UNIQUE,
-            patient_name       TEXT NOT NULL,
-            is_chatted         INTEGER NOT NULL DEFAULT 0
-        )
-    ''')
-    patients = [
-        ('P2026001', 'U1a2b3c4d5', '劉一', 1),
-        ('P2026002', 'U2e3f4g5h6', '陳二', 0),
-        ('P2026003', 'U3i4j5k6l7', '張三', 0),
-        ('P2026004', 'U4m5n6o7p8', '李四', 0)
-    ]
+    
     c.executemany(
-        'INSERT INTO PATIENT (medical_record_num, line_id, patient_name, is_chatted) VALUES (?,?,?,?)',
-        patients
+        'INSERT INTO patients (patient_id, medical_record_number, has_chatted) VALUES (?,?,?)',
+        patients_data
     )
-    conn.commit()
-    conn.close()
-    print('patient.db 初始化完成')
-
-
-# ── FORM ─────────────────────────────────────────────────────────────────────
-def init_form_db():
-    conn = get_db('form.db')
-    c = conn.cursor()
-    c.execute('DROP TABLE IF EXISTS FORM')
-    c.execute('''
-        CREATE TABLE FORM (
-            medical_record_num TEXT    NOT NULL,
-            doctor_account     TEXT    NOT NULL,
-            checkout_date      DATE    NOT NULL,
-            symptoms           TEXT,
-            is_chatted         INTEGER NOT NULL DEFAULT 0,
-            PRIMARY KEY (medical_record_num, checkout_date)
-        )
-    ''')
-    forms = [
-        ('P2026001', 'dr_wang', '2026-05-01',
-         json.dumps(['腹痛', '腸胃炎'], ensure_ascii=False), 1),
-        ('P2026001', 'dr_wang', '2026-05-08',
-         json.dumps(['腹痛'], ensure_ascii=False), 1),
-        ('P2026002', 'dr_wang', '2026-05-05',
-         json.dumps(['胸痛', '頭暈'], ensure_ascii=False), 0),
-        ('P2026003', 'dr_li',   '2026-05-07',
-         json.dumps(['便秘', '腹瀉'], ensure_ascii=False), 0),
-        ('P2026004', 'dr_wang', '2026-05-09',
-         json.dumps(['頭暈', '水腫'], ensure_ascii=False), 0),
-    ]
+    
     c.executemany(
-        'INSERT INTO FORM '
-        '(medical_record_num, doctor_account, checkout_date, symptoms, is_chatted) VALUES (?,?,?,?,?)',
-        forms
+        'INSERT INTO line_patient_pairs (line_patient_pairs_id, line_uuid, medical_record_number, relation, latest_record_id) VALUES (?,?,?,?,?)',
+        line_pairs_data
     )
+    
+    c.executemany(
+        'INSERT INTO record (record_id, line_patient_pairs_id, checkout_date, doctor_id, symptoms) VALUES (?,?,?,?,?)',
+        records_data
+    )
+    
     conn.commit()
     conn.close()
-    print('form.db 初始化完成')
+    print('hospital.db 初始化完成 (包含 tables: doctors, patients, line_patient_pairs, record)')
 
 
 # ── data/ ─────────────────────────────────────────────────────────────────────
@@ -128,9 +147,7 @@ def create_data_dir():
 if __name__ == '__main__':
     os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
     print('=== EDDI 資料庫初始化 ===\n')
-    init_doctor_db()
-    init_patient_db()
-    init_form_db()
+    init_hospital_db()
     create_data_dir()
     print('\n初始化完成！測試帳號：')
     print('  管理員 : admin   / admin123')

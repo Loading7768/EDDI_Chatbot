@@ -10,7 +10,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f0f2f5;
             margin: 0;
-            padding: 20px 10px;
+            padding: 20px 10px 100px 10px;
             display: flex;
             justify-content: center;
         }
@@ -53,6 +53,25 @@
             border-radius: 5px;
             box-sizing: border-box;
             font-size: 16px;
+        }
+
+        .bottom-fixed-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(255,255,255,1) 60%, rgba(255,255,255,0) 100%);
+            padding: 25px 20px 20px 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+        .bottom-fixed-bar > * {
+            pointer-events: auto;
+            width: 100%;
+            max-width: 600px;
         }
 
         /* 人體圖片與互動區塊設定 */
@@ -854,7 +873,10 @@
         </div>
     </div>
 
-    <button class="submit-btn" onclick="submitForm()">送出表單</button>
+    <div class="bottom-fixed-bar">
+        <div id="submit-error-msg" style="color: #d9534f; font-size: 14px; text-align: center; margin-bottom: 10px; display: none; font-weight: bold;"></div>
+        <button class="submit-btn" onclick="submitForm()" style="margin-top: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">送出表單</button>
+    </div>
 
     <!-- Confirmation Dialog Modal -->
     <div id="confirm-modal" class="modal-overlay">
@@ -862,19 +884,19 @@
             <h3 class="modal-title">確認送出衛教表單</h3>
             <div class="modal-body">
                 <div class="summary-item">
-                    <span class="summary-label">LINE 帳號</span>
-                    <span class="summary-value" id="summary-line-info"></span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">就診日期</span>
-                    <span class="summary-value" id="summary-discharge-date"></span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">病歷號</span>
+                    <span class="summary-label">病患：</span>
                     <span class="summary-value" id="summary-record-num"></span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label">醫師帳號</span>
+                    <span class="summary-label">LINE 帳號：</span>
+                    <span class="summary-value" id="summary-line-info"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">就診日期：</span>
+                    <span class="summary-value" id="summary-discharge-date"></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">醫師：</span>
                     <span class="summary-value" id="summary-doctor-id"></span>
                 </div>
                 <div class="summary-topics-section">
@@ -883,6 +905,7 @@
                 </div>
             </div>
             <div style="color: #d9534f; font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 14px;">請確認資料無誤，送出後必須至後台修改。</div>
+            <div id="modal-submit-error" style="color: #d9534f; font-weight: bold; text-align: center; margin-bottom: 10px; font-size: 14px; display: none;"></div>
             <div class="modal-footer">
                 <button class="modal-btn btn-cancel" onclick="closeConfirmModal()">取消</button>
                 <button class="modal-btn btn-confirm" onclick="executeSubmit()">確認送出</button>
@@ -1155,6 +1178,7 @@
         let finalPairId = "";
         let finalRelation = "";
         let finalMedicalNum = "";
+        let prefilledTopics = [];
         
         if (currentSelectedType === 'self') {
             finalRelation = "本人";
@@ -1174,6 +1198,7 @@
             finalPairId = r.pair_id;
             finalRelation = r.relation;
             finalMedicalNum = r.medical_record_num;
+            prefilledTopics = r.prefilled_topics || [];
         } else if (currentSelectedType === 'new') {
             finalRelation = document.getElementById('new_relation').value.trim();
             finalMedicalNum = document.getElementById('new_medical_record_num').value.trim();
@@ -1197,6 +1222,18 @@
             }
         }
         
+        if (currentSelectedType === 'self' || currentSelectedType === 'new') {
+            selectedTopics.clear();
+        } else {
+            selectedTopics.clear();
+            prefilledTopics.forEach(t => selectedTopics.add(t));
+        }
+        syncPopoverCheckboxes();
+        renderConfirmedChips(true);
+        
+        const submitErrorMsg = document.getElementById('submit-error-msg');
+        if(submitErrorMsg) submitErrorMsg.style.display = 'none';
+
         inputSelectedPairId.value = finalPairId;
         inputSelectedRelation.value = finalRelation;
         inputSelectedMedicalRecordNum.value = finalMedicalNum;
@@ -1215,7 +1252,14 @@
         }
     });
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const date = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${date} ${hours}:${minutes}:${seconds}`;
     document.getElementById('discharge_date').value = todayStr;
     const displayDateEl = document.getElementById('display_discharge_date');
     if (displayDateEl) {
@@ -1361,6 +1405,10 @@
                 checkbox.addEventListener('change', function() {
                     if (this.checked) selectedTopics.add(topic);
                     else selectedTopics.delete(topic);
+                    
+                    const submitErrorMsg = document.getElementById('submit-error-msg');
+                    if(submitErrorMsg) submitErrorMsg.style.display = 'none';
+                    
                     renderConfirmedChips(); // 同步 Chips
                 });
 
@@ -1506,6 +1554,9 @@
         div.addEventListener('click', function(e) {
             e.stopPropagation(); // 阻止冒泡到 Document 引發清除動作
             
+            const submitErrorMsg = document.getElementById('submit-error-msg');
+            if(submitErrorMsg) submitErrorMsg.style.display = 'none';
+
             if (selectedTopics.has(topic)) {
                 // 取消選擇：後台立即刪除
                 selectedTopics.delete(topic);
@@ -1526,29 +1577,37 @@
     }
 
     function submitForm() {
+        if (selectedTopics.size === 0) {
+            const submitErrorMsg = document.getElementById('submit-error-msg');
+            submitErrorMsg.innerText = "最少要選擇一項衛教資料";
+            submitErrorMsg.style.display = 'block';
+            return;
+        }
+        
         const userName = document.getElementById('line_info').dataset.uname;
         const lineId = document.getElementById('line_info').dataset.uid;
-        const medicalRecordNum = document.getElementById('medical_record_num').value.trim();
+        const medicalRecordNum = document.getElementById('selected_medical_record_num').value.trim();
+        const relation = document.getElementById('selected_relation').value.trim();
         
-        const doctorSelect = document.getElementById('doctor_id');
-        const doctorId = doctorSelect.value.trim();
-        const doctorName = doctorSelect.options[doctorSelect.selectedIndex].text;
+        const doctorId = document.getElementById('doctor_id').value.trim();
+        const doctorName = "{{ doctor_department }} - {{ doctor_name }}";
         
         const dischargeDate = document.getElementById('discharge_date').value;
 
-        if (!medicalRecordNum || !doctorId || !dischargeDate) {
-            alert('請填寫完整的基本資訊 (病歷號、醫師帳號、出院日期)！');
-            return;
-        }
-        if (selectedTopics.size === 0) {
-            alert('請至少選擇一項衛教資料！');
+        if (!medicalRecordNum || !relation || !dischargeDate) {
+            alert('請填寫完整的基本資訊 (病患關係、就診日期)！');
             return;
         }
 
         // Populate summary modal text values
         document.getElementById('summary-line-info').textContent = `${userName} (${lineId})`;
         document.getElementById('summary-discharge-date').textContent = dischargeDate;
-        document.getElementById('summary-record-num').textContent = medicalRecordNum;
+        document.getElementById('summary-record-num').innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3;">
+                <span style="font-weight: bold; font-size: 16px; color: #333;">${relation}</span>
+                <span style="font-size: 13px; color: #666;">${medicalRecordNum}</span>
+            </div>
+        `;
         document.getElementById('summary-doctor-id').textContent = doctorName;
 
         // Populate summary topics list as chips
@@ -1579,11 +1638,18 @@
     }
 
     async function executeSubmit() {
-        closeConfirmModal();
+        // Disable buttons to prevent double submission
+        document.querySelector('.btn-confirm').disabled = true;
+        document.querySelector('.btn-cancel').disabled = true;
+        document.querySelector('.btn-confirm').innerText = '處理中...';
+        
+        const modalError = document.getElementById('modal-submit-error');
+        modalError.style.display = 'none';
 
         const userName = document.getElementById('line_info').dataset.uname;
         const lineId = document.getElementById('line_info').dataset.uid;
-        const medicalRecordNum = document.getElementById('medical_record_num').value.trim();
+        const medicalRecordNum = document.getElementById('selected_medical_record_num').value.trim();
+        const relation = document.getElementById('selected_relation').value.trim();
         const doctorId = document.getElementById('doctor_id').value.trim();
         const dischargeDate = document.getElementById('discharge_date').value;
 
@@ -1591,6 +1657,7 @@
             user_name: userName,
             line_id: lineId,
             medical_record_num: medicalRecordNum,
+            relation: relation,
             doctor_id: doctorId,
             discharge_date: dischargeDate,
             topics: Array.from(selectedTopics) 

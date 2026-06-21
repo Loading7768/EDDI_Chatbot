@@ -80,55 +80,7 @@ def init_hospital_db():
     c.execute('CREATE INDEX idx_record_lookup ON record (line_patient_pairs_id, doctor_id, checkout_date DESC)')
     c.execute('CREATE INDEX idx_doctors_department ON doctors (department)')
     c.execute('CREATE INDEX idx_line_patient_pairs_uuid ON line_patient_pairs (line_uuid)')
-    
-    # 插入測試資料
-    doctors = [
-        (1, 'admin',   hash_pw('admin123'), '張大亮 醫師', '急診科', 1, 1),
-        (2, 'dr_wang', hash_pw('wang123'),  '王大明 醫師', '內科',   1, 0),
-        (3, 'dr_li',   hash_pw('li123'),    '李小華 醫師', '小兒科', 1, 0),
-    ]
-    
-    patients_data = [
-        (1, 'P2026001', 1),
-        (2, 'P2026002', 0),
-        (3, 'P2026003', 0),
-        (4, 'P2026004', 0)
-    ]
-    
-    line_pairs_data = [
-        (1, 'U1a2b3c4d5', 1, '本人'),
-        (2, 'U2e3f4g5h6', 2, '本人'),
-        (3, 'U3i4j5k6l7', 3, '媽媽'),
-        (4, 'U4m5n6o7p8', 4, '丈夫')
-    ]
-    
-    records_data = [
-        (1, 1, '2026-05-01 10:00:00.000', 1, json.dumps(['腹痛', '腸胃炎'], ensure_ascii=False)),
-        (2, 2, '2026-05-05 09:15:30.456', 2, json.dumps(['胸痛', '頭暈'], ensure_ascii=False)),
-        (3, 3, '2026-05-07 16:45:00.789', 3, json.dumps(['便秘', '腹瀉'], ensure_ascii=False)),
-        (4, 1, '2026-05-08 14:30:15.123', 2, json.dumps(['腹痛'], ensure_ascii=False)),
-        (5, 4, '2026-05-09 11:20:10.012', 2, json.dumps(['頭暈', '水腫'], ensure_ascii=False))
-    ]
-    
-    c.executemany(
-        'INSERT INTO doctors (doctor_id, account_name, password_hash, doctor_name, department, is_active, is_admin) VALUES (?,?,?,?,?,?,?)',
-        doctors
-    )
-    
-    c.executemany(
-        'INSERT INTO patients (patient_id, medical_record_number, has_chatted) VALUES (?,?,?)',
-        patients_data
-    )
-    
-    c.executemany(
-        'INSERT INTO line_patient_pairs (line_patient_pairs_id, line_uuid, patient_id, relation) VALUES (?,?,?,?)',
-        line_pairs_data
-    )
-    
-    c.executemany(
-        'INSERT INTO record (record_id, line_patient_pairs_id, checkout_date, doctor_id, symptoms) VALUES (?,?,?,?,?)',
-        records_data
-    )
+
     
     conn.commit()
     conn.close()
@@ -150,6 +102,14 @@ def create_data_dir():
 
 # ── main ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
+    print('WARNING: Running this script will reset hospital.db and remove all of the exsisting data.')
+    confirm_msg = "Yes. I understand this action will wipe the database and want to proceed."
+    user_input = input(f'Please type exactly "{confirm_msg}" to continue:\n')
+    if user_input != confirm_msg:
+        print('Input did not match. Terminating script.')
+        import sys
+        sys.exit(1)
+        
     os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
     print('=== EDDI 資料庫初始化 ===\n')
     init_hospital_db()

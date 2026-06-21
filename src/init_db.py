@@ -58,7 +58,8 @@ def init_hospital_db():
             patient_id            INTEGER NOT NULL,
             line_uuid             TEXT    NOT NULL,
             relation              TEXT,
-            FOREIGN KEY (patient_id) REFERENCES patients (patient_id)
+            FOREIGN KEY (patient_id) REFERENCES patients (patient_id),
+            UNIQUE (line_uuid, patient_id)
         )
     ''')
     
@@ -74,6 +75,11 @@ def init_hospital_db():
             FOREIGN KEY (doctor_id) REFERENCES doctors (doctor_id)
         )
     ''')
+    
+    # 建立 Indexes
+    c.execute('CREATE INDEX idx_record_lookup ON record (line_patient_pairs_id, doctor_id, checkout_date DESC)')
+    c.execute('CREATE INDEX idx_doctors_department ON doctors (department)')
+    c.execute('CREATE INDEX idx_line_patient_pairs_uuid ON line_patient_pairs (line_uuid)')
     
     # 插入測試資料
     doctors = [

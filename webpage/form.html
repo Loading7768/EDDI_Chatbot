@@ -593,6 +593,92 @@
             font-weight: bold;
         }
 
+        /* Relation List Modal Styles */
+        .btn-change-relation {
+            padding: 6px 12px;
+            background-color: #f0f2f5;
+            color: #333;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .btn-change-relation:hover {
+            background-color: #e4e6eb;
+        }
+        .relation-section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }
+        .relation-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+            position: relative;
+        }
+        .relation-item:hover {
+            background-color: #f9f9f9;
+        }
+        .relation-item.selected {
+            background-color: #f0fbf4;
+            border-color: #06C755;
+        }
+        .relation-item.selected::before {
+            content: '✓';
+            color: #06C755;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .relation-item.selected .hide-on-select {
+            display: none;
+        }
+        .relation-item-content {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .relation-item-title {
+            font-weight: bold;
+            font-size: 15px;
+            color: #333;
+        }
+        .relation-item-subtitle {
+            font-size: 13px;
+            color: #777;
+            margin-top: 2px;
+        }
+        .relation-inputs {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .relation-item.selected .relation-inputs {
+            display: flex;
+        }
+        .relation-inputs input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
         /* Collapsible accordion content styles to prevent any seams when collapsed */
         .accordion-content {
             max-height: 500px;
@@ -649,7 +735,7 @@
     <input type="hidden" id="doctor_id" value="{{ doctor_id }}">
 
     <!-- Collapsible accordion containing patient info meta-box and text fields -->
-    <div class="accordion-container" style="margin-bottom: 20px;">
+    <div class="accordion-container">
         <div class="accordion-header" id="accordion-toggle" style="display: flex; align-items: center; cursor: pointer; user-select: none; font-weight: bold; color: #333; font-size: 15px; padding: 5px 0;">
             <span id="accordion-icon" style="margin-right: 6px; font-family: monospace; color: #333;">▼</span>
             <span>病患基本資料：</span>
@@ -663,7 +749,15 @@
                 </div>
                 <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <span class="meta-label">出院日期：</span>
+                    <span class="meta-label">病患：</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="meta-value" id="display_relation_text">尚未選擇</span>
+                        <button type="button" class="btn-change-relation" style="padding: 2px 8px; font-size: 12px;" onclick="openRelationModal()">更改</button>
+                    </div>
+                </div>
+                <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="meta-label">就診日期：</span>
                     <span id="display_discharge_date" class="meta-value"></span>
                 </div>
                 <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
@@ -673,17 +767,12 @@
                 </div>
             </div>
 
-            <!-- User inputs with floating labels -->
-            <div class="floating-group">
-                <input type="text" id="medical_record_num" placeholder=" " required value="{{ prefill_record_num | default('') }}">
-                <label for="medical_record_num">病歷號</label>
-            </div>
+            <!-- Hidden inputs to store selection for submission -->
+            <input type="hidden" id="selected_pair_id" value="">
+            <input type="hidden" id="selected_relation" value="">
+            <input type="hidden" id="selected_medical_record_num" value="">
         </div>
     </div>
-
-    <!-- Divider between patient info and image section -->
-    <div style="height: 1px; background-color: #333; margin: 20px 0; opacity: 0.15;"></div>
-
     
     <div class="image-section" style="margin-bottom: 5px;">
         <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
@@ -744,7 +833,7 @@
                     <span class="summary-value" id="summary-line-info"></span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label">出院日期</span>
+                    <span class="summary-label">就診日期</span>
                     <span class="summary-value" id="summary-discharge-date"></span>
                 </div>
                 <div class="summary-item">
@@ -764,6 +853,23 @@
             <div class="modal-footer">
                 <button class="modal-btn btn-cancel" onclick="closeConfirmModal()">取消</button>
                 <button class="modal-btn btn-confirm" onclick="executeSubmit()">確認送出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Relation Selection Modal -->
+    <div id="relation-modal" class="modal-overlay">
+        <div class="modal-card" style="max-height: 85vh; display: flex; flex-direction: column; padding: 20px;">
+            <h3 class="modal-title">請選擇對象</h3>
+            
+            <div id="relation-list-container" style="overflow-y: auto; flex: 1; margin-bottom: 15px; padding-right: 5px;">
+                <!-- Populated by JS -->
+            </div>
+            
+            <div id="relation-error-msg" style="color: #d9534f; font-size: 14px; text-align: center; margin-bottom: 10px; min-height: 20px;"></div>
+            
+            <div class="modal-footer" style="display: flex; justify-content: center;">
+                <button class="modal-btn btn-confirm" style="max-width: 200px;" onclick="confirmRelation()">確認</button>
             </div>
         </div>
     </div>
@@ -893,6 +999,183 @@
         }
     }
 {% else %}
+    const backendRelations = {{ relations | default([]) | tojson }};
+    
+    // Relation Modal Elements
+    const relationModal = document.getElementById('relation-modal');
+    const relationListContainer = document.getElementById('relation-list-container');
+    const relationErrorMsg = document.getElementById('relation-error-msg');
+    const displayRelationText = document.getElementById('display_relation_text');
+    const inputSelectedPairId = document.getElementById('selected_pair_id');
+    const inputSelectedRelation = document.getElementById('selected_relation');
+    const inputSelectedMedicalRecordNum = document.getElementById('selected_medical_record_num');
+    
+    let currentSelectedType = null; // 'self', 'existing_X', 'new'
+    let hasSelectedOnce = false;
+
+    let isRelationListRendered = false;
+
+    function renderRelationList() {
+        if (isRelationListRendered) return;
+        relationListContainer.innerHTML = '';
+        
+        let hasSelf = backendRelations.some(r => r.relation === '本人');
+        
+        // --- 1. Self Section ---
+        if (!hasSelf) {
+            const selfItem = document.createElement('div');
+            selfItem.className = `relation-item ${currentSelectedType === 'self' ? 'selected' : ''}`;
+            selfItem.dataset.type = 'self';
+            selfItem.onclick = (e) => { if(!e.target.closest('input')) selectRelation('self'); };
+            
+            const selfContent = document.createElement('div');
+            selfContent.className = 'relation-item-content';
+            selfContent.innerHTML = `<div class="relation-item-title">本人</div>`;
+            
+            const selfInputs = document.createElement('div');
+            selfInputs.className = 'relation-inputs';
+            selfInputs.innerHTML = `<input type="text" id="self_medical_record_num" placeholder="病歷號">`;
+            
+            selfContent.appendChild(selfInputs);
+            selfItem.appendChild(selfContent);
+            relationListContainer.appendChild(selfItem);
+        }
+        
+        // --- 2. Existing Section ---
+        if (backendRelations.length > 0) {
+            const sortedRelations = [...backendRelations].sort((a, b) => {
+                if (a.relation === '本人') return -1;
+                if (b.relation === '本人') return 1;
+                return 0;
+            });
+            
+            sortedRelations.forEach((r, idx) => {
+                const existingItem = document.createElement('div');
+                const typeId = `existing_${idx}`;
+                existingItem.className = `relation-item ${currentSelectedType === typeId ? 'selected' : ''}`;
+                existingItem.dataset.type = typeId;
+                existingItem.onclick = () => selectRelation(typeId);
+                
+                const existingContent = document.createElement('div');
+                existingContent.className = 'relation-item-content';
+                existingContent.innerHTML = `
+                    <div class="relation-item-title">${r.relation}</div>
+                    <div class="relation-item-subtitle">${r.medical_record_num}</div>
+                `;
+                existingItem.appendChild(existingContent);
+                relationListContainer.appendChild(existingItem);
+            });
+        }
+        
+        // --- 3. New Section ---
+        const newItem = document.createElement('div');
+        newItem.className = `relation-item ${currentSelectedType === 'new' ? 'selected' : ''}`;
+        newItem.dataset.type = 'new';
+        newItem.onclick = (e) => { if(!e.target.closest('input')) selectRelation('new'); };
+        
+        const newContent = document.createElement('div');
+        newContent.className = 'relation-item-content';
+        newContent.innerHTML = `<div class="relation-item-title hide-on-select">新增</div>`;
+        
+        const newInputs = document.createElement('div');
+        newInputs.className = 'relation-inputs';
+        newInputs.innerHTML = `
+            <input type="text" id="new_relation" placeholder="新增對象">
+            <input type="text" id="new_medical_record_num" placeholder="病歷號">
+        `;
+        
+        newContent.appendChild(newInputs);
+        newItem.appendChild(newContent);
+        relationListContainer.appendChild(newItem);
+        
+        isRelationListRendered = true;
+    }
+    
+    function selectRelation(type) {
+        currentSelectedType = type;
+        relationErrorMsg.innerText = '';
+        document.querySelectorAll('.relation-item').forEach(item => {
+            if (item.dataset.type === type) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+    
+    function openRelationModal() {
+        relationErrorMsg.innerText = '';
+        relationModal.classList.add('show');
+        renderRelationList();
+    }
+    
+    function confirmRelation() {
+        if (!currentSelectedType) {
+            relationErrorMsg.innerText = "請選擇一位對象";
+            return;
+        }
+        
+        let finalPairId = "";
+        let finalRelation = "";
+        let finalMedicalNum = "";
+        
+        if (currentSelectedType === 'self') {
+            finalRelation = "本人";
+            finalMedicalNum = document.getElementById('self_medical_record_num').value.trim();
+            if (!finalMedicalNum) {
+                relationErrorMsg.innerText = "輸入欄位不可空白";
+                return;
+            }
+        } else if (currentSelectedType.startsWith('existing_')) {
+            const idx = parseInt(currentSelectedType.split('_')[1]);
+            const sortedRelations = [...backendRelations].sort((a, b) => {
+                if (a.relation === '本人') return -1;
+                if (b.relation === '本人') return 1;
+                return 0;
+            });
+            const r = sortedRelations[idx];
+            finalPairId = r.pair_id;
+            finalRelation = r.relation;
+            finalMedicalNum = r.medical_record_num;
+        } else if (currentSelectedType === 'new') {
+            finalRelation = document.getElementById('new_relation').value.trim();
+            finalMedicalNum = document.getElementById('new_medical_record_num').value.trim();
+            
+            if (!finalRelation || !finalMedicalNum) {
+                relationErrorMsg.innerText = "輸入欄位不可空白";
+                return;
+            }
+            if (finalRelation === "本人" || finalRelation === "新增") {
+                relationErrorMsg.innerText = "關係名稱不可為「本人」或「新增」";
+                return;
+            }
+        }
+        
+        if (currentSelectedType === 'self' || currentSelectedType === 'new') {
+            for (let r of backendRelations) {
+                if (r.relation === finalRelation || r.medical_record_num === finalMedicalNum) {
+                    relationErrorMsg.innerText = "對象或病歷號不可重複";
+                    return;
+                }
+            }
+        }
+        
+        inputSelectedPairId.value = finalPairId;
+        inputSelectedRelation.value = finalRelation;
+        inputSelectedMedicalRecordNum.value = finalMedicalNum;
+        
+        displayRelationText.innerText = `${finalRelation} | ${finalMedicalNum}`;
+        
+        relationModal.classList.remove('show');
+        hasSelectedOnce = true;
+    }
+    
+    window.addEventListener('load', () => {
+        if (!hasSelectedOnce) {
+            openRelationModal();
+        }
+    });
+
     const todayStr = new Date().toISOString().split('T')[0];
     document.getElementById('discharge_date').value = todayStr;
     const displayDateEl = document.getElementById('display_discharge_date');

@@ -44,16 +44,16 @@ def verify_page():
 
 @form_bp.route("/api/verify_code", methods=['POST'])
 def verify_code():
-    # verification_codes["112233"] = {
-    #     "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
-    #     "user_name": "曾宇晨",
-    #     "expires_at": time.time() + 3600
-    # }
-    # verification_codes["223344"] = {
-    #     "user_id": "U223344",
-    #     "user_name": "楚中天",
-    #     "expires_at": time.time() + 3600
-    # }
+    verification_codes["112233"] = {
+        "user_id": "U3i4j5k6l7",
+        "user_name": "曾宇晨",
+        "expires_at": time.time() + 3600
+    }
+    verification_codes["223344"] = {
+        "user_id": "U223344",
+        "user_name": "楚中天",
+        "expires_at": time.time() + 3600
+    }
 
     data = request.json
     account = data.get("account")
@@ -116,46 +116,31 @@ def form_page():
     doctor_name = session.get('doctor_name')
     doctor_department = session.get('doctor_department')
 
-    # ==== 新增註解：查詢使用者是否存在歷史紀錄，以利預先填入表單 ====
-    prefill_record_num = ""
-    prefill_topics = []
-
+    # ==== 查詢使用者關聯的病患資料 ====
+    relations = []
     try:
-        # 1. 透過 line_id 去 patient.db 查出該名病患的病歷號
-        conn_pat = get_db('patient.db')
-        c_pat = conn_pat.cursor()
-        c_pat.execute('SELECT medical_record_num FROM PATIENT WHERE line_id = ?', (uid,))
-        pat_row = c_pat.fetchone()
-        conn_pat.close()
-
-        if pat_row:
-            medical_record_num = pat_row[0]
-            
-            # 2. 拿著病歷號去 form.db 查詢最近一次的紀錄 (以 checkout_date 遞減排序取第一筆)
-            conn_form = get_db('form.db')
-            c_form = conn_form.cursor()
-            c_form.execute('''
-                SELECT medical_record_num, doctor_account, symptoms 
-                FROM FORM 
-                WHERE medical_record_num = ? 
-                ORDER BY checkout_date DESC 
-                LIMIT 1
-            ''', (medical_record_num,))
-            form_row = c_form.fetchone()
-            conn_form.close()
-
-            if form_row:
-                prefill_record_num = form_row[0]
-                if form_row[2]:
-                    prefill_topics = json.loads(form_row[2])
+        conn = get_db('hospital.db')
+        c = conn.cursor()
+        c.execute('''
+            SELECT lpp.line_patient_pairs_id, lpp.relation, p.medical_record_number
+            FROM line_patient_pairs lpp
+            JOIN patients p ON lpp.patient_id = p.patient_id
+            WHERE lpp.line_uuid = ?
+        ''', (uid,))
+        rows = c.fetchall()
+        conn.close()
+        for r in rows:
+            relations.append({
+                'pair_id': r[0],
+                'relation': r[1],
+                'medical_record_num': r[2]
+            })
     except Exception as e:
-        print(f"讀取歷史資料發生錯誤: {str(e)}")
-    # ==========================================================
+        print(f"讀取關聯資料發生錯誤: {str(e)}")
 
     return render_template("form.html", verified=True, uname=uname, uid=uid, 
                            doctor_id=doctor_id, doctor_name=doctor_name, doctor_department=doctor_department,
-                           prefill_record_num=prefill_record_num, 
-                           prefill_topics=prefill_topics)
+                           relations=relations)
 
 
 # --- 新增註解：新增處理表單送出的 API 路由，將資料寫入 patient.db 及 form.db ---

@@ -252,6 +252,7 @@
   .badge-green  { background: #d1fae5; color: #065f46; }
   .badge-orange { background: #fef3c7; color: #92400e; }
   .badge-gray   { background: #f3f4f6; color: var(--muted); }
+  .badge-relation { background: #fbbf24; color: #78350f; }
 
   /* chat panel */
   .chat-panel {
@@ -336,25 +337,55 @@
     text-align: center;
     margin-bottom: 24px;
   }
-  .prompt-wrapper {
-    max-width: 800px;
+  .prompt-layout {
+    display: flex;
+    gap: 16px;
     margin: 20px auto 0;
+    height: calc(100vh - 180px);
+    min-height: 520px;
+  }
+  .prompt-col-left {
+    flex: 0 0 20%;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .prompt-col-center {
+    flex: 0 0 40%;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 16px 20px;
+    transition: flex 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .prompt-col-right {
+    flex: 0 0 40%;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 16px 20px;
   }
   .prompt-info {
     background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
-    padding: 12px 16px; font-size: 13px; color: var(--primary); margin-bottom: 16px;
-    text-align: center;
+    padding: 10px 14px; font-size: 12px; color: var(--primary); margin-bottom: 12px;
+    line-height: 1.45;
   }
-  #prompt-textarea {
-    width: 100%; height: 480px; padding: 16px; font-family: 'Consolas', monospace;
-    font-size: 13px; line-height: 1.7; border: 1.5px solid var(--border);
-    border-radius: 8px; resize: vertical; outline: none; background: #fafafa;
+  #prompt-textarea, #prompt-active-textarea {
+    width: 100%; padding: 14px; font-family: 'Consolas', monospace;
+    font-size: 13px; line-height: 1.6; border: 1.5px solid var(--border);
+    border-radius: 8px; outline: none; background: #fafafa;
   }
   #prompt-textarea:focus { border-color: var(--primary-l); background: #fff; }
-  .prompt-actions {
-    display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px;
-  }
-  .save-status      { font-size: 13px; color: var(--muted); }
+  .save-status      { font-size: 12px; color: var(--muted); }
   .save-status.ok   { color: var(--accent); }
   .save-status.fail { color: var(--danger); }
 
@@ -431,6 +462,18 @@
       max-width: 320px;
       margin: 0 auto;
   }
+  /* 人體圖片與互動區塊設定 */
+  .image-section {
+      margin-top: 30px;
+      text-align: center;
+  }
+  .image-wrapper {
+      position: relative;
+      display: block;
+      width: 100%;
+      max-width: 550px;
+      margin: 0 auto;
+  }
   .image-container {
       position: relative;
       display: inline-block;
@@ -442,15 +485,38 @@
       border-radius: 8px;
   }
   
-  .shiftable-container {
-      position: relative;
+  /* 3-column Interactive Layout */
+  .interactive-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      margin: 15px auto 0 auto;
+      gap: 10px;
       width: 100%;
-      transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-      transform: translateX(0%);
-      z-index: 2;
+      max-width: 500px;
+      position: relative;
+      padding: 0 5px;
+      box-sizing: border-box;
   }
-  .shiftable-container.shifted {
-      transform: translateX(-20%);
+  .body-column {
+      flex: 0 0 140px;
+      position: relative;
+  }
+  .popover-column {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 220px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 100;
+      transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  .buttons-column {
+      flex: 0 0 75px;
+      position: relative;
   }
   
   /* 熱區圓圈 */
@@ -471,47 +537,82 @@
       z-index: 10;
   }
 
-  .bottom-buttons-row {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 15px;
-      position: relative;
-      z-index: 3;
-  }
+  /* 底層類 Chip 型按鈕樣式 */
   .bottom-btn {
-      position: relative !important;
-      top: auto !important; left: auto !important;
-      width: auto !important; height: auto !important;
-      padding: 6px 16px;
-      border-radius: 20px;
+      position: absolute !important;
+      width: 100% !important;
+      height: auto !important;
+      padding: 7px 9px;
+      border-radius: 21px;
       background-color: rgba(6, 199, 85, 0.1);
       color: #05883b;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 16px;
       border: 2px solid #06C755;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-sizing: border-box;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s, transform 0.2s;
   }
-  .bottom-btn:hover, .bottom-btn.active {
+  
+  /* Specific vertical alignments */
+  .btn-skin {
+      top: 25% !important;
+      left: 0 !important;
+      transform: translateY(-50%) !important;
+  }
+  .btn-mental {
+      top: 50% !important;
+      left: 0 !important;
+      transform: translateY(-50%) !important;
+  }
+  .btn-other {
+      top: 75% !important;
+      left: 0 !important;
+      transform: translateY(-50%) !important;
+  }
+
+  .btn-skin:hover, .btn-skin.active {
       background-color: #06C755;
       color: white;
       border-width: 2px;
-      transform: translateY(-2px);
+      transform: translateY(-50%) scale(1.05) !important;
+  }
+  .btn-mental:hover, .btn-mental.active {
+      background-color: #06C755;
+      color: white;
+      border-width: 2px;
+      transform: translateY(-50%) scale(1.05) !important;
+  }
+  .btn-other:hover, .btn-other.active {
+      background-color: #06C755;
+      color: white;
+      border-width: 2px;
+      transform: translateY(-50%) scale(1.05) !important;
   }
 
-  /* Popover */
+  /* 浮動彈出框 (Popover) */
   #popover {
       display: none;
       position: absolute;
+      left: 0;
+      width: 220px;
       z-index: 100;
-      width: 180px;
-      animation: popIn 0.18s ease;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      transform: scale(0.92);
       box-sizing: border-box;
+      pointer-events: auto;
   }
-  #popover.show { display: block; }
+  #popover.show {
+      display: block;
+      opacity: 1;
+      transform: scale(1);
+  }
 
+  /* 切分內容區塊以實作標題固定與清單滑動 */
   .popover-content {
       background: #fff;
       border: 1.5px solid #06C755;
@@ -519,16 +620,16 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.18);
       display: flex;
       flex-direction: column;
-      max-height: 240px;
+      max-height: 320px;
       overflow: hidden;
   }
 
   #popover h4 {
       margin: 0;
-      padding: 10px 12px 8px 12px;
+      padding: 14px 16px 10px 16px;
       background-color: #fff;
       color: #06C755;
-      font-size: 13px;
+      font-size: 14px;
       border-bottom: 1px solid #e0f5e9;
       display: flex;
       justify-content: space-between;
@@ -537,7 +638,7 @@
   }
   #popover h4 .close-btn {
       cursor: pointer;
-      font-size: 16px;
+      font-size: 18px;
       color: #aaa;
       line-height: 1;
       padding: 0 2px;
@@ -546,61 +647,50 @@
   #popover h4 .close-btn:hover { color: #555; }
 
   .pop-checkbox-list {
-      padding: 8px 12px;
+      padding: 10px 16px 14px 16px;
       overflow-y: auto;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      text-align: left;
+      gap: 8px;
   }
   
+  /* 彈出框箭頭設定 */
   #popover::before {
       content: '';
       position: absolute;
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       background: #fff;
       z-index: 2;
-  }
-  #popover.arrow-left::before {
       border-left: 1.5px solid #06C755;
       border-top: 1.5px solid #06C755;
-      left: -6px;
+  }
+  #popover.arrow-left::before {
+      left: -7px;
       top: var(--arrow-top, 18px);
       transform: rotate(-45deg);
   }
   #popover.arrow-right::before {
-      border-left: 1.5px solid #06C755;
-      border-top: 1.5px solid #06C755;
-      right: -6px;
+      right: -7px;
       top: var(--arrow-top, 18px);
       transform: rotate(135deg);
-  }
-  #popover.arrow-bottom::before {
-      border-left: 1.5px solid #06C755;
-      border-bottom: 1.5px solid #06C755;
-      border-top: none;
-      bottom: -6px;
-      left: var(--arrow-left, 50%);
-      top: auto;
-      transform: rotate(-45deg);
   }
 
   .pop-checkbox-item {
       display: flex;
       align-items: center;
-      font-size: 13px;
+      font-size: 15px;
       cursor: pointer;
-      padding: 3px 2px;
+      padding: 4px 2px;
       border-radius: 6px;
       transition: background 0.1s;
   }
   .pop-checkbox-item:hover { background: #f0fbf4; }
   .pop-checkbox-item input[type="checkbox"] {
-      margin-right: 6px;
-      width: 15px;
-      height: 15px;
+      margin-right: 9px;
+      width: 18px;
+      height: 18px;
       cursor: pointer;
       accent-color: #06C755;
       flex-shrink: 0;
@@ -608,30 +698,37 @@
 
   /* Chips */
   .confirmation-section {
-      margin-top: 20px;
-      padding: 12px;
+      margin-top: 30px;
+      padding: 15px;
       background-color: #ebf8f0;
       border-radius: 8px;
       border: 1px solid #bce3c9;
   }
+  .confirmation-section h3 {
+      text-align: left;
+      margin-top: 0;
+      color: #05883b;
+      font-size: 16px;
+      margin-bottom: 15px;
+  }
   .chip-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
   }
   .chip {
       display: inline-flex;
       align-items: center;
-      padding: 4px 10px;
-      border-radius: 15px;
-      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 14px;
       font-weight: 500;
       cursor: pointer;
       user-select: none;
       transition: background-color 0.2s, color 0.2s, opacity 0.2s;
   }
   .chip .icon {
-      margin-right: 4px;
+      margin-right: 6px;
       font-weight: bold;
   }
   .chip.active {
@@ -646,6 +743,293 @@
   }
   .chip.inactive .icon {
       opacity: 0.5;
+  }
+
+  /* Three-column layout specific for chats and forms */
+  #section-chats .chat-layout, #section-forms .chat-layout {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 196px);
+    margin-top: 20px;
+    position: relative;
+  }
+  #section-chats .patient-list, #section-forms .patient-list {
+    width: 250px !important;
+    flex-shrink: 0;
+  }
+  #section-chats .visit-list, #section-forms .visit-list {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  #section-chats .chat-panel, #section-forms .chat-panel {
+    flex: 1;
+    min-width: 0;
+    position: relative; /* relative parent for timeline navigation */
+  }
+
+  /* Stats hover tooltips */
+  .stat-card {
+    position: relative;
+  }
+  .stat-card::after {
+    content: attr(data-definition);
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(15, 23, 42, 0.95);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+    width: 240px;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 100;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  }
+  .stat-card:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  #chat-body {
+    position: relative;
+    padding-right: 60px;
+  }
+
+  .visit-list-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .visit-item {
+    padding: 16px 60px 16px 20px !important;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s, border-left-color .1s;
+    border-left: 3px solid transparent;
+  }
+  .visit-item:hover {
+    background: var(--bg);
+  }
+  .visit-item.active {
+    background: #eff6ff;
+    border-left-color: var(--primary);
+  }
+  .visit-item:last-child {
+    border-bottom: none;
+  }
+  .visit-title {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .visit-meta {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* Chat timelines */
+  .chat-timeline-nav {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10;
+  }
+  .timeline-dot-small {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .timeline-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+    position: relative;
+  }
+  .timeline-dot:hover, .timeline-dot.active {
+    background: var(--primary);
+    transform: scale(1.3);
+  }
+  .timeline-dot::after {
+    content: attr(data-label);
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%) translateX(10px);
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  }
+  .timeline-dot:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  .session-divider {
+    text-align: center;
+    margin: 28px 0 16px;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    position: relative;
+  }
+  .session-divider::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--primary-l), transparent);
+    z-index: 1;
+  }
+  .session-divider span {
+    position: relative;
+    z-index: 2;
+    background: var(--card);
+    padding: 2px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--primary-l);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  /* ── Alert Modals ── */
+  .modal-backdrop-alert {
+    backdrop-filter: blur(8px);
+    background: rgba(15, 23, 42, 0.45) !important;
+  }
+  .modal-alert {
+    width: 440px;
+    padding: 32px;
+    border-radius: 20px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    background: #ffffff;
+    box-shadow: 0 20px 48px -10px rgba(15, 23, 42, 0.18);
+    text-align: center;
+  }
+  .modal-alert-icon-wrap {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+  }
+  .modal-alert-icon-wrap.warning {
+    background: #fffbe5;
+    color: #d97706;
+  }
+  .modal-alert-icon-wrap.info {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+  .modal-alert-icon-wrap.danger {
+    background: #fef2f2;
+    color: #ef4444;
+  }
+  .modal-alert-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 12px;
+  }
+  .modal-alert-banner {
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    text-align: left;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .modal-alert-banner.warning {
+    background-color: #fffbeb;
+    border: 1px solid #fef3c7;
+    color: #92400e;
+  }
+  .modal-alert-banner.info {
+    background-color: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #1e40af;
+  }
+  .modal-alert-banner.danger {
+    background-color: #fef2f2;
+    border: 1px solid #fee2e2;
+    color: #991b1b;
+  }
+  .modal-alert-subtitle {
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 28px;
+  }
+  .modal-alert-actions {
+    display: flex;
+    gap: 12px;
+  }
+  .modal-alert-actions .btn {
+    flex: 1;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    height: 42px;
+    border-radius: 10px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .modal-alert-actions .btn-danger {
+    background: #ef4444;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  }
+  .modal-alert-actions .btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  }
+  .modal-alert-actions .btn-outline {
+    border: 1.5px solid #cbd5e1;
+    color: #475569;
+    background: transparent;
+  }
+  .modal-alert-actions .btn-outline:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #1e293b;
+    transform: translateY(-1px);
   }
 </style>
 </head>
@@ -722,25 +1106,15 @@
       <section id="section-stats" class="section active">
         <div class="section-title">統計數據</div>
         <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-value" id="s-friends">—</div>
-            <div class="stat-label">好友總數</div>
-          </div>
-          <div class="stat-card green">
+          <div class="stat-card green" data-definition="已在系統中建立就診紀錄（病歷表單）的獨特病患病歷號碼總數。">
             <div class="stat-icon">🧑‍⚕️</div>
             <div class="stat-value" id="s-patients">—</div>
             <div class="stat-label">病患總數</div>
           </div>
-          <div class="stat-card orange">
+          <div class="stat-card orange" data-definition="已開始對話聊天（有 chat_logs 聊天記錄檔）的病患數，佔 LINE 帳號好友總數的百分比。">
             <div class="stat-icon">📱</div>
             <div class="stat-value" id="s-usage">—</div>
             <div class="stat-label">LINE Bot 使用率</div>
-          </div>
-          <div class="stat-card red">
-            <div class="stat-icon">🔄</div>
-            <div class="stat-value" id="s-return">—</div>
-            <div class="stat-label">回診總數</div>
           </div>
         </div>
         <div class="last-updated" id="s-updated"></div>
@@ -752,13 +1126,33 @@
         <div class="section-title">聊天紀錄</div>
         <div class="chat-layout">
           <div class="patient-list">
-            <div class="plist-header">
-              病患列表
-              <span class="badge badge-gray" id="patient-count">0</span>
+            <div class="plist-header" style="justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                病患列表
+                <span class="badge badge-gray" id="patient-count">0</span>
+              </div>
+              <select id="patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
+                <option value="checkout_desc">出院日期 ⬇</option>
+                <option value="checkout_asc">出院日期 ⬆</option>
+                <option value="mrn_desc">病歷號 ⬇</option>
+                <option value="mrn_asc">病歷號 ⬆</option>
+              </select>
             </div>
             <div id="patient-list-body">
               <div class="empty-state" style="padding:32px 0;">
                 <div class="empty-icon">👤</div><p>載入中…</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="visit-list">
+            <div class="plist-header">
+              就診紀錄
+              <span class="badge badge-gray" id="visit-count">0</span>
+            </div>
+            <div id="visit-list-body" class="visit-list-body">
+              <div class="empty-state" style="padding:32px 0;">
+                <div class="empty-icon">📋</div><p>請先選擇病患</p>
               </div>
             </div>
           </div>
@@ -769,10 +1163,8 @@
                 <div class="chat-panel-title" id="chat-title">請選擇病患</div>
                 <div class="chat-panel-sub"   id="chat-sub">點擊左側病患查看詳情</div>
               </div>
-              <div id="session-select-wrapper" class="session-select-container" style="display: none;">
-                <span style="font-size: 13px; font-weight: 600; color: var(--text);">選擇對話：</span>
-                <select id="session-select" class="session-select-dropdown">
-                </select>
+              <div id="session-select-wrapper" style="display: none !important;">
+                <select id="session-select"></select>
               </div>
             </div>
             <div class="chat-panel-body" id="chat-body">
@@ -781,6 +1173,8 @@
                 <p>選擇左側病患以查看表單與聊天紀錄</p>
               </div>
             </div>
+            <!-- Timeline Navigation -->
+            <div class="chat-timeline-nav" id="chat-timeline-nav" style="display: none;"></div>
           </div>
         </div>
       </section>
@@ -789,10 +1183,19 @@
       <section id="section-forms" class="section">
         <div class="section-title">修改表單</div>
         <div class="chat-layout">
+          <!-- Column 1: Patient List -->
           <div class="patient-list">
-            <div class="plist-header">
-              病患列表
-              <span class="badge badge-gray" id="form-patient-count">0</span>
+            <div class="plist-header" style="justify-content: space-between; align-items: center; display: flex;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                病患列表
+                <span class="badge badge-gray" id="form-patient-count">0</span>
+              </div>
+              <select id="form-patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderFormPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
+                <option value="checkout_desc">出院日期 ⬇</option>
+                <option value="checkout_asc">出院日期 ⬆</option>
+                <option value="mrn_desc">病歷號 ⬇</option>
+                <option value="mrn_asc">病歷號 ⬆</option>
+              </select>
             </div>
             <div id="form-patient-list-body">
               <div class="empty-state" style="padding:32px 0;">
@@ -801,17 +1204,102 @@
             </div>
           </div>
 
+          <!-- Column 2: Visit List -->
+          <div class="visit-list">
+            <div class="plist-header">
+              就診紀錄
+              <span class="badge badge-gray" id="form-visit-count">0</span>
+            </div>
+            <div id="form-visit-list-body" class="visit-list-body">
+              <div class="empty-state" style="padding:32px 0;">
+                <div class="empty-icon">📋</div><p>請先選擇病患</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Edit Form Content -->
           <div class="chat-panel">
             <div class="chat-panel-header">
               <div>
-                <div class="chat-panel-title" id="form-edit-title">請選擇病患</div>
-                <div class="chat-panel-sub"   id="form-edit-sub">點擊左側病患以修改表單</div>
+                <div class="chat-panel-title" id="form-edit-title">請選擇就診紀錄</div>
+                <div class="chat-panel-sub"   id="form-edit-sub">點擊就診紀錄載入表單進行修改</div>
               </div>
             </div>
-            <div class="chat-panel-body" id="form-edit-body">
-              <div class="empty-state">
+            <div class="chat-panel-body" id="form-edit-body" style="position: relative;">
+              <!-- Empty state before select -->
+              <div class="empty-state" id="form-edit-empty">
                 <div class="empty-icon">📋</div>
-                <p>選擇左側病患以查看並修改表單</p>
+                <p>請先選擇就診紀錄以修改表單</p>
+              </div>
+              
+              <!-- Form container which is hidden by default -->
+              <div id="form-edit-container" style="display: none;">
+                <input type="hidden" id="edit-form-mrn">
+                <input type="hidden" id="edit-form-orig-date">
+                
+                <div class="form-group">
+                  <label>病歷號</label>
+                  <input type="text" id="edit-form-mrn-show" disabled style="background:#f3f4f6;color:var(--muted)">
+                </div>
+                <div class="form-group">
+                  <label>出院日期</label>
+                  <input type="date" id="edit-form-date">
+                </div>
+                <div class="form-group" id="edit-form-doctor-group">
+                  <label>主治醫師帳號</label>
+                  <select id="edit-form-doctor"></select>
+                </div>
+                
+                <div class="form-group">
+                  <div class="confirmation-section" style="display: none; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: #05883b; font-size: 14px; margin-bottom: 10px;">已選擇的衛教資料確認清單：</h3>
+                    <p id="empty-msg" style="color: #777; font-size: 13px; font-style: italic;">尚未選擇任何衛教資料</p>
+                    <div class="chip-list" id="confirmed-list"></div>
+                  </div>
+
+                  <div class="image-wrapper" id="image-wrapper">
+                    <div class="interactive-layout">
+                      <!-- Left Column: Human Body -->
+                      <div class="body-column">
+                        <div class="image-container" id="body-image-container">
+                          <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+                          <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 15.97%; width: 38.27%; height: 11%;" title="頭"></div>
+                          <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 22.88%; width: 23.55%; height: 6%;" title="脖子"></div>
+                          <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 63.94%; width: 32.38%; height: 32%;" title="手"></div>
+                          <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 5.22%; width: 58.88%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+                          <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 2.13%; width: 64.77%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+                          <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 31.56%; width: 38.27%; height: 39%;" title="腳"></div>
+                        </div>
+                      </div>
+
+                      <!-- Middle Column: Popover -->
+                      <div class="popover-column">
+                        <div id="popover" style="display: none;">
+                          <div class="popover-content">
+                            <h4>
+                              <span id="popover-title">選擇衛教資料</span>
+                              <span class="close-btn" id="popover-close">✕</span>
+                            </h4>
+                            <div class="pop-checkbox-list" id="popover-checkboxes"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Right Column: 3 Buttons -->
+                      <div class="buttons-column">
+                        <div class="hotspot bottom-btn btn-skin" data-region="皮膚" data-position="bottom">皮膚</div>
+                        <div class="hotspot bottom-btn btn-mental" data-region="精神" data-position="bottom">精神</div>
+                        <div class="hotspot bottom-btn btn-other" data-region="其他" data-position="bottom">其他</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <p class="error-msg" id="form-edit-error" style="text-align:left; color: var(--danger);"></p>
+                
+                <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                  <button class="btn btn-accent" onclick="saveFormEdit()">💾 儲存修改</button>
+                </div>
               </div>
             </div>
           </div>
@@ -838,13 +1326,14 @@
               <tr>
                 <th>帳號</th>
                 <th>姓名</th>
+                <th>科別</th>
                 <th>狀態</th>
                 <th>角色</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody id="doctor-tbody">
-              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>
             </tbody>
           </table>
         </div>
@@ -856,14 +1345,57 @@
           系統 Prompt 修改
           <span class="role-tag role-admin" style="margin-left:8px;vertical-align:middle;">管理員</span>
         </div>
-        <div class="prompt-wrapper">
-          <div class="prompt-info">
-            ℹ️ 修改內容儲存至 <code>assets/prompt.md</code>，直接影響 LINE Bot 回覆邏輯。
+        <div class="prompt-layout">
+          <!-- 左側 1/5 列表 -->
+          <div class="prompt-col-left">
+            <div class="plist-header" style="background: var(--bg); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; padding: 12px 16px;">
+              📁 Prompt 版本列表
+            </div>
+            <div id="prompt-version-list" style="flex: 1; overflow-y: auto;">
+              <!-- 列表內容由 JS 產生 -->
+            </div>
           </div>
-          <textarea id="prompt-textarea" placeholder="載入中…"></textarea>
-          <div class="prompt-actions">
-            <button class="btn btn-accent" onclick="savePrompt()">💾 儲存 Prompt</button>
-            <span class="save-status" id="save-status"></span>
+
+          <!-- 中間 2/5 修改框 -->
+          <div class="prompt-col-center">
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+              <span>✏️ 編輯框 (<code id="editing-version-label">-</code>)</span>
+              <span id="active-badge" class="badge badge-green" style="display:none;">目前使用中</span>
+            </div>
+            <div class="prompt-info" style="margin-bottom: 8px;">
+              ℹ️ 修改將會儲存並新增一個版本。最原始的 <code>prompt_001.md</code> 將會被保留。
+            </div>
+            <!-- 自定義 prompt 暱稱 -->
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: var(--bg); padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border);">
+              <span style="font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap;">自訂名稱：</span>
+              <input type="text" id="prompt-nickname-input" placeholder="例如：活潑版本" style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1.5px solid var(--border); font-size: 13px; outline: none; background: #fff; color: var(--text);">
+              <button class="btn btn-primary" id="btn-save-nickname" onclick="savePromptNickname()" style="padding: 6px 14px; font-size: 13px; width: auto; flex-shrink: 0; white-space: nowrap;">💾 儲存名稱</button>
+            </div>
+            <textarea id="prompt-textarea" placeholder="載入中…" oninput="checkPromptModified()" style="flex: 1; resize: none; margin-bottom: 12px;"></textarea>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+              <!-- 左側小按鈕 ↩️ 和 ↪️ -->
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-gray" id="btn-rollback-prompt" onclick="prevPromptVersion()" style="padding: 6px 12px; font-size: 15px;" title="前一個版本">↩️</button>
+                <button class="btn btn-gray" id="btn-next-prompt" onclick="nextPromptVersion()" style="padding: 6px 12px; font-size: 15px;" title="後一個版本">↪️</button>
+              </div>
+              
+              <!-- 右側功能按鈕 -->
+              <div style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap;">
+                <button class="btn btn-danger" id="btn-delete-prompt" onclick="deletePrompt()" style="display:none; white-space: nowrap; width: auto; flex-shrink: 0;">🗑️ 刪除</button>
+                <button class="btn btn-primary" id="btn-save-prompt" onclick="savePrompt()" disabled style="white-space: nowrap; width: auto; flex-shrink: 0;">💾 儲存並新增</button>
+                <button class="btn btn-accent" id="btn-apply-prompt" onclick="applyPrompt()" disabled style="white-space: nowrap; width: auto; flex-shrink: 0;">套用</button>
+              </div>
+            </div>
+            <div class="save-status" id="save-status" style="margin-top: 8px; font-size: 12px; min-height: 18px;"></div>
+          </div>
+
+          <!-- 右側 2/5 當前使用的 prompt -->
+          <div class="prompt-col-right" id="prompt-active-column">
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">
+              🟢 目前使用的 Prompt (<code id="active-version-label">-</code>)
+            </div>
+            <textarea id="prompt-active-textarea" readonly placeholder="載入中…" style="flex: 1; resize: none; background: #fafafa; color: var(--muted); cursor: not-allowed;"></textarea>
           </div>
         </div>
       </section>
@@ -880,6 +1412,52 @@
   </div>
 </div>
 
+<!-- ── Modal：確認套用 Prompt ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-apply-prompt">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap warning">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認套用此 Prompt 版本</div>
+    <div class="modal-alert-banner warning">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">此操作將變更 LINE Bot 目前套用的 active 系統 Prompt！</div>
+    </div>
+    <div class="modal-alert-subtitle">這會立即影響 LINE Bot 的回覆邏輯，確定要套用嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-apply-prompt')">取消</button>
+      <button class="btn btn-danger" onclick="doApplyPrompt()">確認套用</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：確認刪除 Prompt ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-delete-prompt">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap danger">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認刪除目前版本</div>
+    <div class="modal-alert-banner danger">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">此操作將永久刪除當前的 Prompt 檔案，且不可復原！</div>
+    </div>
+    <div class="modal-alert-subtitle">系統將會自動切換到相鄰的其他版本。確定要刪除嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-delete-prompt')">取消</button>
+      <button class="btn btn-danger" onclick="doDeletePrompt()">確認刪除</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal：修改醫師 ── -->
 <div class="modal-backdrop" id="modal-doctor">
   <div class="modal">
@@ -892,6 +1470,10 @@
     <div class="form-group">
       <label>姓名</label>
       <input type="text" id="edit-doctor-name" placeholder="醫師姓名">
+    </div>
+    <div class="form-group">
+      <label>科別</label>
+      <input type="text" id="edit-doctor-specialty" placeholder="例如: 急診科">
     </div>
     <div class="form-group">
       <label>新密碼（留空則不修改）</label>
@@ -930,7 +1512,11 @@
       </div>
       <div class="form-group">
         <label>姓名</label>
-        <input type="text" id="add-doctor-name" placeholder="例如: 王大明 醫師">
+        <input type="text" id="add-doctor-name" placeholder="例如: 王大明">
+      </div>
+      <div class="form-group">
+        <label>科別</label>
+        <input type="text" id="add-doctor-specialty" placeholder="例如: 急診科">
       </div>
       <div class="form-group">
         <label>狀態</label>
@@ -978,79 +1564,14 @@
   </div>
 </div>
 
-<!-- ── Modal：修改表單 ── -->
-<div class="modal-backdrop" id="modal-form">
-  <div class="modal">
-    <div class="modal-title">✏️ 修改表單</div>
-    <input type="hidden" id="edit-form-mrn">
-    <input type="hidden" id="edit-form-orig-date">
-    <div class="form-group">
-      <label>病歷號</label>
-      <input type="text" id="edit-form-mrn-show" disabled style="background:#f3f4f6;color:var(--muted)">
-    </div>
-    <div class="form-group">
-      <label>出院日期</label>
-      <input type="date" id="edit-form-date">
-    </div>
-    <div class="form-group" id="edit-form-doctor-group">
-      <label>主治醫師帳號</label>
-      <select id="edit-form-doctor"></select>
-    </div>
-    <div class="form-group">
-      <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
-      
-      <div class="image-section">
-        <div class="image-wrapper" id="image-wrapper">
-          <div id="body-shift-container" class="shiftable-container">
-            <div class="image-container" id="body-image-container">
-              <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
-              <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 43.7%; width: 13%; height: 11%;" title="頭"></div>
-              <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 46.05%; width: 8%; height: 6%;" title="脖子"></div>
-              <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 60%; width: 11%; height: 32%;" title="手"></div>
-              <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 40.05%; width: 20%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
-              <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 39%; width: 22%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
-              <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 49%; width: 13%; height: 39%;" title="腳"></div>
-            </div>
-          </div>
-          
-          <div class="bottom-buttons-row">
-            <div class="hotspot bottom-btn" data-region="皮膚" data-position="bottom">皮膚</div>
-            <div class="hotspot bottom-btn" data-region="精神" data-position="bottom">精神</div>
-            <div class="hotspot bottom-btn" data-region="其他" data-position="bottom">其他</div>
-          </div>
-
-          <div id="popover">
-            <div class="popover-content">
-              <h4>
-                <span id="popover-title">選擇衛教資料</span>
-                <span class="close-btn" id="popover-close">✕</span>
-              </h4>
-              <div class="pop-checkbox-list" id="popover-checkboxes"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="confirmation-section">
-        <h3 style="margin-top: 0; color: #05883b; font-size: 14px; margin-bottom: 10px;">已選擇的衛教資料確認清單：</h3>
-        <p id="empty-msg" style="color: #777; font-size: 13px; font-style: italic;">尚未選擇任何衛教資料</p>
-        <div class="chip-list" id="confirmed-list"></div>
-      </div>
-    </div>
-    <p class="error-msg" id="form-modal-error" style="text-align:left"></p>
-    <div class="modal-actions">
-      <button class="btn btn-gray btn-sm" onclick="closeModal('modal-form')">取消</button>
-      <button class="btn btn-accent btn-sm" onclick="saveFormEdit()">💾 儲存</button>
-    </div>
-  </div>
-</div>
+<!-- Modal：修改表單已改為內嵌，此處 Modal 已刪除 -->
 
 <!-- toast -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ── state ──
-const state = { isAdmin: false, currentMrn: null, formCurrentMrn: null, doctors: [], currentForms: [], currentSessions: [] };
+const state = { isAdmin: false, currentMrn: null, formCurrentMrn: null, doctors: [], currentForms: [], currentSessions: [], allPatients: [], allFormPatients: [] };
 
 // ── api ──
 async function api(method, path, body) {
@@ -1182,13 +1703,18 @@ async function loadStats() {
   try {
     const d = await api('GET', '/api/stats');
     if (d.error) { document.getElementById('s-error').textContent = d.error; return; }
-    document.getElementById('s-friends').textContent  = d.total_friends  ?? '—';
-    document.getElementById('s-patients').textContent = d.total_patients ?? '—';
-    document.getElementById('s-usage').textContent    = (d.bot_usage_rate ?? '—') + '%';
-    document.getElementById('s-return').textContent   = d.return_visits   ?? '—';
-    document.getElementById('s-updated').textContent  =
+    const friendsEl = document.getElementById('s-friends');
+    if (friendsEl) friendsEl.textContent = d.total_friends ?? '—';
+    const patientsEl = document.getElementById('s-patients');
+    if (patientsEl) patientsEl.textContent = d.total_patients ?? '—';
+    const usageEl = document.getElementById('s-usage');
+    if (usageEl) usageEl.textContent = (d.bot_usage_rate ?? '—') + '%';
+    const returnEl = document.getElementById('s-return');
+    if (returnEl) returnEl.textContent = d.return_visits ?? '—';
+    document.getElementById('s-updated').textContent =
       d.last_updated ? '最後更新：' + d.last_updated : '';
-  } catch {
+  } catch (err) {
+    console.error(err);
     document.getElementById('s-error').textContent = '無法載入統計資料';
   }
 }
@@ -1198,9 +1724,47 @@ async function loadChats() {
   loading(true);
   try {
     const list = await api('GET', '/api/chats');
-    renderPatientList(Array.isArray(list) ? list : []);
-  } catch { renderPatientList([]); }
-  finally  { loading(false); }
+    state.allPatients = Array.isArray(list) ? list : [];
+    const sortCriteria = document.getElementById('patient-sort-select').value;
+    sortAndRenderPatients(sortCriteria);
+  } catch (err) {
+    console.error(err);
+    state.allPatients = [];
+    renderPatientList([]);
+  } finally  { loading(false); }
+}
+
+function sortAndRenderPatients(criteria) {
+  if (!state.allPatients) return;
+  const patients = [...state.allPatients];
+  
+  if (criteria === 'checkout_desc') {
+    patients.sort((a, b) => {
+      const dateA = a.latest_checkout || '';
+      const dateB = b.latest_checkout || '';
+      return dateB.localeCompare(dateA);
+    });
+  } else if (criteria === 'checkout_asc') {
+    patients.sort((a, b) => {
+      const dateA = a.latest_checkout || '';
+      const dateB = b.latest_checkout || '';
+      return dateA.localeCompare(dateB);
+    });
+  } else if (criteria === 'mrn_desc') {
+    patients.sort((a, b) => {
+      const mrnA = a.medical_record_num || '';
+      const mrnB = b.medical_record_num || '';
+      return mrnB.localeCompare(mrnA);
+    });
+  } else if (criteria === 'mrn_asc') {
+    patients.sort((a, b) => {
+      const mrnA = a.medical_record_num || '';
+      const mrnB = b.medical_record_num || '';
+      return mrnA.localeCompare(mrnB);
+    });
+  }
+
+  renderPatientList(patients);
 }
 
 function renderPatientList(patients) {
@@ -1211,24 +1775,30 @@ function renderPatientList(patients) {
       <div class="empty-icon">👤</div><p>無病患資料</p></div>`;
     return;
   }
-  body.innerHTML = patients.map(p => `
-    <div class="patient-item${p.medical_record_num === state.currentMrn ? ' active' : ''}"
-         onclick="loadDetail('${esc(p.medical_record_num)}', this)">
-      <div class="patient-mrn">${esc(p.medical_record_num)}</div>
-      <div class="patient-meta">
-        ${p.is_return
-          ? '<span class="badge badge-orange">回診</span>'
-          : '<span class="badge badge-blue">首診</span>'}
-        ${p.has_logs
-          ? '<span class="badge badge-green">有紀錄</span>'
-          : '<span class="badge badge-gray">無紀錄</span>'}
-        <span>表單 ${p.form_count} 筆</span>
-      </div>
-      ${p.last_chat
-        ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">最後聊天：${p.last_chat}</div>`
-        : ''}
-    </div>`
-  ).join('');
+  body.innerHTML = patients.map(p => {
+    let specialtyText = esc(p.specialty);
+    let specialtyTitle = '';
+    if (p.specialties && p.specialties.length > 1) {
+      specialtyText += ' ...';
+      specialtyTitle = `所有看診科別：${p.specialties.join(', ')}`;
+    }
+    return `
+      <div class="patient-item${p.medical_record_num === state.currentMrn ? ' active' : ''}"
+           onclick="loadDetail('${esc(p.medical_record_num)}', this)">
+        <div class="patient-mrn">
+          ${esc(p.medical_record_num)}
+          ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
+        </div>
+        <div class="patient-meta">
+          <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
+          ${p.has_logs
+            ? '<span class="badge badge-green">已開始聊天</span>'
+            : '<span class="badge badge-gray">尚未聊天</span>'}
+          <span>就診 ${p.form_count} 次</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">出院日期：${esc(p.latest_checkout || '—')}</div>
+      </div>`;
+  }).join('');
 }
 
 // ── chat detail ──
@@ -1237,108 +1807,192 @@ async function loadDetail(mrn, el) {
   document.querySelectorAll('#patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
 
-  document.getElementById('chat-body').innerHTML =
+  document.getElementById('visit-list-body').innerHTML =
     '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
-  document.getElementById('chat-title').textContent = mrn;
+  document.getElementById('chat-body').innerHTML =
+    '<div class="empty-state"><p>請選擇就診紀錄以查看聊天對話</p></div>';
+  document.getElementById('chat-title').textContent = '請選擇就診紀錄';
   document.getElementById('chat-sub').textContent   = '';
-  document.getElementById('session-select-wrapper').style.display = 'none';
+  document.getElementById('chat-timeline-nav').style.display = 'none';
 
   try {
     const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
     if (d.error) {
-      document.getElementById('chat-body').innerHTML =
-        `<p style="color:var(--danger)">${esc(d.error)}</p>`;
+      document.getElementById('visit-list-body').innerHTML =
+        `<p style="color:var(--danger);padding:16px;">${esc(d.error)}</p>`;
       return;
     }
-    renderDetail(d);
-  } catch {
-    document.getElementById('chat-body').innerHTML =
-      '<p style="color:var(--danger)">載入失敗</p>';
+    
+    state.currentSessions = d.sessions || [];
+    state.currentForms = d.forms || [];
+    
+    renderVisits();
+  } catch (err) {
+    console.error(err);
+    document.getElementById('visit-list-body').innerHTML =
+      '<p style="color:var(--danger);padding:16px;">載入失敗</p>';
   }
 }
 
-function renderDetail(d) {
-  const p = d.patient;
-  document.getElementById('chat-title').textContent = p.medical_record_num;
-  document.getElementById('chat-sub').textContent   =
-    `LINE ID：${p.line_id || '未連結'}`;
-
-  state.currentSessions = d.sessions || [];
-  state.currentForms = d.forms || [];
-
-  const selectWrapper = document.getElementById('session-select-wrapper');
-  const selectEl = document.getElementById('session-select');
-
-  if (!state.currentSessions || !state.currentSessions.length) {
-    selectWrapper.style.display = 'none';
-    renderSessionContent(state.currentForms, -1);
-  } else {
-    // Populate select element options
-    selectEl.innerHTML = state.currentSessions.map((s, idx) => {
-      return `<option value="${idx}">${esc(s.label)}</option>`;
-    }).join('');
-    
-    // Set event listener
-    selectEl.onchange = function(e) {
-      const idx = parseInt(e.target.value, 10);
-      renderSessionContent(state.currentForms, idx);
-    };
-
-    selectWrapper.style.display = 'flex';
-    
-    // Default to displaying the first (newest) session
-    renderSessionContent(state.currentForms, 0);
+function renderVisits() {
+  const body = document.getElementById('visit-list-body');
+  const forms = state.currentForms || [];
+  
+  document.getElementById('visit-count').textContent = forms.length;
+  
+  if (!forms.length) {
+    body.innerHTML = `<div class="empty-state" style="padding:32px 0;">
+      <div class="empty-icon">📋</div><p>無就診紀錄</p></div>`;
+    return;
   }
-}
-
-function renderSessionContent(forms, sessionIdx) {
-  let html = '';
-
-  if (forms && forms.length) {
-    html += `<p class="subsection-title">📋 表單紀錄（共 ${forms.length} 筆）</p>`;
-    forms.forEach((f, i) => {
-      html += `
-        <div class="form-card">
-          <div class="form-card-head">
-            <span class="form-card-label">${i > 0 ? '🔄 回診' : '📝 首診'} — ${esc(f.checkout_date)}</span>
-            ${f.is_chatted
-              ? '<span class="chatted-tag">已開始聊天</span>'
-              : '<span class="not-chatted-tag">尚未聊天</span>'}
-          </div>
-          <div class="form-row">主治醫師帳號：<b>${esc(f.doctor_account)}</b></div>
-          <div class="form-topics">
-            ${(f.symptoms || []).map(s => `<span class="topic-tag">${esc(s)}</span>`).join('')}
-          </div>
-        </div>`;
+  
+  const sortedForms = [...forms].sort((a, b) => b.checkout_date.localeCompare(a.checkout_date));
+  
+  body.innerHTML = sortedForms.map((f, index) => {
+    const v_current = f.checkout_date;
+    const formsAsc = [...forms].sort((a, b) => a.checkout_date.localeCompare(b.checkout_date));
+    const nextForm = formsAsc.find(fa => fa.checkout_date > v_current);
+    const v_next = nextForm ? nextForm.checkout_date : null;
+    
+    const hasLogs = state.currentSessions.some(s => {
+      const sDate = s.start_time ? s.start_time.substring(0, 10) : '';
+      return sDate >= v_current && (!v_next || sDate < v_next);
     });
-    html += '<div class="divider"></div>';
+    
+    return `
+      <div class="visit-item" id="visit-item-${index}" onclick="selectVisit('${esc(f.checkout_date)}', this)">
+        <div class="visit-title">${esc(f.checkout_date)}</div>
+        <div class="visit-meta">
+          <span class="badge badge-blue">${esc(f.specialty)}</span>
+          ${hasLogs
+            ? '<span class="badge badge-green">已開始聊天</span>'
+            : '<span class="badge badge-gray">尚未聊天</span>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  const firstVisitItem = body.querySelector('.visit-item');
+  if (firstVisitItem) {
+    firstVisitItem.click();
   }
+}
 
-  if (sessionIdx === -1 || !state.currentSessions || !state.currentSessions[sessionIdx]) {
-    html += '<div class="no-logs-notice">⚠️ 此病患尚無聊天紀錄</div>';
-  } else {
-    const session = state.currentSessions[sessionIdx];
-    const msgs = session.messages || [];
-
-    if (!msgs.length) {
-      html += '<div class="no-logs-notice">⚠️ 此對話無聊天紀錄</div>';
+function selectVisit(checkoutDate, el) {
+  document.querySelectorAll('#visit-list-body .visit-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  
+  document.getElementById('chat-title').textContent = `${state.currentMrn}`;
+  document.getElementById('chat-sub').textContent = '就診日期：' + checkoutDate;
+  
+  const v_current = checkoutDate;
+  const formsAsc = [...state.currentForms].sort((a, b) => a.checkout_date.localeCompare(b.checkout_date));
+  const nextForm = formsAsc.find(f => f.checkout_date > v_current);
+  const v_next = nextForm ? nextForm.checkout_date : null;
+  
+  const matchedSessions = state.currentSessions.filter(s => {
+    const sDate = s.start_time ? s.start_time.substring(0, 10) : '';
+    return sDate >= v_current && (!v_next || sDate < v_next);
+  });
+  
+  matchedSessions.sort((a, b) => a.start_time.localeCompare(b.start_time));
+  
+  const chatBody = document.getElementById('chat-body');
+  const timelineNav = document.getElementById('chat-timeline-nav');
+  
+  if (!matchedSessions.length) {
+    chatBody.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p>此就診期間無聊天紀錄</p></div>';
+    timelineNav.innerHTML = '';
+    timelineNav.style.display = 'none';
+    return;
+  }
+  
+  let chatHtml = '';
+  let dotHtml = '';
+  
+  matchedSessions.forEach((s, idx) => {
+    let labelStr = '';
+    if (s.session_id === 'active_session.json') {
+      labelStr = s.label.replace('進行中對話', '最後一次對話');
     } else {
-      html += `<p class="subsection-title">💬 聊天紀錄（共 ${msgs.length} 則）</p>`;
+      const sessionDate = s.metadata?.session_date || (s.start_time ? s.start_time.substring(0, 10) : '');
+      const seq = s.metadata?.session_sequence;
+      const seqStr = seq ? `第 ${seq} 次對話` : '對話';
+      const timePart = s.start_time && s.start_time.includes(' ') ? s.start_time.split(' ')[1] : '';
+      const timeStr = timePart ? ` (${timePart})` : '';
+      labelStr = `${sessionDate} ${seqStr}${timeStr}`;
+    }
+    
+    chatHtml += `
+      <div class="session-divider" id="session-divider-${idx}">
+        <span>———— ${esc(labelStr)} ————</span>
+      </div>
+    `;
+    
+    const msgs = s.messages || [];
+    if (!msgs.length) {
+      chatHtml += '<div class="no-logs-notice" style="margin: 0 20px;">⚠️ 此對話無聊天紀錄</div>';
+    } else {
       msgs.forEach(m => {
         const isUser = m.role === 'user';
-        html += `
+        chatHtml += `
           <div class="bubble-row ${isUser ? 'user' : 'assistant'}">
             <div>
               <div class="bubble">${esc(m.content)}</div>
               <div class="bubble-time">${m.created_at}</div>
             </div>
-          </div>`;
+          </div>
+        `;
       });
     }
-  }
+    
+    const sessionDate = s.metadata?.session_date || (s.start_time ? s.start_time.substring(0, 10) : '');
+    const datePrefix = sessionDate ? sessionDate + ' ' : '';
+    const tooltipLabel = s.session_id === 'active_session.json' ? `${datePrefix}最後一次對話` : `${datePrefix}對話 #${s.metadata?.session_sequence || (idx + 1)}`;
+  
+    dotHtml += `
+      <div class="timeline-dot${idx === 0 ? ' active' : ''}" 
+           data-label="${esc(tooltipLabel)}" 
+           onclick="scrollToSession(${idx})">
+      </div>
+    `;
+  });
+  
+  chatBody.innerHTML = chatHtml;
+  timelineNav.innerHTML = dotHtml;
+  timelineNav.style.display = 'flex';
+  
+  chatBody.scrollTop = 0;
+  
+  chatBody.onscroll = function() {
+    let activeIdx = 0;
+    const dividers = chatBody.querySelectorAll('.session-divider');
+    dividers.forEach((div, idx) => {
+      if (div.offsetTop <= chatBody.scrollTop + 40) {
+        activeIdx = idx;
+      }
+    });
+    
+    const dots = timelineNav.querySelectorAll('.timeline-dot');
+    dots.forEach((dot, idx) => {
+      if (idx === activeIdx) {
+        dot.classList.add('active');
+      } else {
+        dot.classList.remove('active');
+      }
+    });
+  };
+}
 
-  document.getElementById('chat-body').innerHTML = html;
-  document.getElementById('chat-body').scrollTop = 0;
+function scrollToSession(idx) {
+  const chatBody = document.getElementById('chat-body');
+  const target = document.getElementById(`session-divider-${idx}`);
+  if (chatBody && target) {
+    chatBody.scrollTo({
+      top: target.offsetTop - 12,
+      behavior: 'smooth'
+    });
+  }
 }
 
 // ── forms section ──
@@ -1346,9 +2000,47 @@ async function loadFormsPatientList() {
   loading(true);
   try {
     const list = await api('GET', '/api/chats');
-    renderFormPatientList(Array.isArray(list) ? list : []);
-  } catch { renderFormPatientList([]); }
+    state.allFormPatients = Array.isArray(list) ? list : [];
+    const sortCriteria = document.getElementById('form-patient-sort-select').value;
+    sortAndRenderFormPatients(sortCriteria);
+  } catch { 
+    state.allFormPatients = [];
+    renderFormPatientList([]); 
+  }
   finally  { loading(false); }
+}
+
+function sortAndRenderFormPatients(criteria) {
+  if (!state.allFormPatients) return;
+  const patients = [...state.allFormPatients];
+  
+  if (criteria === 'checkout_desc') {
+    patients.sort((a, b) => {
+      const dateA = a.latest_checkout || '';
+      const dateB = b.latest_checkout || '';
+      return dateB.localeCompare(dateA);
+    });
+  } else if (criteria === 'checkout_asc') {
+    patients.sort((a, b) => {
+      const dateA = a.latest_checkout || '';
+      const dateB = b.latest_checkout || '';
+      return dateA.localeCompare(dateB);
+    });
+  } else if (criteria === 'mrn_desc') {
+    patients.sort((a, b) => {
+      const mrnA = a.medical_record_num || '';
+      const mrnB = b.medical_record_num || '';
+      return mrnB.localeCompare(mrnA);
+    });
+  } else if (criteria === 'mrn_asc') {
+    patients.sort((a, b) => {
+      const mrnA = a.medical_record_num || '';
+      const mrnB = b.medical_record_num || '';
+      return mrnA.localeCompare(mrnB);
+    });
+  }
+
+  renderFormPatientList(patients);
 }
 
 function renderFormPatientList(patients) {
@@ -1359,18 +2051,26 @@ function renderFormPatientList(patients) {
       <div class="empty-icon">👤</div><p>無病患資料</p></div>`;
     return;
   }
-  body.innerHTML = patients.map(p => `
-    <div class="patient-item${p.medical_record_num === state.formCurrentMrn ? ' active' : ''}"
-         onclick="loadFormDetail('${esc(p.medical_record_num)}', this)">
-      <div class="patient-mrn">${esc(p.medical_record_num)}</div>
-      <div class="patient-meta">
-        ${p.is_return
-          ? '<span class="badge badge-orange">回診</span>'
-          : '<span class="badge badge-blue">首診</span>'}
-        <span>表單 ${p.form_count} 筆</span>
-      </div>
-    </div>`
-  ).join('');
+  body.innerHTML = patients.map(p => {
+    let specialtyText = esc(p.specialty);
+    let specialtyTitle = '';
+    if (p.specialties && p.specialties.length > 1) {
+      specialtyText += ' ...';
+      specialtyTitle = `所有看診科別：${p.specialties.join(', ')}`;
+    }
+    return `
+      <div class="patient-item${p.medical_record_num === state.formCurrentMrn ? ' active' : ''}"
+           onclick="loadFormDetail('${esc(p.medical_record_num)}', this)">
+        <div class="patient-mrn">
+          ${esc(p.medical_record_num)}
+          ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
+        </div>
+        <div class="patient-meta">
+          <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
+          <span>表單 ${p.form_count} 筆</span>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function loadFormDetail(mrn, el) {
@@ -1378,65 +2078,82 @@ async function loadFormDetail(mrn, el) {
   document.querySelectorAll('#form-patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
 
-  const body = document.getElementById('form-edit-body');
-  body.innerHTML = '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
+  const visitBody = document.getElementById('form-visit-list-body');
+  visitBody.innerHTML = '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
+  
   document.getElementById('form-edit-title').textContent = mrn;
   document.getElementById('form-edit-sub').textContent   = '';
+  document.getElementById('form-edit-empty').style.display = 'block';
+  document.getElementById('form-edit-container').style.display = 'none';
 
   try {
     const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
     if (d.error) {
-      body.innerHTML = `<p style="color:var(--danger)">${esc(d.error)}</p>`; return;
+      visitBody.innerHTML = `<p style="color:var(--danger);padding:16px;">${esc(d.error)}</p>`;
+      return;
     }
-    renderFormEdit(d);
-  } catch {
-    body.innerHTML = '<p style="color:var(--danger)">載入失敗</p>';
+    
+    state.currentForms = d.forms || [];
+    renderFormVisits();
+  } catch (err) {
+    console.error(err);
+    visitBody.innerHTML = '<p style="color:var(--danger);padding:16px;">載入失敗</p>';
   }
 }
 
-function renderFormEdit(d) {
-  const p = d.patient;
-  document.getElementById('form-edit-title').textContent = p.medical_record_num;
-  document.getElementById('form-edit-sub').textContent   = `LINE ID：${p.line_id || '未連結'}`;
-
-  // 把表單資料存進 state，onclick 只傳 index，避免引號問題
-  state.currentForms = d.forms || [];
-
-  let html = '';
-  if (!state.currentForms.length) {
-    html = '<div class="no-logs-notice">⚠️ 此病患尚無表單資料</div>';
-  } else {
-    html += `<p class="subsection-title">📋 表單列表（共 ${state.currentForms.length} 筆）</p>`;
-    state.currentForms.forEach((f, i) => {
-      html += `
-        <div class="form-card">
-          <div class="form-card-head">
-            <span class="form-card-label">${i > 0 ? '🔄 回診' : '📝 首診'} — ${esc(f.checkout_date)}</span>
-            <button class="btn btn-warn btn-xs" onclick="openFormEditModal(${i})">
-              ✏️ 修改
-            </button>
-          </div>
-          <div class="form-row">主治醫師帳號：<b>${esc(f.doctor_account)}</b></div>
-          <div class="form-topics">
-            ${(f.symptoms || []).map(s => `<span class="topic-tag">${esc(s)}</span>`).join('')}
-          </div>
-        </div>`;
-    });
+function renderFormVisits() {
+  const body = document.getElementById('form-visit-list-body');
+  const forms = state.currentForms || [];
+  
+  document.getElementById('form-visit-count').textContent = forms.length;
+  
+  if (!forms.length) {
+    body.innerHTML = `<div class="empty-state" style="padding:32px 0;">
+      <div class="empty-icon">📋</div><p>無就診紀錄</p></div>`;
+    return;
   }
-  document.getElementById('form-edit-body').innerHTML = html;
-  document.getElementById('form-edit-body').scrollTop = 0;
+  
+  const sortedForms = [...forms].sort((a, b) => b.checkout_date.localeCompare(a.checkout_date));
+  
+  body.innerHTML = sortedForms.map((f, index) => {
+    const origIdx = forms.findIndex(fa => fa.checkout_date === f.checkout_date);
+    return `
+      <div class="visit-item" id="form-visit-item-${index}" onclick="selectFormVisit(${origIdx}, this)">
+        <div class="visit-title">${esc(f.checkout_date)}</div>
+        <div class="visit-meta">
+          <span class="badge badge-blue">${esc(f.specialty)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Auto select the first (newest) visit
+  const firstVisitItem = body.querySelector('.visit-item');
+  if (firstVisitItem) {
+    firstVisitItem.click();
+  }
 }
 
-async function openFormEditModal(idx) {
+async function selectFormVisit(idx, el) {
+  document.querySelectorAll('#form-visit-list-body .visit-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+
   const f   = state.currentForms[idx];
   const mrn = state.formCurrentMrn;
   if (!f || !mrn) return;
+
+  document.getElementById('form-edit-title').textContent = `${mrn} (${f.checkout_date})`;
+  document.getElementById('form-edit-sub').textContent   = '修改此就診病歷表單';
 
   document.getElementById('edit-form-mrn').value          = mrn;
   document.getElementById('edit-form-orig-date').value    = f.checkout_date;
   document.getElementById('edit-form-mrn-show').value     = mrn;
   document.getElementById('edit-form-date').value         = f.checkout_date;
-  document.getElementById('form-modal-error').textContent = '';
+  document.getElementById('form-edit-error').textContent   = '';
+
+  // Hide empty state, show form container
+  document.getElementById('form-edit-empty').style.display = 'none';
+  document.getElementById('form-edit-container').style.display = 'block';
 
   // 初始化人體圖狀態
   selectedTopics = new Set(f.symptoms || []);
@@ -1460,8 +2177,6 @@ async function openFormEditModal(idx) {
   } else {
     docGroup.style.display = 'none';
   }
-
-  openModal('modal-form');
 }
 
 async function saveFormEdit() {
@@ -1470,7 +2185,7 @@ async function saveFormEdit() {
   const newDate  = document.getElementById('edit-form-date').value;
   const doctor   = state.isAdmin ? document.getElementById('edit-form-doctor').value : undefined;
   const symptoms = Array.from(selectedTopics);
-  const errEl    = document.getElementById('form-modal-error');
+  const errEl    = document.getElementById('form-edit-error');
   errEl.textContent = '';
 
   if (!newDate) { errEl.textContent = '請填寫出院日期'; return; }
@@ -1481,9 +2196,48 @@ async function saveFormEdit() {
 
   const res = await api('PUT', `/api/forms/${encodeURIComponent(mrn)}/${encodeURIComponent(origDate)}`, payload);
   if (res.success) {
-    closeModal('modal-form');
     showToast('✅ 表單已儲存', 'ok');
-    loadFormDetail(mrn, null);
+    
+    // 重新載入表單資料並更新第二欄
+    try {
+      const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
+      if (!d.error) {
+        state.currentForms = d.forms || [];
+        
+        const body = document.getElementById('form-visit-list-body');
+        const forms = state.currentForms || [];
+        document.getElementById('form-visit-count').textContent = forms.length;
+        
+        if (forms.length) {
+          const sortedForms = [...forms].sort((a, b) => b.checkout_date.localeCompare(a.checkout_date));
+          
+          let selectIndex = sortedForms.findIndex(f => f.checkout_date === newDate);
+          if (selectIndex === -1) selectIndex = 0;
+          
+          body.innerHTML = sortedForms.map((f, index) => {
+            const origIdx = forms.findIndex(fa => fa.checkout_date === f.checkout_date);
+            return `
+              <div class="visit-item${index === selectIndex ? ' active' : ''}" id="form-visit-item-${index}" onclick="selectFormVisit(${origIdx}, this)">
+                <div class="visit-title">${esc(f.checkout_date)}</div>
+                <div class="visit-meta">
+                  <span class="badge badge-blue">${esc(f.specialty)}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+          
+          const origIdx = forms.findIndex(fa => fa.checkout_date === sortedForms[selectIndex].checkout_date);
+          selectFormVisit(origIdx, body.querySelector(`#form-visit-item-${selectIndex}`));
+        } else {
+          body.innerHTML = `<div class="empty-state" style="padding:32px 0;"><div class="empty-icon">📋</div><p>無就診紀錄</p></div>`;
+          document.getElementById('form-edit-empty').style.display = 'block';
+          document.getElementById('form-edit-container').style.display = 'none';
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    
     // 同步更新聊天紀錄列表
     if (state.currentMrn === mrn) loadDetail(mrn, null);
   } else {
@@ -1494,18 +2248,19 @@ async function saveFormEdit() {
 // ── doctors ──
 async function loadDoctors() {
   const tbody = document.getElementById('doctor-tbody');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>';
   try {
     const list = await api('GET', '/api/doctors');
     state.doctors = Array.isArray(list) ? list : [];
     if (!state.doctors.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">無資料</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">無資料</td></tr>';
       return;
     }
     tbody.innerHTML = state.doctors.map(dr => `
       <tr>
         <td><code>${esc(dr.account_name)}</code></td>
         <td>${esc(dr.doctor_name)}</td>
+        <td><span class="badge badge-blue">${esc(dr.specialty || '急診科')}</span></td>
         <td>
           <span class="badge ${dr.is_active ? 'badge-green' : 'badge-gray'}">
             ${dr.is_active ? '啟用' : '停用'}
@@ -1518,7 +2273,7 @@ async function loadDoctors() {
         </td>
         <td>
           <button class="btn btn-warn btn-xs"
-            onclick="openDoctorEditModal('${esc(dr.account_name)}','${esc(dr.doctor_name)}',${dr.is_active},${dr.is_admin})">
+            onclick="openDoctorEditModal('${esc(dr.account_name)}','${esc(dr.doctor_name)}',${dr.is_active},${dr.is_admin},'${esc(dr.specialty || '急診科')}')">
             ✏️ 修改
           </button>
           <button class="btn btn-danger btn-xs"
@@ -1530,14 +2285,15 @@ async function loadDoctors() {
       </tr>`
     ).join('');
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);padding:16px">載入失敗：${esc(String(e))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger);padding:16px">載入失敗：${esc(String(e))}</td></tr>`;
   }
 }
 
-function openDoctorEditModal(account, name, isActive, isAdmin) {
+function openDoctorEditModal(account, name, isActive, isAdmin, specialty) {
   document.getElementById('edit-doctor-account').value       = account;
   document.getElementById('edit-doctor-account-show').value  = account;
   document.getElementById('edit-doctor-name').value          = name;
+  document.getElementById('edit-doctor-specialty').value     = specialty || '';
   document.getElementById('edit-doctor-pw').value            = '';
   document.getElementById('edit-doctor-active').value        = String(isActive);
   document.getElementById('edit-doctor-admin').value         = String(isAdmin);
@@ -1546,17 +2302,19 @@ function openDoctorEditModal(account, name, isActive, isAdmin) {
 }
 
 async function saveDoctorEdit() {
-  const account  = document.getElementById('edit-doctor-account').value;
-  const name     = document.getElementById('edit-doctor-name').value.trim();
-  const pw       = document.getElementById('edit-doctor-pw').value;
-  const isActive = parseInt(document.getElementById('edit-doctor-active').value);
-  const isAdmin  = parseInt(document.getElementById('edit-doctor-admin').value);
-  const errEl    = document.getElementById('doctor-modal-error');
+  const account   = document.getElementById('edit-doctor-account').value;
+  const name      = document.getElementById('edit-doctor-name').value.trim();
+  const specialty = document.getElementById('edit-doctor-specialty').value.trim();
+  const pw        = document.getElementById('edit-doctor-pw').value;
+  const isActive  = parseInt(document.getElementById('edit-doctor-active').value);
+  const isAdmin   = parseInt(document.getElementById('edit-doctor-admin').value);
+  const errEl     = document.getElementById('doctor-modal-error');
   errEl.textContent = '';
 
   if (!name) { errEl.textContent = '姓名不可空白'; return; }
+  if (!specialty) { errEl.textContent = '科別不可空白'; return; }
 
-  const payload = { doctor_name: name, is_active: isActive, is_admin: isAdmin };
+  const payload = { doctor_name: name, specialty: specialty, is_active: isActive, is_admin: isAdmin };
   if (pw) payload.new_password = pw;
 
   const res = await api('PUT', `/api/doctors/${encodeURIComponent(account)}`, payload);
@@ -1572,6 +2330,7 @@ async function saveDoctorEdit() {
 function openAddDoctorModal() {
   document.getElementById('add-doctor-account').value = '';
   document.getElementById('add-doctor-name').value = '';
+  document.getElementById('add-doctor-specialty').value = '';
   document.getElementById('add-doctor-active').value = '1';
   document.getElementById('add-doctor-admin').value = '0';
   document.getElementById('add-doctor-modal-error').textContent = '';
@@ -1592,6 +2351,7 @@ function closeAddDoctorModal(shouldReload = false) {
 async function submitAddDoctor() {
   const account = document.getElementById('add-doctor-account').value.trim();
   const name = document.getElementById('add-doctor-name').value.trim();
+  const specialty = document.getElementById('add-doctor-specialty').value.trim();
   const active = parseInt(document.getElementById('add-doctor-active').value, 10);
   const admin = parseInt(document.getElementById('add-doctor-admin').value, 10);
   const errEl = document.getElementById('add-doctor-modal-error');
@@ -1601,11 +2361,16 @@ async function submitAddDoctor() {
     errEl.textContent = '帳號與姓名不可空白';
     return;
   }
+  if (!specialty) {
+    errEl.textContent = '科別不可空白';
+    return;
+  }
   
   try {
     const res = await api('POST', '/api/doctors', {
       account_name: account,
       doctor_name: name,
+      specialty: specialty,
       is_active: active,
       is_admin: admin
     });
@@ -1660,28 +2425,235 @@ async function deleteDoctor(account, name) {
 }
 
 // ── prompt ──
-async function loadPrompt() {
+function checkPromptModified() {
   const ta = document.getElementById('prompt-textarea');
-  ta.value = '載入中…'; ta.disabled = true;
-  document.getElementById('save-status').textContent = '';
-  try {
-    const d = await api('GET', '/api/prompt');
-    ta.value    = d.error ? '錯誤：' + d.error : (d.content || '');
-    ta.disabled = !!d.error;
-  } catch { ta.value = '無法連線至伺服器'; }
+  const btnSave = document.getElementById('btn-save-prompt');
+  if (!btnSave) return;
+  const modified = ta.value !== (state.originalPromptContent || '');
+  btnSave.disabled = !modified;
 }
 
-async function savePrompt() {
+async function loadPrompt(version) {
+  const ta = document.getElementById('prompt-textarea');
+  const activeTa = document.getElementById('prompt-active-textarea');
+  const nickInput = document.getElementById('prompt-nickname-input');
+  
+  ta.value = '載入中…'; ta.disabled = true;
+  if (activeTa) {
+    activeTa.value = '載入中…';
+  }
+  if (nickInput) {
+    nickInput.value = '';
+    nickInput.disabled = true;
+  }
+  
+  document.getElementById('save-status').textContent = '';
+  document.getElementById('btn-rollback-prompt').style.display = 'none';
+  document.getElementById('btn-next-prompt').style.display = 'none';
+  document.getElementById('btn-delete-prompt').style.display = 'none';
+  document.getElementById('btn-apply-prompt').disabled = true;
+  
+  const editingLabel = document.getElementById('editing-version-label');
+  const activeLabel = document.getElementById('active-version-label');
+  const activeBadge = document.getElementById('active-badge');
+  
+  if (editingLabel) editingLabel.textContent = '-';
+  if (activeLabel) activeLabel.textContent = '-';
+  if (activeBadge) activeBadge.style.display = 'none';
+  
+  try {
+    let url = '/api/prompt';
+    if (version) {
+      url += '?version=' + encodeURIComponent(version);
+    }
+    const d = await api('GET', url);
+    ta.value    = d.error ? '錯誤：' + d.error : (d.content || '');
+    ta.disabled = !!d.error;
+    
+    if (d.error) return;
+    
+    const getDisplayLabel = (ver, nicknames) => {
+      if (!ver) return '-';
+      const nick = nicknames && nicknames[ver];
+      return nick ? `${nick}(${ver})` : ver;
+    };
+    
+    if (editingLabel) editingLabel.textContent = getDisplayLabel(d.current_version, d.nicknames);
+    if (activeLabel) activeLabel.textContent = getDisplayLabel(d.active_version, d.nicknames);
+    
+    if (activeTa) {
+      activeTa.value = d.active_content || '';
+    }
+    if (nickInput) {
+      nickInput.disabled = false;
+      nickInput.value = (d.nicknames && d.nicknames[d.current_version]) || '';
+    }
+    
+    state.originalPromptContent = d.content || '';
+    state.viewingVersion = d.current_version;
+    state.activeVersion = d.active_version;
+    state.prevVersion = d.prev_version;
+    state.nextVersion = d.next_version;
+    
+    checkPromptModified();
+    
+    const activeCol = document.getElementById('prompt-active-column');
+    const centerCol = document.querySelector('.prompt-col-center');
+    
+    if (d.current_version === d.active_version) {
+      if (activeBadge) activeBadge.style.display = 'inline-block';
+      document.getElementById('btn-apply-prompt').disabled = true;
+      if (activeCol) activeCol.style.display = 'none';
+      if (centerCol) centerCol.style.flex = '0 0 80%';
+    } else {
+      if (activeBadge) activeBadge.style.display = 'none';
+      document.getElementById('btn-apply-prompt').disabled = false;
+      if (activeCol) activeCol.style.display = 'flex';
+      if (centerCol) centerCol.style.flex = '0 0 40%';
+    }
+    
+    if (d.has_prev) {
+      document.getElementById('btn-rollback-prompt').style.display = 'inline-block';
+    }
+    if (d.has_next) {
+      document.getElementById('btn-next-prompt').style.display = 'inline-block';
+    }
+    if (d.current_version && d.current_version !== 'prompt_001.md') {
+      document.getElementById('btn-delete-prompt').style.display = 'inline-block';
+    }
+    
+    if (d.versions) {
+      renderPromptVersionsList(d.versions, d.active_version, d.current_version, d.nicknames);
+    }
+  } catch (e) { 
+    ta.value = '無法連線至伺服器'; 
+    console.error(e);
+  }
+}
+
+function renderPromptVersionsList(versions, activeVersion, viewingVersion, nicknames) {
+  const listEl = document.getElementById('prompt-version-list');
+  if (!listEl) return;
+  listEl.innerHTML = versions.map(v => {
+    const isActive = v === activeVersion;
+    const isViewing = v === viewingVersion;
+    const displayLabel = nicknames && nicknames[v] ? `${nicknames[v]}(${v})` : v;
+    return `
+      <div class="patient-item${isViewing ? ' active' : ''}" 
+           style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer;"
+           onclick="loadPrompt('${v}')">
+        <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: space-between;">
+          <span>${displayLabel}</span>
+          ${isActive ? '<span class="badge badge-green" style="font-size: 9px; padding: 1px 4px;">使用中</span>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function savePromptNickname() {
+  const version = state.viewingVersion;
+  if (!version) return;
+  const nickname = document.getElementById('prompt-nickname-input').value.trim();
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = '儲存名稱中…'; statusEl.className = 'save-status';
+  try {
+    const res = await api('POST', '/api/prompt/nickname', { version, nickname });
+    if (res.success) {
+      statusEl.textContent = '✅ 已成功儲存版本名稱';
+      statusEl.className   = 'save-status ok';
+      loadPrompt(version);
+    } else {
+      statusEl.textContent = '❌ ' + (res.error || '儲存名稱失敗');
+      statusEl.className   = 'save-status fail';
+    }
+  } catch (err) {
+    statusEl.textContent = '❌ 無法連線至伺服器';
+    statusEl.className   = 'save-status fail';
+    console.error(err);
+  }
+}
+
+function savePrompt() {
+  doSavePrompt();
+}
+
+async function doSavePrompt() {
   const content = document.getElementById('prompt-textarea').value;
   const statusEl = document.getElementById('save-status');
-  statusEl.textContent = ''; statusEl.className = 'save-status';
+  statusEl.textContent = '儲存中…'; statusEl.className = 'save-status';
   try {
     const res = await api('POST', '/api/prompt', { content });
     if (res.success) {
-      statusEl.textContent = '✅ 已儲存（' + res.saved_at + '）→ ' + (res.path || '');
+      statusEl.textContent = '✅ 已儲存並新增版本：' + (res.version || '');
       statusEl.className   = 'save-status ok';
+      loadPrompt(res.version);
     } else {
       statusEl.textContent = '❌ ' + (res.error || '儲存失敗');
+      statusEl.className   = 'save-status fail';
+    }
+  } catch {
+    statusEl.textContent = '❌ 無法連線至伺服器';
+    statusEl.className   = 'save-status fail';
+  }
+}
+
+function prevPromptVersion() {
+  if (state.prevVersion) {
+    loadPrompt(state.prevVersion);
+  }
+}
+
+function nextPromptVersion() {
+  if (state.nextVersion) {
+    loadPrompt(state.nextVersion);
+  }
+}
+
+function applyPrompt() {
+  openModal('modal-confirm-apply-prompt');
+}
+
+async function doApplyPrompt() {
+  closeModal('modal-confirm-apply-prompt');
+  const version = state.viewingVersion;
+  if (!version) return;
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = '套用中…'; statusEl.className = 'save-status';
+  try {
+    const res = await api('POST', '/api/prompt/switch', { version });
+    if (res.success) {
+      statusEl.textContent = '✅ 已成功套用此 Prompt 版本';
+      statusEl.className   = 'save-status ok';
+      loadPrompt(version);
+    } else {
+      statusEl.textContent = '❌ ' + (res.error || '套用失敗');
+      statusEl.className   = 'save-status fail';
+    }
+  } catch {
+    statusEl.textContent = '❌ 無法連線至伺服器';
+    statusEl.className   = 'save-status fail';
+  }
+}
+
+function deletePrompt() {
+  openModal('modal-confirm-delete-prompt');
+}
+
+async function doDeletePrompt() {
+  closeModal('modal-confirm-delete-prompt');
+  const version = state.viewingVersion;
+  if (!version) return;
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = '刪除中…'; statusEl.className = 'save-status';
+  try {
+    const res = await api('POST', '/api/prompt/delete', { version });
+    if (res.success) {
+      statusEl.textContent = '✅ 已成功刪除版本';
+      statusEl.className   = 'save-status ok';
+      loadPrompt(res.version);
+    } else {
+      statusEl.textContent = '❌ ' + (res.error || '刪除失敗');
       statusEl.className   = 'save-status fail';
     }
   } catch {
@@ -1706,14 +2678,14 @@ const topicMapping = {
 let selectedTopics = new Set();
 let currentActiveRegion = null;
 
-function getFormModalEl(id) {
-  return document.querySelector(`#modal-form #${id}`) || document.getElementById(id);
+function getFormEl(id) {
+  return document.querySelector(`#form-edit-container #${id}`) || document.getElementById(id);
 }
 
 function initBodyDiagramEvents() {
-  const popover = getFormModalEl('popover');
-  const hotspots = document.querySelectorAll('#modal-form .hotspot');
-  const popoverCloseBtn = getFormModalEl('popover-close');
+  const popover = getFormEl('popover');
+  const hotspots = document.querySelectorAll('#form-edit-container .hotspot');
+  const popoverCloseBtn = getFormEl('popover-close');
 
   if (popoverCloseBtn) {
     popoverCloseBtn.addEventListener('click', function(e) {
@@ -1746,42 +2718,39 @@ function initBodyDiagramEvents() {
   }
 
   document.addEventListener('click', function(e) {
-    if (!e.target.closest('#modal-form #image-wrapper')) {
+    if (!e.target.closest('#form-edit-container #image-wrapper')) {
       closePopover();
     }
 
-    const hasInactive = document.querySelectorAll('#modal-form .chip.inactive').length > 0;
-    if (hasInactive && !e.target.closest('#modal-form .confirmation-section')) {
+    const hasInactive = document.querySelectorAll('#form-edit-container .chip.inactive').length > 0;
+    if (hasInactive && !e.target.closest('#form-edit-container .confirmation-section')) {
       renderConfirmedChips(true);
     }
   });
 }
 
 function closePopover() {
-  const popover = getFormModalEl('popover');
+  const popover = getFormEl('popover');
   if (!popover) return;
   popover.classList.remove('show');
   popover.style.display = 'none';
-  const hotspots = document.querySelectorAll('#modal-form .hotspot');
+  
+  const layout = document.querySelector('#form-edit-container .interactive-layout');
+  if (layout) {
+    layout.classList.remove('popover-open');
+    layout.classList.remove('trigger-body');
+    layout.classList.remove('trigger-button');
+  }
+  
+  const hotspots = document.querySelectorAll('#form-edit-container .hotspot');
   hotspots.forEach(s => s.classList.remove('active'));
   currentActiveRegion = null;
-
-  const shiftContainer = getFormModalEl('body-shift-container');
-  if (shiftContainer) {
-    shiftContainer.classList.remove('shifted');
-    shiftContainer.style.zIndex = '2';
-  }
-
-  const imageWrapper = getFormModalEl('image-wrapper');
-  if (imageWrapper && popover.parentElement !== imageWrapper) {
-    imageWrapper.appendChild(popover);
-  }
 }
 
 function showPopover(hotspotEl, region) {
-  const popover = getFormModalEl('popover');
-  const popoverTitle = getFormModalEl('popover-title');
-  const popoverCheckboxes = getFormModalEl('popover-checkboxes');
+  const popover = getFormEl('popover');
+  const popoverTitle = getFormEl('popover-title');
+  const popoverCheckboxes = getFormEl('popover-checkboxes');
   if (!popover || !popoverTitle || !popoverCheckboxes) return;
 
   popoverTitle.textContent = `「${region}」相關衛教`;
@@ -1789,7 +2758,7 @@ function showPopover(hotspotEl, region) {
 
   const topics = topicMapping[region] || [];
   if (topics.length === 0) {
-    popoverCheckboxes.innerHTML = '<span style="color:#777; font-size:13px; padding: 10px; display: block;">此區域無相關衛教資料。</span>';
+    popoverCheckboxes.innerHTML = '<span style="color:#777; font-size:14px; padding: 10px; display: block;">此區域無相關衛教資料。</span>';
   } else {
     topics.forEach(topic => {
       const label = document.createElement('label');
@@ -1812,103 +2781,65 @@ function showPopover(hotspotEl, region) {
   }
 
   popover.style.display = 'block';
+  popover.offsetHeight; // Force reflow
   popover.classList.add('show');
 
-  positionPopoverAndTriggerShift(hotspotEl, region);
-}
-
-function positionPopoverAndTriggerShift(hotspotEl, region) {
-  const popover = getFormModalEl('popover');
-  const shiftContainer = getFormModalEl('body-shift-container');
-  const imageWrapper = getFormModalEl('image-wrapper');
-  if (!popover || !shiftContainer || !imageWrapper) return;
-
-  const parentEl = hotspotEl.parentElement;
-  
-  if (popover.parentElement !== parentEl) {
-    parentEl.appendChild(popover);
-  }
-
+  const layoutEl = document.querySelector('#form-edit-container .interactive-layout');
+  if (!layoutEl) return;
   const posType = hotspotEl.getAttribute('data-position');
   
   if (posType === 'body') {
-    shiftContainer.classList.add('shifted');
-    shiftContainer.style.zIndex = '101';
+    layoutEl.classList.add('trigger-body');
+    layoutEl.classList.remove('trigger-button');
+    popover.className = 'arrow-left show';
   } else {
-    shiftContainer.classList.remove('shifted');
-    shiftContainer.style.zIndex = '2';
+    layoutEl.classList.add('trigger-button');
+    layoutEl.classList.remove('trigger-body');
+    popover.className = 'arrow-right show';
   }
+  layoutEl.classList.add('popover-open');
 
-  const spotLeft   = hotspotEl.offsetLeft;
-  const spotTop    = hotspotEl.offsetTop;
-  const spotW      = hotspotEl.offsetWidth;
-  const spotH      = hotspotEl.offsetHeight;
+  const layoutRect = layoutEl.getBoundingClientRect();
+  const spotRect = hotspotEl.getBoundingClientRect();
+  const popoverRect = popover.getBoundingClientRect();
 
-  const popW = popover.offsetWidth  || 180;
-  const popH = popover.offsetHeight || 180;
-  const gap  = 8; 
+  const spotCenterY = (spotRect.top + spotRect.bottom) / 2 - layoutRect.top;
 
-  const spotRight   = spotLeft + spotW;
-  const spotCenterY = spotTop + spotH / 2;
+  let popoverTop = spotCenterY - popoverRect.height / 2;
+  const maxTop = layoutRect.height - popoverRect.height - 15;
+  popoverTop = Math.max(0, Math.min(popoverTop, maxTop));
 
-  const parentW = parentEl.offsetWidth;
-  const parentH = parentEl.offsetHeight || imageWrapper.offsetHeight;
+  popover.style.position = 'absolute';
+  popover.style.top = popoverTop + 'px';
 
-  let left, top, arrowClass;
+  let arrowTop = spotCenterY - popoverTop;
+  arrowTop = Math.max(20, Math.min(arrowTop, popoverRect.height - 20));
+  popover.style.setProperty('--arrow-top', arrowTop + 'px');
 
-  if (posType === 'bottom') {
-    top = spotTop - popH - gap;
-    left = spotLeft + (spotW / 2) - (popW / 2);
-    
-    if (left < 0) left = 0;
-    if (left + popW > parentW) left = parentW - popW;
+  let spotLeft = spotRect.left - layoutRect.left;
+  let spotRight = spotRect.right - layoutRect.left;
 
-    let arrowOffset = spotLeft + (spotW / 2) - left;
-    popover.style.setProperty('--arrow-left', arrowOffset + 'px');
-    arrowClass = 'arrow-bottom';
-  } else {
-    let availableSpaceRight = parentW - spotRight;
+  const popoverColumn = document.querySelector('#form-edit-container .popover-column');
+  if (popoverColumn) {
+    let popoverLeft = 0;
     if (posType === 'body') {
-      availableSpaceRight += parentW * 0.2;
-    }
-    
-    const spaceLeft = spotLeft;
-
-    if (availableSpaceRight >= popW + gap) {
-      left = spotRight + gap;
-      arrowClass = 'arrow-left';
-    } else if (spaceLeft >= popW + gap) {
-      left = spotLeft - popW - gap;
-      arrowClass = 'arrow-right';
+      popoverLeft = spotRight + 6;
     } else {
-      left = spotRight + gap;
-      arrowClass = 'arrow-left';
+      popoverLeft = spotLeft - 226;
     }
-
-    top = spotCenterY - popH / 2;
-    top = Math.max(0, top);
-    if (top + popH > parentH) top = parentH - popH;
-    top = Math.max(0, top);
-
-    const arrowOffset = spotCenterY - top - 6; 
-    const clampedArrow = Math.max(15, Math.min(arrowOffset, popH - 25));
-    popover.style.setProperty('--arrow-top', clampedArrow + 'px');
+    popoverColumn.style.left = popoverLeft + 'px';
   }
-
-  popover.style.left = left + 'px';
-  popover.style.top  = top  + 'px';
-  popover.className  = 'show ' + arrowClass;
 }
 
 function syncPopoverCheckboxes() {
-  document.querySelectorAll('#modal-form .pop-checkbox-item input').forEach(cb => {
+  document.querySelectorAll('#form-edit-container .pop-checkbox-item input').forEach(cb => {
     cb.checked = selectedTopics.has(cb.value);
   });
 }
 
 function renderConfirmedChips(forceClean = false) {
-  const confirmedList = getFormModalEl('confirmed-list');
-  const emptyMsg = getFormModalEl('empty-msg');
+  const confirmedList = getFormEl('confirmed-list');
+  const emptyMsg = getFormEl('empty-msg');
   if (!confirmedList || !emptyMsg) return;
 
   if (forceClean) {
@@ -1941,6 +2872,15 @@ function renderConfirmedChips(forceClean = false) {
         chip.querySelector('.icon').textContent = '✕';
       }
     });
+  }
+
+  const confirmationSection = document.querySelector('#form-edit-container .confirmation-section');
+  if (confirmationSection) {
+    if (selectedTopics.size > 0) {
+      confirmationSection.style.display = 'block';
+    } else {
+      confirmationSection.style.display = 'none';
+    }
   }
 
   if (confirmedList.children.length === 0) {

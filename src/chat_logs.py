@@ -12,46 +12,110 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 tw_tz = timezone(timedelta(hours=8))
 
 def get_db_connection():
-    """建立與 patient.db 的連線"""
-    db_path = os.path.join(BASE_DIR, 'database', 'patient.db')
+    """建立與 hospital.db 的連線"""
+    db_path = os.path.join(BASE_DIR, 'database', 'hospital.db')
     return sqlite3.connect(db_path)
 
-def get_patient_id(line_id):
-    """透過 line_id 從資料庫查詢 medical_record_num"""
+def get_patients_for_line_id(line_id):
+    """透過 line_id 從資料庫查詢綁定的所有病患關係及病歷號"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT medical_record_num FROM PATIENT WHERE line_id = ?", (line_id,))
-        result = cursor.fetchone()
-        return result[0] if result else None
+        cursor.execute("""
+            SELECT p.medical_record_number, lpp.relation, p.patient_id
+            FROM line_patient_pairs lpp
+            JOIN patients p ON lpp.patient_id = p.patient_id
+            WHERE lpp.line_uuid = ?
+        """, (line_id,))
+        rows = cursor.fetchall()
+        # 回傳 [(medical_record_number, relation, patient_id), ...]
+        return rows
+    except sqlite3.Error as e:
+        print(f"[ChatLog DB Error] {e}")
+        return []
+    finally:
+        conn.close()
+
+def get_symptoms_for_patient(line_id, relation):
+    """取得某病患對應的所有症狀的聯集"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 先找出 line_patient_pairs_id
+        cursor.execute("""
+            SELECT line_patient_pairs_id
+            FROM line_patient_pairs
+            WHERE line_uuid = ? AND relation = ?
+        """, (line_id, relation))
+        row = cursor.fetchone()
+        if not row:
+            return []
+        lpp_id = row[0]
+        
+        # 再查出該 line_patient_pairs_id 對應的 record 裡的所有症狀
+        cursor.execute("""
+            SELECT symptoms
+            FROM record
+            WHERE line_patient_pairs_id = ?
+        """, (lpp_id,))
+        rows = cursor.fetchall()
+        
+        symptoms_set = set()
+        for r in rows:
+            if r[0]:
+                try:
+                    syms = json.loads(r[0])
+                    for s in syms:
+                        symptoms_set.add(s)
+                except Exception:
+                    pass
+        return list(symptoms_set)
+    except sqlite3.Error as e:
+        print(f"[ChatLog DB Error] {e}")
+        return []
+    finally:
+        conn.close()
+
+def get_patient_mrn(line_id, relation):
+    """取得某病患的病歷號"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT p.medical_record_number
+            FROM line_patient_pairs lpp
+            JOIN patients p ON lpp.patient_id = p.patient_id
+            WHERE lpp.line_uuid = ? AND lpp.relation = ?
+        """, (line_id, relation))
+        row = cursor.fetchone()
+        return row[0] if row else None
     except sqlite3.Error as e:
         print(f"[ChatLog DB Error] {e}")
         return None
     finally:
         conn.close()
 
-def save_chat_to_json(line_id, role, content, current_time=None):
+def save_chat_to_json(mrn, role, content, current_time=None):
     """
     將聊天訊息依據版本 B 格式存入 JSON，並實作 1 小時無對話即切分 Session 的機制。
     """
-    patient_id = get_patient_id(line_id)
-    if not patient_id:
-        print(f"[ChatLog] 找不到 line_id: {line_id} 對應的病歷號，略過記錄。")
+    if not mrn:
+        print("[ChatLog] 傳入的病歷號為空，略過記錄。")
         return
 
     # 確保該病患的儲存目錄存在 ({專案根目錄}/chat_logs/{病歷號})
-    log_dir = os.path.join(BASE_DIR, 'chat_logs', patient_id)
+    log_dir = os.path.join(BASE_DIR, 'chat_logs', mrn)
     os.makedirs(log_dir, exist_ok=True)
 
     active_file_path = os.path.join(log_dir, 'active_session.json')
 
-    # --- 關鍵修正：若有傳入自訂時間則使用自訂時間，否則使用現在時間 ---
+    # 關鍵修正：若有傳入自訂時間則使用自訂時間，否則使用現在時間
     now = current_time if current_time else datetime.now(tw_tz)
     
     # 初始化版本 B 的預設結構
     session_data = {
         "metadata": {
-            "medical_record_num": patient_id,
+            "medical_record_num": mrn,
             "session_date": "",
             "session_sequence": None,
             "message_count": 0,
@@ -103,7 +167,7 @@ def save_chat_to_json(line_id, role, content, current_time=None):
                 # 舊的 Session 已歸檔，重置結構以開啟全新對話階段
                 session_data = {
                     "metadata": {
-                        "medical_record_num": patient_id,
+                        "medical_record_num": mrn,
                         "session_date": "",
                         "session_sequence": None,
                         "message_count": 0,
@@ -134,3 +198,42 @@ def save_chat_to_json(line_id, role, content, current_time=None):
     # 5. 寫回 active_session.json 暫存檔
     with open(active_file_path, 'w', encoding='utf-8') as f:
         json.dump(session_data, f, ensure_ascii=False, indent=4)
+
+def finalize_session(mrn):
+    """將現有的 active_session.json 直接強制結算歸檔，並清除 active_session.json"""
+    if not mrn:
+        return
+    log_dir = os.path.join(BASE_DIR, 'chat_logs', mrn)
+    active_file_path = os.path.join(log_dir, 'active_session.json')
+    
+    if os.path.exists(active_file_path):
+        try:
+            with open(active_file_path, 'r', encoding='utf-8') as f:
+                session_data = json.load(f)
+            messages = session_data.get("messages", [])
+            if messages:
+                first_msg_time = datetime.fromisoformat(messages[0]['timestamp'])
+                date_str = first_msg_time.strftime('%Y%m%d')
+
+                # 尋找當天已結算的檔案數量，用來決定本次編號
+                existing_files = glob.glob(os.path.join(log_dir, f"{date_str}_*.json"))
+                valid_files = [f for f in existing_files if "active_session" not in f]
+                seq_num = len(valid_files) + 1
+                
+                # 更新最終點收的 Metadata
+                session_data["metadata"]["session_sequence"] = seq_num
+                session_data["metadata"]["session_date"] = first_msg_time.strftime('%Y-%m-%d')
+                
+                # 產生檔名：如 20260521_01.json
+                final_filename = f"{date_str}_{seq_num:02d}.json"
+                final_filepath = os.path.join(log_dir, final_filename)
+
+                # 寫入正式歷史紀錄檔
+                with open(final_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(session_data, f, ensure_ascii=False, indent=4)
+            
+            # 刪除 active_session.json
+            os.remove(active_file_path)
+            print(f"[ChatLog] Session for {mrn} successfully finalized and archived.")
+        except Exception as e:
+            print(f"[ChatLog Error] Failed to finalize session for {mrn}: {e}")

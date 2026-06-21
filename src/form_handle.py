@@ -16,7 +16,19 @@ def get_db(name: str) -> sqlite3.Connection:
 # --- 驗證碼暫存區 ---
 # 將原本在 app.py 的暫存區移到這裡統一管理
 # 格式: { "123456": {"user_id": "Uxxxx...", "expires_at": 1690000000} }
-verification_codes = {}
+verification_codes = {
+    "112233": {
+        "user_id": "U3i4j5k6l7",
+        # "user_id": "U1a2b3c4d5",
+        "user_name": "曾宇晨",
+        "expires_at": time.time() + 3600
+    },
+    "223344": {
+        "user_id": "U223344",
+        "user_name": "楚中天",
+        "expires_at": time.time() + 3600
+    }
+}
 
 # 清理過期驗證碼的輔助函式
 def cleanup_expired_codes():
@@ -29,39 +41,29 @@ def cleanup_expired_codes():
 
 @form_bp.route("/verify", methods=['GET'])
 def verify_page():
-    # 本地測試用 (測試完需刪除)：直接在記憶體塞入一組寫死的代碼，方便本地網頁點擊測試
-    # verification_codes["112233"] = {
-    #     "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
-    #     "user_name": "曾宇晨",
-    #     "expires_at": time.time() + 3600
-    # }
-    # verification_codes["223344"] = {
-    #     "user_id": "U223344",
-    #     "user_name": "楚中天",
-    #     "expires_at": time.time() + 3600
-    # }
     return redirect('/form')
 
 @form_bp.route("/api/verify_code", methods=['POST'])
 def verify_code():
-    # verification_codes["112233"] = {
-    #     "user_id": "Ub9b6d7cc1b3b3d2ffcdef9379c47e8fa",
-    #     "user_name": "曾宇晨",
-    #     "expires_at": time.time() + 3600
-    # }
-    # verification_codes["223344"] = {
-    #     "user_id": "U223344",
-    #     "user_name": "楚中天",
-    #     "expires_at": time.time() + 3600
-    # }
-
     data = request.json
-    code = data.get("code")
+    account = data.get("account")
     password = data.get("password")
+    code = data.get("code")
 
-    # 1. 驗證密碼
-    if password != "12345":
-        return jsonify({"success": False, "message": "密碼錯誤"})
+    if not account or not password or not code:
+        return jsonify({"success": False, "message": "請填寫完整資訊"})
+
+    import hashlib
+    hashed_pw = hashlib.sha256(password.encode()).hexdigest()
+
+    conn = get_db('hospital.db')
+    c = conn.cursor()
+    c.execute('SELECT doctor_id, doctor_name, department FROM doctors WHERE account_name = ? AND password_hash = ? AND is_active = 1', (account, hashed_pw))
+    doctor = c.fetchone()
+    conn.close()
+
+    if not doctor:
+        return jsonify({"success": False, "message": "帳號或密碼錯誤，或此醫師未啟用"})
 
     # 2. 尋找驗證碼記錄
     record = verification_codes.get(code)
@@ -82,6 +84,10 @@ def verify_code():
     session['form_verified'] = True
     session['form_user_id'] = user_id
     session['form_user_name'] = user_name
+    
+    session['doctor_id'] = doctor[0]
+    session['doctor_name'] = doctor[1]
+    session['doctor_department'] = doctor[2]
 
     return jsonify({"success": True, "redirect_url": "/form"})
 
@@ -96,57 +102,53 @@ def form_page():
     uid = session.get('form_user_id', '未知 ID')
     uname = session.get('form_user_name', '未知名字')
     
-    # --- 新增註解：連接 doctor.db，讀取啟用的醫師名單作為表單下拉選單資料 ---
-    conn = get_db('doctor.db')
-    c = conn.cursor()
-    c.execute('SELECT account_name, doctor_name FROM DOCTOR WHERE is_active = 1')
-    doctors = [{'account_name': row[0], 'doctor_name': row[1]} for row in c.fetchall()]
-    conn.close()
+    doctor_id = session.get('doctor_id')
+    doctor_name = session.get('doctor_name')
+    doctor_department = session.get('doctor_department')
 
-    # ==== 新增註解：查詢使用者是否存在歷史紀錄，以利預先填入表單 ====
-    prefill_record_num = ""
-    prefill_doctor_id = ""
-    prefill_topics = []
-
+    # ==== 查詢使用者關聯的病患資料 ====
+    relations = []
     try:
-        # 1. 透過 line_id 去 patient.db 查出該名病患的病歷號
-        conn_pat = get_db('patient.db')
-        c_pat = conn_pat.cursor()
-        c_pat.execute('SELECT medical_record_num FROM PATIENT WHERE line_id = ?', (uid,))
-        pat_row = c_pat.fetchone()
-        conn_pat.close()
-
-        if pat_row:
-            medical_record_num = pat_row[0]
-            
-            # 2. 拿著病歷號去 form.db 查詢最近一次的紀錄 (以 checkout_date 遞減排序取第一筆)
-            conn_form = get_db('form.db')
-            c_form = conn_form.cursor()
-            c_form.execute('''
-                SELECT medical_record_num, doctor_account, symptoms 
-                FROM FORM 
-                WHERE medical_record_num = ? 
-                ORDER BY checkout_date DESC 
+        conn = get_db('hospital.db')
+        c = conn.cursor()
+        c.execute('''
+            SELECT lpp.line_patient_pairs_id, lpp.relation, p.medical_record_number
+            FROM line_patient_pairs lpp
+            JOIN patients p ON lpp.patient_id = p.patient_id
+            WHERE lpp.line_uuid = ?
+        ''', (uid,))
+        rows = c.fetchall()
+        for r in rows:
+            # Query most recent symptoms for this patient pair under the current doctor's department
+            c.execute('''
+                SELECT r.symptoms FROM record r
+                JOIN doctors d ON r.doctor_id = d.doctor_id
+                WHERE r.line_patient_pairs_id = ?
+                  AND d.department = ?
+                ORDER BY r.checkout_date DESC, r.record_id DESC
                 LIMIT 1
-            ''', (medical_record_num,))
-            form_row = c_form.fetchone()
-            conn_form.close()
-
-            if form_row:
-                prefill_record_num = form_row[0]
-                prefill_doctor_id = form_row[1]
-                if form_row[2]:
-                    prefill_topics = json.loads(form_row[2])
+            ''', (r[0], doctor_department))
+            recent_record = c.fetchone()
+            prefilled = []
+            if recent_record and recent_record[0]:
+                try:
+                    prefilled = json.loads(recent_record[0])
+                except:
+                    pass
+            
+            relations.append({
+                'pair_id': r[0],
+                'relation': r[1],
+                'medical_record_num': r[2],
+                'prefilled_topics': prefilled
+            })
+        conn.close()
     except Exception as e:
-        print(f"讀取歷史資料發生錯誤: {str(e)}")
-    # ==========================================================
+        print(f"讀取關聯資料發生錯誤: {str(e)}")
 
-    # --- 新增註解：將 doctors 傳遞給前端 ---
-    # ==== 新增註解：一併將查到的歷史紀錄 (prefill 相關變數) 傳遞給前端 ====
-    return render_template("form.html", verified=True, uname=uname, uid=uid, doctors=doctors, 
-                           prefill_record_num=prefill_record_num, 
-                           prefill_doctor_id=prefill_doctor_id, 
-                           prefill_topics=prefill_topics)
+    return render_template("form.html", verified=True, uname=uname, uid=uid, 
+                           doctor_id=doctor_id, doctor_name=doctor_name, doctor_department=doctor_department,
+                           relations=relations)
 
 
 # --- 新增註解：新增處理表單送出的 API 路由，將資料寫入 patient.db 及 form.db ---
@@ -156,36 +158,64 @@ def submit_form():
     user_name = data.get("user_name")
     line_id = data.get("line_id")
     medical_record_num = data.get("medical_record_num")
+    relation = data.get("relation")
     doctor_id = data.get("doctor_id")
     discharge_date = data.get("discharge_date")
     topics = data.get("topics", [])
 
+    conn = None
     try:
-        # --- 新增註解：處理 patient.db，寫入病歷號、LINE ID 及 病患姓名 ---
-        conn_patient = get_db('patient.db')
-        c_patient = conn_patient.cursor()
-        c_patient.execute('''
-            INSERT OR REPLACE INTO PATIENT (medical_record_num, line_id, patient_name) 
+        conn = get_db('hospital.db')
+        c = conn.cursor()
+        c.execute('BEGIN TRANSACTION')
+
+        # -- patients table
+        c.execute('''
+            INSERT OR IGNORE INTO patients (medical_record_number, has_chatted) 
+            VALUES (?, 0)
+        ''', (medical_record_num,))
+
+        # -- Retrieve patient_id safely
+        c.execute('''
+            SELECT patient_id FROM patients WHERE medical_record_number = ?
+        ''', (medical_record_num,))
+        patient_row = c.fetchone()
+        if not patient_row:
+            raise Exception("無法取得 patient_id")
+        patient_id = patient_row[0]
+
+        # -- line_patient_pairs table
+        c.execute('''
+            INSERT OR IGNORE INTO line_patient_pairs (patient_id, line_uuid, relation)
             VALUES (?, ?, ?)
-        ''', (medical_record_num, line_id, user_name))
-        conn_patient.commit()
-        conn_patient.close()
+        ''', (patient_id, line_id, relation))
 
-        # --- 新增註解：處理 form.db，寫入病歷號、醫師帳號、出院日期 及 衛教症狀 ---
-        conn_form = get_db('form.db')
-        c_form = conn_form.cursor()
-        # 將衛教項目陣列轉為 JSON 格式字串存入資料庫
+        # -- Retrieve line_patient_pairs_id
+        c.execute('''
+            SELECT line_patient_pairs_id FROM line_patient_pairs 
+            WHERE line_uuid = ? AND patient_id = ?
+        ''', (line_id, patient_id))
+        pair_row = c.fetchone()
+        if not pair_row:
+            raise Exception("無法取得 line_patient_pairs_id")
+        pair_id = pair_row[0]
+
+        # -- records table
         symptoms_json = json.dumps(topics, ensure_ascii=False)
-        c_form.execute('''
-            INSERT OR REPLACE INTO FORM (medical_record_num, doctor_account, checkout_date, symptoms) 
+        c.execute('''
+            INSERT INTO record (line_patient_pairs_id, checkout_date, doctor_id, symptoms)
             VALUES (?, ?, ?, ?)
-        ''', (medical_record_num, doctor_id, discharge_date, symptoms_json))
-        conn_form.commit()
-        conn_form.close()
+        ''', (pair_id, discharge_date, doctor_id, symptoms_json))
 
-        # --- 清除 session ---
+        conn.commit()
+        conn.close()
+
+        # 清除 session
         session.clear()
 
         return jsonify({"success": True, "message": "表單已成功儲存至資料庫"})
     except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
         return jsonify({"success": False, "message": f"寫入資料庫失敗: {str(e)}"})

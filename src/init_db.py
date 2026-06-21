@@ -58,7 +58,6 @@ def init_hospital_db():
             patient_id            INTEGER NOT NULL,
             line_uuid             TEXT    NOT NULL,
             relation              TEXT,
-            latest_record_id      TEXT, -- 存 JSON 字串
             FOREIGN KEY (patient_id) REFERENCES patients (patient_id)
         )
     ''')
@@ -78,25 +77,23 @@ def init_hospital_db():
     
     # 插入測試資料
     doctors = [
-        (1, 'admin',   hash_pw('admin123'), '張大亮', '急診科', 1, 1),
-        (2, 'dr_wang', hash_pw('wang123'),  '王大明', '內科',   1, 0),
-        (3, 'dr_li',   hash_pw('li123'),    '李小華', '小兒科', 1, 0),
+        (1, 'admin',   hash_pw('admin123'), '張大亮 醫師', '急診科', 1, 1),
+        (2, 'dr_wang', hash_pw('wang123'),  '王大明 醫師', '內科',   1, 0),
+        (3, 'dr_li',   hash_pw('li123'),    '李小華 醫師', '小兒科', 1, 0),
     ]
     
     patients_data = [
         (1, 'P2026001', 1),
         (2, 'P2026002', 0),
         (3, 'P2026003', 0),
-        (4, 'P2026004', 0),
-        (5, 'P2026005', 0)
+        (4, 'P2026004', 0)
     ]
     
     line_pairs_data = [
-        (1, 'U1a2b3c4d5', 1, '本人', json.dumps([1, 4])),
-        (2, 'U2e3f4g5h6', 2, '本人', json.dumps([2])),
-        (3, 'U3i4j5k6l7', 3, '媽媽', json.dumps([3])),
-        (4, 'U4m5n6o7p8', 4, '丈夫', json.dumps([5])),
-        (5, 'U1a2b3c4d5', 5, '兒子', json.dumps([6]))
+        (1, 'U1a2b3c4d5', 1, '本人'),
+        (2, 'U2e3f4g5h6', 2, '本人'),
+        (3, 'U3i4j5k6l7', 3, '媽媽'),
+        (4, 'U4m5n6o7p8', 4, '丈夫')
     ]
     
     records_data = [
@@ -104,8 +101,7 @@ def init_hospital_db():
         (2, 2, '2026-05-05 09:15:30.456', 2, json.dumps(['胸痛', '頭暈'], ensure_ascii=False)),
         (3, 3, '2026-05-07 16:45:00.789', 3, json.dumps(['便秘', '腹瀉'], ensure_ascii=False)),
         (4, 1, '2026-05-08 14:30:15.123', 2, json.dumps(['腹痛'], ensure_ascii=False)),
-        (5, 4, '2026-05-09 11:20:10.012', 2, json.dumps(['頭暈', '水腫'], ensure_ascii=False)),
-        (6, 5, '2026-05-10 15:00:00.000', 1, json.dumps(['發燒'], ensure_ascii=False))
+        (5, 4, '2026-05-09 11:20:10.012', 2, json.dumps(['頭暈', '水腫'], ensure_ascii=False))
     ]
     
     c.executemany(
@@ -119,7 +115,7 @@ def init_hospital_db():
     )
     
     c.executemany(
-        'INSERT INTO line_patient_pairs (line_patient_pairs_id, line_uuid, patient_id, relation, latest_record_id) VALUES (?,?,?,?,?)',
+        'INSERT INTO line_patient_pairs (line_patient_pairs_id, line_uuid, patient_id, relation) VALUES (?,?,?,?)',
         line_pairs_data
     )
     

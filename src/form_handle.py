@@ -46,6 +46,7 @@ def verify_page():
 def verify_code():
     verification_codes["112233"] = {
         "user_id": "U3i4j5k6l7",
+        # "user_id": "U1a2b3c4d5",
         "user_name": "曾宇晨",
         "expires_at": time.time() + 3600
     }

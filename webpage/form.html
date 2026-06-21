@@ -595,18 +595,22 @@
 
         /* Relation List Modal Styles */
         .btn-change-relation {
-            padding: 6px 12px;
-            background-color: #f0f2f5;
-            color: #333;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            background-color: #06C755;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 44px;
+            align-self: flex-start;
+            height: 63px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             cursor: pointer;
-            font-size: 13px;
-            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
             transition: background-color 0.2s;
         }
         .btn-change-relation:hover {
-            background-color: #e4e6eb;
+            background-color: #05b04a;
         }
         .relation-section-title {
             font-size: 14px;
@@ -636,11 +640,27 @@
             border-color: #06C755;
         }
         .relation-item.selected::before {
-            content: '✓';
-            color: #06C755;
-            font-weight: bold;
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
             margin-right: 10px;
-            font-size: 16px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2306C755' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+        .relation-item[data-type="new"].selected::before,
+        .relation-item[data-type="self"].selected::before {
+            content: '';
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2306C755' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='12' y1='5' x2='12' y2='19'%3E%3C/line%3E%3Cline x1='5' y1='12' x2='19' y2='12'%3E%3C/line%3E%3C/svg%3E");
+        }
+        .existing-section-wrapper {
+            overflow-y: auto;
+            max-height: 240px;
+            margin: 5px 0;
+            padding: 5px 0;
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
         }
         .relation-item.selected .hide-on-select {
             display: none;
@@ -727,52 +747,65 @@
 {% else %}
 <div class="container">
     <h2>病患衛教表單</h2>
-    <div style="height: 2px; background-color: #333; margin-top: 10px; margin-bottom: 25px; border-radius: 2px;"></div>
+    <!-- <div style="height: 2px; background-color: #333; margin-top: 10px; margin-bottom: 25px; border-radius: 2px;"></div> -->
 
     <!-- Hidden fields to preserve JS compatibility -->
     <input type="hidden" id="line_info" value="{{ uname }} ({{ uid }})" data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'>
     <input type="hidden" id="discharge_date">
     <input type="hidden" id="doctor_id" value="{{ doctor_id }}">
 
-    <!-- Collapsible accordion containing patient info meta-box and text fields -->
-    <div class="accordion-container">
-        <div class="accordion-header" id="accordion-toggle" style="display: flex; align-items: center; cursor: pointer; user-select: none; font-weight: bold; color: #333; font-size: 15px; padding: 5px 0;">
-            <span id="accordion-icon" style="margin-right: 6px; font-family: monospace; color: #333;">▼</span>
-            <span>病患基本資料：</span>
-        </div>
-        <div class="accordion-content" id="accordion-content">
-            <!-- Combined Solid meta-box for LINE Name and Date -->
-            <div class="meta-box" style="flex-direction: column; align-items: stretch; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+    <!-- Patient Info Section -->
+    <div style="display: flex; align-items: stretch; margin-bottom: 20px;">
+        <!-- Left: Meta Box (Patient field + Collapsible details) -->
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: stretch; background-color: #f5f6f7; border-radius: 6px; overflow: hidden; margin-right: 12px; border-left: 4px solid #06C755;">
+            
+            <!-- Patient Field (Always Visible, Highlighted) -->
+            <div style="background-color: #e8f5e9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c8e6c9;">
+                <span class="meta-label">病患：</span>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3;">
+                    <span id="display_relation" style="font-weight: bold; font-size: 16px; color: #333;">尚未選擇</span>
+                    <span id="display_medical_num" style="font-size: 13px; color: #666;">-</span>
+                </div>
+            </div>
+            
+            <!-- Accordion Toggle -->
+            <div id="accordion-toggle" style="display: flex; justify-content: center; align-items: center; cursor: pointer; padding: 4px 0; background-color: #f5f6f7; border-top: 1px solid #e2e8f0; display: none;">
+                <svg id="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            
+            <!-- Accordion Content -->
+            <div class="accordion-content" id="accordion-content" style="padding: 0 16px; margin-top: 0;">
+                <div style="height: 1px; background-color: #e2e8f0; margin: 0 0 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px;">
                     <span class="meta-label">LINE 帳號：</span>
                     <span class="meta-value">{{ uname }} ({{ uid }})</span>
                 </div>
                 <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <span class="meta-label">病患：</span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="meta-value" id="display_relation_text">尚未選擇</span>
-                        <button type="button" class="btn-change-relation" style="padding: 2px 8px; font-size: 12px;" onclick="openRelationModal()">更改</button>
-                    </div>
-                </div>
-                <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px;">
                     <span class="meta-label">就診日期：</span>
                     <span id="display_discharge_date" class="meta-value"></span>
                 </div>
                 <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px;">
                     <span class="meta-label">醫師：</span>
                     <span class="meta-value">{{ doctor_department }} - {{ doctor_name }}</span>
                 </div>
             </div>
-
-            <!-- Hidden inputs to store selection for submission -->
-            <input type="hidden" id="selected_pair_id" value="">
-            <input type="hidden" id="selected_relation" value="">
-            <input type="hidden" id="selected_medical_record_num" value="">
         </div>
+        
+        <!-- Change Relation Button Outside -->
+        <button type="button" class="btn-change-relation" onclick="openRelationModal()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+        </button>
     </div>
+
+    <!-- Hidden inputs for submission -->
+    <input type="hidden" id="selected_pair_id" value="">
+    <input type="hidden" id="selected_relation" value="">
+    <input type="hidden" id="selected_medical_record_num" value="">
     
     <div class="image-section" style="margin-bottom: 5px;">
         <label style="font-weight: bold; color: #555; display: block; text-align: left; margin-bottom:10px;">請點擊圖示部位選擇衛教資料：</label>
@@ -862,7 +895,7 @@
         <div class="modal-card" style="max-height: 85vh; display: flex; flex-direction: column; padding: 20px;">
             <h3 class="modal-title">請選擇對象</h3>
             
-            <div id="relation-list-container" style="overflow-y: auto; flex: 1; margin-bottom: 15px; padding-right: 5px;">
+            <div id="relation-list-container" style="margin-bottom: 15px; padding-right: 5px;">
                 <!-- Populated by JS -->
             </div>
             
@@ -1005,7 +1038,6 @@
     const relationModal = document.getElementById('relation-modal');
     const relationListContainer = document.getElementById('relation-list-container');
     const relationErrorMsg = document.getElementById('relation-error-msg');
-    const displayRelationText = document.getElementById('display_relation_text');
     const inputSelectedPairId = document.getElementById('selected_pair_id');
     const inputSelectedRelation = document.getElementById('selected_relation');
     const inputSelectedMedicalRecordNum = document.getElementById('selected_medical_record_num');
@@ -1043,6 +1075,9 @@
         
         // --- 2. Existing Section ---
         if (backendRelations.length > 0) {
+            const existingWrapper = document.createElement('div');
+            existingWrapper.className = 'existing-section-wrapper';
+            
             const sortedRelations = [...backendRelations].sort((a, b) => {
                 if (a.relation === '本人') return -1;
                 if (b.relation === '本人') return 1;
@@ -1063,8 +1098,9 @@
                     <div class="relation-item-subtitle">${r.medical_record_num}</div>
                 `;
                 existingItem.appendChild(existingContent);
-                relationListContainer.appendChild(existingItem);
+                existingWrapper.appendChild(existingItem);
             });
+            relationListContainer.appendChild(existingWrapper);
         }
         
         // --- 3. New Section ---
@@ -1104,6 +1140,7 @@
     }
     
     function openRelationModal() {
+        document.body.style.overflow = 'hidden';
         relationErrorMsg.innerText = '';
         relationModal.classList.add('show');
         renderRelationList();
@@ -1164,9 +1201,11 @@
         inputSelectedRelation.value = finalRelation;
         inputSelectedMedicalRecordNum.value = finalMedicalNum;
         
-        displayRelationText.innerText = `${finalRelation} | ${finalMedicalNum}`;
+        document.getElementById('display_relation').innerText = finalRelation;
+        document.getElementById('display_medical_num').innerText = finalMedicalNum;
         
         relationModal.classList.remove('show');
+        document.body.style.overflow = '';
         hasSelectedOnce = true;
     }
     
@@ -1198,10 +1237,10 @@
         
         if (accordionExpanded) {
             accordionContent.classList.remove('collapsed');
-            accordionIcon.textContent = "▼";
+            accordionToggle.style.display = 'none';
         } else {
             accordionContent.classList.add('collapsed');
-            accordionIcon.textContent = "▶";
+            accordionToggle.style.display = 'flex';
         }
     }
 

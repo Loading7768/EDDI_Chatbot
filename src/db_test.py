@@ -7,14 +7,14 @@ def insert_test_data():
     
     # 插入測試資料
     doctors = [
-        (1, 'admin',   hash_pw('admin123'), '張大亮 醫師', '急診科', 1, 1),
-        (2, 'dr_wang', hash_pw('wang123'),  '王大明 醫師', '內科',   1, 0),
-        (3, 'dr_li',   hash_pw('li123'),    '李小華 醫師', '小兒科', 1, 0),
+        (1, 'admin',   hash_pw('admin123'), '張大亮', '急診科', 1, 1),
+        (2, 'dr_wang', hash_pw('wang123'),  '王大明', '內科',   1, 0),
+        (3, 'dr_li',   hash_pw('li123'),    '李小華', '小兒科', 1, 0),
         # 1 more in '急診科'
-        (4, 'dr_chen', hash_pw('chen123'),  '陳小妹 醫師', '急診科', 1, 0),
+        (4, 'dr_chen', hash_pw('chen123'),  '陳小妹', '急診科', 1, 0),
         # 2 more inactive accounts
-        (5, 'dr_lin',  hash_pw('lin123'),   '林志玲 醫師', '內科',   0, 0),
-        (6, 'dr_wu',   hash_pw('wu123'),    '吳宗憲 醫師', '小兒科', 0, 0),
+        (5, 'dr_lin',  hash_pw('lin123'),   '林志玲', '內科',   0, 0),
+        (6, 'dr_wu',   hash_pw('wu123'),    '吳宗憲', '小兒科', 0, 0),
     ]
     
     # patients: 10, only this first one has_chatted

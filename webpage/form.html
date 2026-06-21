@@ -615,16 +615,24 @@
 <div class="container" style="max-width: 380px; padding: 30px; margin-top: 50px;">
     <h2 style="margin-bottom: 25px;">病患表單登入</h2>
     
-    <div class="form-group">
-        <label for="code">請輸入 LINE 取得的 6 位數驗證碼：</label>
-        <input type="text" id="code" maxlength="6" placeholder="例如：123456" required>
-        <div id="code-error" class="field-error">此處不能空白</div>
+    <div class="form-group floating-group">
+        <input type="text" id="account" placeholder=" " required>
+        <label for="account">醫師帳號</label>
+        <div id="account-error" class="field-error">此處不能空白</div>
     </div>
     
-    <div class="form-group">
-        <label for="password">請輸入管理員密碼：</label>
-        <input type="password" id="password" placeholder="請輸入密碼" required>
+    <div class="form-group floating-group">
+        <input type="password" id="password" placeholder=" " required>
+        <label for="password">醫師密碼</label>
         <div id="password-error" class="field-error">此處不能空白</div>
+    </div>
+    
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+    
+    <div class="form-group floating-group">
+        <input type="text" id="code" maxlength="6" placeholder=" " required>
+        <label for="code">請輸入 LINE 取得的 6 位數驗證碼</label>
+        <div id="code-error" class="field-error">此處不能空白</div>
     </div>
     
     <button class="submit-btn" style="margin-top: 10px; font-size: 16px;" onclick="submitVerify()">驗證並進入</button>
@@ -638,6 +646,7 @@
     <!-- Hidden fields to preserve JS compatibility -->
     <input type="hidden" id="line_info" value="{{ uname }} ({{ uid }})" data-uname="{{ uname }}" data-uid="{{ uid }}" data-topics='{{ prefill_topics | default([]) | tojson }}'>
     <input type="hidden" id="discharge_date">
+    <input type="hidden" id="doctor_id" value="{{ doctor_id }}">
 
     <!-- Collapsible accordion containing patient info meta-box and text fields -->
     <div class="accordion-container" style="margin-bottom: 20px;">
@@ -657,22 +666,17 @@
                     <span class="meta-label">出院日期：</span>
                     <span id="display_discharge_date" class="meta-value"></span>
                 </div>
+                <div style="height: 1px; background-color: #e2e8f0; margin: 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span class="meta-label">醫師：</span>
+                    <span class="meta-value">{{ doctor_department }} - {{ doctor_name }}</span>
+                </div>
             </div>
 
             <!-- User inputs with floating labels -->
             <div class="floating-group">
                 <input type="text" id="medical_record_num" placeholder=" " required value="{{ prefill_record_num | default('') }}">
                 <label for="medical_record_num">病歷號</label>
-            </div>
-
-            <div class="floating-group" style="margin-bottom: 5px;">
-                <select id="doctor_id" required>
-                    <option value="" disabled {% if not prefill_doctor_id %}selected{% endif %} hidden></option>
-                    {% for doc in doctors %}
-                        <option value="{{ doc.account_name }}" {% if doc.account_name == prefill_doctor_id %}selected{% endif %}>{{ doc.doctor_name }}</option>
-                    {% endfor %}
-                </select>
-                <label for="doctor_id">醫師帳號</label>
             </div>
         </div>
     </div>
@@ -768,16 +772,16 @@
 
 <script>
 {% if not verified %}
-    // 監聽驗證碼輸入框的 Enter 鍵
-    document.getElementById('code').addEventListener('keydown', function(e) {
+    // 監聽帳號輸入框的 Enter 鍵
+    document.getElementById('account').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
-            e.preventDefault(); // 防止網頁預設行為
-            const codeError = document.getElementById('code-error');
+            e.preventDefault();
+            const accountError = document.getElementById('account-error');
             if (this.value.trim() === '') {
-                codeError.style.display = 'block'; // 顯示錯誤訊息
+                accountError.style.display = 'block';
             } else {
-                codeError.style.display = 'none'; // 隱藏錯誤訊息
-                document.getElementById('password').focus(); // 游標跳到密碼框
+                accountError.style.display = 'none';
+                document.getElementById('password').focus();
             }
         }
     });
@@ -791,45 +795,64 @@
                 passwordError.style.display = 'block'; // 顯示錯誤訊息
             } else {
                 passwordError.style.display = 'none'; 
-                submitVerify(); // 觸發登入按鈕的功能
+                document.getElementById('code').focus();
             }
         }
     });
 
-    // 當使用者開始打字時，自動隱藏紅色錯誤訊息，讓體驗更順暢
-    document.getElementById('code').addEventListener('input', function() {
-        document.getElementById('code-error').style.display = 'none';
+    // 監聽驗證碼輸入框的 Enter 鍵
+    document.getElementById('code').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const codeError = document.getElementById('code-error');
+            if (this.value.trim() === '') {
+                codeError.style.display = 'block';
+            } else {
+                codeError.style.display = 'none'; 
+                submitVerify();
+            }
+        }
+    });
+
+    // 當使用者開始打字時，自動隱藏紅色錯誤訊息
+    document.getElementById('account').addEventListener('input', function() {
+        document.getElementById('account-error').style.display = 'none';
     });
     document.getElementById('password').addEventListener('input', function() {
         document.getElementById('password-error').style.display = 'none';
     });
+    document.getElementById('code').addEventListener('input', function() {
+        document.getElementById('code-error').style.display = 'none';
+    });
 
     async function submitVerify() {
-        const code = document.getElementById('code').value.trim();
+        const account = document.getElementById('account').value.trim();
         const password = document.getElementById('password').value.trim();
+        const code = document.getElementById('code').value.trim();
+        
         const errorMsg = document.getElementById('error-msg');
-        const codeError = document.getElementById('code-error');
+        const accountError = document.getElementById('account-error');
         const passwordError = document.getElementById('password-error');
+        const codeError = document.getElementById('code-error');
 
         // 重置全局錯誤訊息
         errorMsg.innerText = "";
 
-        // 點擊按鈕時，也檢查是否空白並顯示對應的紅字
+        // 點擊按鈕時，檢查是否空白並顯示對應的紅字
         let hasError = false;
-        if (!code) {
-            codeError.style.display = 'block';
+        if (!account) {
+            accountError.style.display = 'block';
             hasError = true;
         }
         if (!password) {
             passwordError.style.display = 'block';
             hasError = true;
         }
-        if (hasError) return; // 如果有空白就中斷送出   
-
-        if (!code || !password) {
-            errorMsg.innerText = "請填寫驗證碼與密碼";
-            return;
+        if (!code) {
+            codeError.style.display = 'block';
+            hasError = true;
         }
+        if (hasError) return;
 
         if (code.length !== 6 || isNaN(code)) {
             errorMsg.style.color = "#d9534f";
@@ -847,8 +870,9 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    code: code,
-                    password: password
+                    account: account,
+                    password: password,
+                    code: code
                 })
             });
 

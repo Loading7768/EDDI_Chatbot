@@ -56,12 +56,24 @@ def verify_code():
     # }
 
     data = request.json
-    code = data.get("code")
+    account = data.get("account")
     password = data.get("password")
+    code = data.get("code")
 
-    # 1. 驗證密碼
-    if password != "12345":
-        return jsonify({"success": False, "message": "密碼錯誤"})
+    if not account or not password or not code:
+        return jsonify({"success": False, "message": "請填寫完整資訊"})
+
+    import hashlib
+    hashed_pw = hashlib.sha256(password.encode()).hexdigest()
+
+    conn = get_db('hospital.db')
+    c = conn.cursor()
+    c.execute('SELECT doctor_id, doctor_name, department FROM doctors WHERE account_name = ? AND password_hash = ? AND is_active = 1', (account, hashed_pw))
+    doctor = c.fetchone()
+    conn.close()
+
+    if not doctor:
+        return jsonify({"success": False, "message": "帳號或密碼錯誤，或此醫師未啟用"})
 
     # 2. 尋找驗證碼記錄
     record = verification_codes.get(code)
@@ -82,6 +94,10 @@ def verify_code():
     session['form_verified'] = True
     session['form_user_id'] = user_id
     session['form_user_name'] = user_name
+    
+    session['doctor_id'] = doctor[0]
+    session['doctor_name'] = doctor[1]
+    session['doctor_department'] = doctor[2]
 
     return jsonify({"success": True, "redirect_url": "/form"})
 
@@ -96,16 +112,12 @@ def form_page():
     uid = session.get('form_user_id', '未知 ID')
     uname = session.get('form_user_name', '未知名字')
     
-    # --- 新增註解：連接 doctor.db，讀取啟用的醫師名單作為表單下拉選單資料 ---
-    conn = get_db('doctor.db')
-    c = conn.cursor()
-    c.execute('SELECT account_name, doctor_name FROM DOCTOR WHERE is_active = 1')
-    doctors = [{'account_name': row[0], 'doctor_name': row[1]} for row in c.fetchall()]
-    conn.close()
+    doctor_id = session.get('doctor_id')
+    doctor_name = session.get('doctor_name')
+    doctor_department = session.get('doctor_department')
 
     # ==== 新增註解：查詢使用者是否存在歷史紀錄，以利預先填入表單 ====
     prefill_record_num = ""
-    prefill_doctor_id = ""
     prefill_topics = []
 
     try:
@@ -134,18 +146,15 @@ def form_page():
 
             if form_row:
                 prefill_record_num = form_row[0]
-                prefill_doctor_id = form_row[1]
                 if form_row[2]:
                     prefill_topics = json.loads(form_row[2])
     except Exception as e:
         print(f"讀取歷史資料發生錯誤: {str(e)}")
     # ==========================================================
 
-    # --- 新增註解：將 doctors 傳遞給前端 ---
-    # ==== 新增註解：一併將查到的歷史紀錄 (prefill 相關變數) 傳遞給前端 ====
-    return render_template("form.html", verified=True, uname=uname, uid=uid, doctors=doctors, 
+    return render_template("form.html", verified=True, uname=uname, uid=uid, 
+                           doctor_id=doctor_id, doctor_name=doctor_name, doctor_department=doctor_department,
                            prefill_record_num=prefill_record_num, 
-                           prefill_doctor_id=prefill_doctor_id, 
                            prefill_topics=prefill_topics)
 
 

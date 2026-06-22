@@ -90,7 +90,7 @@ def get_prompt_version() -> str:
             try:
                 with open(p, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    return config.get("current_version", "prompt_001.md")
+                    return config.get("current_version", "prompt_001.md") # 如果找不到 "current_version" 就直接給 "prompt_001.md"
             except Exception:
                 pass
     return "prompt_001.md"
@@ -372,20 +372,8 @@ def handle_message(event):
         line_bot_api = MessagingApi(api_client)
         user_message = event.message.text.strip()
         user_id = event.source.user_id
-        
-        # 1. 查詢該 line_id 綁定的病患
-        bound_patients = chat_logs.get_patients_for_line_id(user_id)
-        if not bound_patients:
-            reply_text = "您尚未綁定任何病歷，請先聯絡系統管理員進行綁定。"
-            line_bot_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply_text)]
-                )
-            )
-            return
 
-        # 特別處理：修改病患表單 (這是 app.py 原有的邏輯)
+        # 1. 修改病患表單 (這是 app.py 原有的邏輯)
         if user_message == '修改病患表單':
             from form_handle import verification_codes, cleanup_expired_codes
             import random
@@ -414,9 +402,22 @@ def handle_message(event):
                     messages=[TextMessage(text=reply_text)]
                 )
             )
+            return      
+          
+        # 2. 查詢該 line_id 綁定的病患
+        bound_patients = chat_logs.get_patients_for_line_id(user_id)
+
+        if not bound_patients:
+            reply_text = "您尚未綁定任何病歷，請先聯絡系統管理員進行綁定。"
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply_text)]
+                )
+            )
             return
 
-        # 2. 載入當前狀態並檢查 timeout
+        # 3. 載入當前狀態並檢查 timeout
         state = get_user_state(user_id)
         now = datetime.now(tw_tz)
         is_timeout = False
@@ -429,7 +430,7 @@ def handle_message(event):
             except Exception:
                 is_timeout = True
                 
-        # 3. 處理「更換對象」或「timeout」的情形
+        # 4. 處理「更換對象」或「timeout」的情形
         if user_message == "更換對象" or is_timeout:
             current_mrn = state.get("medical_record_number")
             if current_mrn:
@@ -450,7 +451,7 @@ def handle_message(event):
                 save_user_state(user_id, state)
                 return
 
-        # 4. 根據狀態機處理訊息
+        # 5. 根據狀態機處理訊息
         status = state.get("status")
         
         if status == "SELECTING_PATIENT":

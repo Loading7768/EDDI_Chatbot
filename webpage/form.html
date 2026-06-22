@@ -1259,12 +1259,11 @@
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
-    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-    const todayStr = `${year}-${month}-${date} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+    const todayStr = `${year}-${month}-${date} ${hours}:${minutes}:${seconds}`;
     document.getElementById('discharge_date').value = todayStr;
     const displayDateEl = document.getElementById('display_discharge_date');
     if (displayDateEl) {
-        displayDateEl.textContent = `${year}-${month}-${date}`;
+        displayDateEl.textContent = todayStr;
     }
 
     // Accordion Toggle Implementation
@@ -1602,7 +1601,7 @@
 
         // Populate summary modal text values
         document.getElementById('summary-line-info').textContent = `${userName} (${lineId})`;
-        document.getElementById('summary-discharge-date').textContent = dischargeDate.split(' ')[0];
+        document.getElementById('summary-discharge-date').textContent = dischargeDate;
         document.getElementById('summary-record-num').innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3;">
                 <span style="font-weight: bold; font-size: 16px; color: #333;">${relation}</span>

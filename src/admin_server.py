@@ -538,13 +538,13 @@ def get_chat_detail(mrn: str):
         conn.close()
         return jsonify({'error': '找不到此病患'}), 404
 
-    # 更改：在修改表單時需要完整的時間（含毫秒），因此不使用 strftime('%Y-%m-%d')
+    # 就診紀錄中都只需要顯示日期就好，不需要顯示時間，因此格式化為 YYYY-MM-DD
     forms = conn.execute('''
         SELECT 
             p.medical_record_number AS medical_record_num,
             d.account_name AS doctor_account,
             d.department AS specialty,
-            r.checkout_date AS checkout_date,
+            strftime('%Y-%m-%d', r.checkout_date) AS checkout_date,
             r.symptoms AS symptoms,
             p.has_chatted AS is_chatted
         FROM record r
@@ -590,134 +590,72 @@ def update_form(mrn: str, checkout_date: str):
     is_admin = session['is_admin']
 
     conn = get_db()
-    
-    try:
-        # 1. 精確比對 checkout_date，確保要修改的表單存在
-        row = conn.execute('''
-            SELECT r.record_id, r.symptoms, r.doctor_id, r.checkout_date
+
+    if not is_admin:
+        allowed = conn.execute('''
+            SELECT 1 
             FROM record r
             JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
             JOIN patients p ON lpp.patient_id = p.patient_id
-            WHERE p.medical_record_number = ? AND r.checkout_date = ?
+            JOIN doctors d ON r.doctor_id = d.doctor_id
+            WHERE p.medical_record_number = ? AND strftime('%Y-%m-%d', r.checkout_date) = ? AND d.account_name = ?
             LIMIT 1
-        ''', (mrn, checkout_date)).fetchone()
-        
-        if not row:
+        ''', (mrn, checkout_date, account)).fetchone()
+        if not allowed:
             conn.close()
-            return jsonify({'error': '找不到此表單'}), 404
+            return jsonify({'error': '無修改權限'}), 403
 
-        record_id = row['record_id']
+    # 修改表單就診紀錄以 YYYY-MM-DD 比對
+    row = conn.execute('''
+        SELECT r.record_id, r.symptoms
+        FROM record r
+        JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
+        JOIN patients p ON lpp.patient_id = p.patient_id
+        WHERE p.medical_record_number = ? AND strftime('%Y-%m-%d', r.checkout_date) = ?
+        LIMIT 1
+    ''', (mrn, checkout_date)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': '找不到此表單'}), 404
 
-        # 2. 權限檢查：非管理員只能修改自己看診的表單
-        if not is_admin:
-            allowed = conn.execute('''
-                SELECT 1 
-                FROM record r
-                JOIN doctors d ON r.doctor_id = d.doctor_id
-                WHERE r.record_id = ? AND d.account_name = ?
-                LIMIT 1
-            ''', (record_id, account)).fetchone()
-            if not allowed:
-                conn.close()
-                return jsonify({'error': '無修改權限'}), 403
+    record_id = row['record_id']
 
-        data               = request.get_json() or {}
-        new_checkout_date  = data.get('checkout_date', checkout_date)
-        new_doctor_account = data.get('doctor_account', '')
-        new_mrn            = data.get('medical_record_num')
-        new_relation       = data.get('relation')
+    data               = request.get_json() or {}
+    new_checkout_date  = data.get('checkout_date', checkout_date)
+    new_doctor_account = data.get('doctor_account', '')
 
-        # 3. 就診日期格式化與防重複
-        new_checkout_date = new_checkout_date.replace('T', ' ').strip()
-        if len(new_checkout_date) >= 16:
-            base_time = new_checkout_date[:16]
-            seconds_part = ":00"
-            if len(new_checkout_date) >= 19:
-                seconds_part = new_checkout_date[16:19]
-            new_checkout_date = base_time + seconds_part + ".000"
-
-        # 獲取原始的配對與病患資料
-        current_pair = conn.execute('''
-            SELECT lpp.line_uuid, lpp.relation, p.medical_record_number, lpp.patient_id
-            FROM line_patient_pairs lpp
-            JOIN record r ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
-            JOIN patients p ON lpp.patient_id = p.patient_id
-            WHERE r.record_id = ?
-        ''', (record_id,)).fetchone()
-
-        if not current_pair:
+    if new_doctor_account:
+        new_doc = conn.execute('SELECT doctor_id FROM doctors WHERE account_name = ?', (new_doctor_account,)).fetchone()
+        if not new_doc:
             conn.close()
-            return jsonify({'error': '無法取得目前病患的 LINE 帳號配對資訊'}), 400
+            return jsonify({'error': f'找不到指定帳號的醫師 ({new_doctor_account})'}), 400
+        new_doctor_id = new_doc['doctor_id']
+    else:
+        record_detail = conn.execute('SELECT doctor_id FROM record WHERE record_id = ?', (record_id,)).fetchone()
+        new_doctor_id = record_detail['doctor_id']
 
-        original_mrn = current_pair['medical_record_number']
-        original_relation = current_pair['relation']
-        line_uuid = current_pair['line_uuid']
-        original_patient_id = current_pair['patient_id']
-
-        # 預設為原配對 ID
-        final_pair_id = conn.execute('SELECT line_patient_pairs_id FROM record WHERE record_id = ?', (record_id,)).fetchone()[0]
-
-        # 4. 修改病歷號與關係 (目前限制不能修改)
-        mrn_changed = new_mrn and new_mrn.strip() != original_mrn
-        relation_changed = new_relation is not None and new_relation.strip() != original_relation
-
-        if mrn_changed or relation_changed:
-            conn.close()
-            return jsonify({'error': '目前不開放修改病歷號與關係。'}), 400
-
-        # 嚴格驗證五：防就診日期重複（同病患在同一時間點不可有兩筆紀錄）
-        # 獲取此表單最終關聯的 patient_id
-        final_patient_id = conn.execute('''
-            SELECT patient_id FROM line_patient_pairs WHERE line_patient_pairs_id = ?
-        ''', (final_pair_id,)).fetchone()[0]
-
-        conflict_date = conn.execute('''
-            SELECT r.record_id FROM record r
-            JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
-            WHERE lpp.patient_id = ? AND r.checkout_date = ? AND r.record_id != ?
-        ''', (final_patient_id, new_checkout_date, record_id)).fetchone()
-
-        if conflict_date:
-            conn.close()
-            return jsonify({'error': f'修改失敗：該病患於 {new_checkout_date} 已有就診紀錄，就診時間不可重複。'}), 400
-
-                        # 5. 醫師更新
-        if new_doctor_account:
-            new_doc = conn.execute('SELECT doctor_id FROM doctors WHERE account_name = ?', (new_doctor_account,)).fetchone()
-            if not new_doc:
-                conn.close()
-                return jsonify({'error': f'找不到指定帳號的醫師 ({new_doctor_account})'}), 400
-            new_doctor_id = new_doc['doctor_id']
+    symptoms_raw       = data.get('symptoms', None)
+    if symptoms_raw is not None:
+        if isinstance(symptoms_raw, list):
+            new_symptoms = json.dumps(symptoms_raw, ensure_ascii=False)
         else:
-            new_doctor_id = row['doctor_id']
+            parts = [s.strip() for s in str(symptoms_raw).split(',') if s.strip()]
+            new_symptoms = json.dumps(parts, ensure_ascii=False)
+    else:
+        new_symptoms = row['symptoms']
 
-        # 6. 症狀更新
-        symptoms_raw = data.get('symptoms', None)
-        if symptoms_raw is not None:
-            if isinstance(symptoms_raw, list):
-                new_symptoms = json.dumps(symptoms_raw, ensure_ascii=False)
-            else:
-                parts = [s.strip() for s in str(symptoms_raw).split(',') if s.strip()]
-                new_symptoms = json.dumps(parts, ensure_ascii=False)
-        else:
-            new_symptoms = row['symptoms']
-
-        # 7. 更新 record 內容
+    try:
         conn.execute('''
             UPDATE record 
             SET checkout_date = ?, doctor_id = ?, symptoms = ? 
             WHERE record_id = ?
         ''', (new_checkout_date, new_doctor_id, new_symptoms, record_id))
-
-        # 提交事務
         conn.commit()
         conn.close()
         return jsonify({'success': True, 'saved_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
-
     except Exception as e:
-        conn.rollback()
         conn.close()
-        return jsonify({'error': f'修改表單時發生資料庫錯誤: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 # ── 醫師帳號管理（管理員）────────────────────────────────────────────────────

@@ -254,6 +254,24 @@
   .badge-gray   { background: #f3f4f6; color: var(--muted); }
   .badge-relation { background: #fbbf24; color: #78350f; }
 
+  .btn-change-relation {
+      background-color: #06C755;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      width: 44px;
+      align-self: stretch;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      transition: background-color 0.2s;
+  }
+  .btn-change-relation:hover {
+      background-color: #05b04a;
+  }
+
   /* chat panel */
   .chat-panel {
     flex: 1; background: var(--card); border-radius: 12px;
@@ -1067,7 +1085,7 @@
     <div class="header-user">
       <span class="user-badge" id="header-name">—</span>
       <span class="role-tag"   id="header-role">—</span>
-      <button class="btn btn-outline btn-sm" onclick="doLogout()">登出</button>
+      <button class="btn btn-outline btn-sm" onclick="openModal('modal-confirm-logout')">登出</button>
     </div>
   </header>
 
@@ -1132,8 +1150,8 @@
                 <span class="badge badge-gray" id="patient-count">0</span>
               </div>
               <select id="patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
-                <option value="checkout_desc">出院日期 ⬇</option>
-                <option value="checkout_asc">出院日期 ⬆</option>
+                <option value="checkout_desc">就診日期 ⬇</option>
+                <option value="checkout_asc">就診日期 ⬆</option>
                 <option value="mrn_desc">病歷號 ⬇</option>
                 <option value="mrn_asc">病歷號 ⬆</option>
               </select>
@@ -1191,8 +1209,8 @@
                 <span class="badge badge-gray" id="form-patient-count">0</span>
               </div>
               <select id="form-patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderFormPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
-                <option value="checkout_desc">出院日期 ⬇</option>
-                <option value="checkout_asc">出院日期 ⬆</option>
+                <option value="checkout_desc">就診日期 ⬇</option>
+                <option value="checkout_asc">就診日期 ⬆</option>
                 <option value="mrn_desc">病歷號 ⬇</option>
                 <option value="mrn_asc">病歷號 ⬆</option>
               </select>
@@ -1219,10 +1237,13 @@
 
           <!-- Column 3: Edit Form Content -->
           <div class="chat-panel">
-            <div class="chat-panel-header">
+            <div class="chat-panel-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
               <div>
                 <div class="chat-panel-title" id="form-edit-title">請選擇就診紀錄</div>
                 <div class="chat-panel-sub"   id="form-edit-sub">點擊就診紀錄載入表單進行修改</div>
+              </div>
+              <div id="form-edit-save-btn-wrapper" style="display: none;">
+                <button class="btn btn-accent" onclick="saveFormEdit()">💾 儲存修改</button>
               </div>
             </div>
             <div class="chat-panel-body" id="form-edit-body" style="position: relative;">
@@ -1237,17 +1258,75 @@
                 <input type="hidden" id="edit-form-mrn">
                 <input type="hidden" id="edit-form-orig-date">
                 
-                <div class="form-group">
-                  <label>病歷號</label>
-                  <input type="text" id="edit-form-mrn-show" disabled style="background:#f3f4f6;color:var(--muted)">
-                </div>
-                <div class="form-group">
-                  <label>出院日期</label>
-                  <input type="date" id="edit-form-date">
-                </div>
-                <div class="form-group" id="edit-form-doctor-group">
-                  <label>主治醫師帳號</label>
-                  <select id="edit-form-doctor"></select>
+                <!-- Redesigned Card style layout -->
+                <div style="display: flex; align-items: stretch; margin-bottom: 20px; gap: 12px;">
+                    <!-- Left: Meta Box (Patient field + details) -->
+                    <div style="flex: 1; display: flex; flex-direction: column; align-items: stretch; background-color: #f5f6f7; border-radius: 6px; overflow: hidden; border-left: 4px solid #06C755; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        
+                        <!-- View Mode Container -->
+                        <div id="card-view-mode" style="display: block;">
+                            <!-- Patient Row (Always visible in view mode) -->
+                            <div style="background-color: #e8f5e9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c8e6c9;">
+                                <span style="font-weight: bold; color: #666; font-size: 13px;">病患：</span>
+                                <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3;">
+                                    <span id="display-form-relation" style="font-weight: bold; font-size: 16px; color: #333;">-</span>
+                                    <span id="display-form-mrn" style="font-size: 13px; color: #666;">-</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Details in View Mode (No LINE Account) -->
+                            <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+                                <!-- 就診日期 -->
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: bold; color: #666; font-size: 13px;">就診日期：</span>
+                                    <span id="display-form-date" style="color: #333; font-weight: 600; font-size: 13px;">-</span>
+                                </div>
+                                <div style="height: 1px; background-color: var(--border, #e2e8f0); margin: 4px 0;"></div>
+                                
+                                <!-- 醫師 -->
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: bold; color: #666; font-size: 13px;">醫師：</span>
+                                    <span id="display-form-doctor" style="color: #333; font-weight: 600; font-size: 13px;">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Edit Mode Container (Vertical Form Layout, No LINE Account) -->
+                        <div id="card-edit-mode" style="display: none; padding: 16px; flex-direction: column; gap: 12px;">
+                            <!-- Admin fields for Relation and MRN -->
+                            <div id="edit-form-admin-fields" style="display: none; flex-direction: column; gap: 12px;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="font-weight: bold; color: #666; font-size: 13px;">關係</label>
+                                    <input type="text" id="edit-form-relation-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="font-weight: bold; color: #666; font-size: 13px;">病歷號</label>
+                                    <input type="text" id="edit-form-mrn-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
+                                </div>
+                            </div>
+                            
+                            <!-- 就診日期 (Full Width Datetime Picker) -->
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <label style="font-weight: bold; color: #666; font-size: 13px;">就診日期</label>
+                                <input type="datetime-local" id="edit-form-date-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
+                            </div>
+                            
+                            <!-- 醫師 (Full Width Select Dropdown) -->
+                            <div id="edit-form-doctor-group" style="display: none; flex-direction: column; gap: 4px;">
+                                <label style="font-weight: bold; color: #666; font-size: 13px;">醫師</label>
+                                <select id="edit-form-doctor-select" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;"></select>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Change Relation Button Outside -->
+                    <button type="button" class="btn-change-relation" id="btn-edit-card" onclick="toggleCardEditMode()">
+                        <svg id="edit-card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                    </button>
                 </div>
                 
                 <div class="form-group">
@@ -1297,9 +1376,7 @@
                 
                 <p class="error-msg" id="form-edit-error" style="text-align:left; color: var(--danger);"></p>
                 
-                <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-                  <button class="btn btn-accent" onclick="saveFormEdit()">💾 儲存修改</button>
-                </div>
+
               </div>
             </div>
           </div>
@@ -1409,6 +1486,29 @@
   <div class="loading-box">
     <div class="spinner-dark"></div>
     <span>載入中…</span>
+  </div>
+</div>
+
+<!-- ── Modal：確認登出 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-logout">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap warning">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認登出系統</div>
+    <div class="modal-alert-banner warning">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">登出後將結束目前的工作階段，需要重新登入才能使用系統。</div>
+    </div>
+    <div class="modal-alert-subtitle">確定要登出嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-logout')">取消</button>
+      <button class="btn btn-danger" onclick="executeLogout()">確認登出</button>
+    </div>
   </div>
 </div>
 
@@ -1670,7 +1770,19 @@ async function doLogin() {
   finally  { btn.innerHTML = '登入'; btn.disabled = false; }
 }
 
+async function executeLogout() {
+  closeModal('modal-confirm-logout');
+  await api('POST', '/api/logout');
+  state.currentMrn = null;
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  showLogin();
+}
+
 async function doLogout() {
+  if (!confirm('確定要登出系統嗎？')) {
+    return;
+  }
   await api('POST', '/api/logout');
   state.currentMrn = null;
   document.getElementById('login-user').value = '';
@@ -1796,7 +1908,7 @@ function renderPatientList(patients) {
             : '<span class="badge badge-gray">尚未聊天</span>'}
           <span>就診 ${p.form_count} 次</span>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;">出院日期：${esc(p.latest_checkout || '—')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">就診日期：${esc(p.latest_checkout || '—')}</div>
       </div>`;
   }).join('');
 }
@@ -2069,11 +2181,12 @@ function renderFormPatientList(patients) {
           <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
           <span>表單 ${p.form_count} 筆</span>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">就診日期：${esc(p.latest_checkout || '—')}</div>
       </div>`;
   }).join('');
 }
 
-async function loadFormDetail(mrn, el) {
+async function loadFormDetail(mrn, el, targetDate = null) {
   state.formCurrentMrn = mrn;
   document.querySelectorAll('#form-patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
@@ -2085,6 +2198,8 @@ async function loadFormDetail(mrn, el) {
   document.getElementById('form-edit-sub').textContent   = '';
   document.getElementById('form-edit-empty').style.display = 'block';
   document.getElementById('form-edit-container').style.display = 'none';
+  const saveBtnWrapper = document.getElementById('form-edit-save-btn-wrapper');
+  if (saveBtnWrapper) saveBtnWrapper.style.display = 'none';
 
   try {
     const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
@@ -2094,14 +2209,14 @@ async function loadFormDetail(mrn, el) {
     }
     
     state.currentForms = d.forms || [];
-    renderFormVisits();
+    renderFormVisits(targetDate);
   } catch (err) {
     console.error(err);
     visitBody.innerHTML = '<p style="color:var(--danger);padding:16px;">載入失敗</p>';
   }
 }
 
-function renderFormVisits() {
+function renderFormVisits(targetDate = null) {
   const body = document.getElementById('form-visit-list-body');
   const forms = state.currentForms || [];
   
@@ -2127,10 +2242,142 @@ function renderFormVisits() {
     `;
   }).join('');
   
-  // Auto select the first (newest) visit
-  const firstVisitItem = body.querySelector('.visit-item');
-  if (firstVisitItem) {
-    firstVisitItem.click();
+  // Auto select the target visit or fallback to the first (newest) visit
+  let selectEl = null;
+  if (targetDate) {
+    const sortedForms = [...forms].sort((a, b) => b.checkout_date.localeCompare(a.checkout_date));
+    const selectIdx = sortedForms.findIndex(f => f.checkout_date === targetDate);
+    if (selectIdx !== -1) {
+      selectEl = body.querySelector(`#form-visit-item-${selectIdx}`);
+    }
+  }
+  if (!selectEl) {
+    selectEl = body.querySelector('.visit-item');
+  }
+  if (selectEl) {
+    selectEl.click();
+  }
+}
+
+let isEditingCard = false;
+
+function toggleCardEditMode() {
+  const btn = document.getElementById('btn-edit-card');
+  const icon = document.getElementById('edit-card-icon');
+  
+  const cardViewMode = document.getElementById('card-view-mode');
+  const cardEditMode = document.getElementById('card-edit-mode');
+  const editAdminFields = document.getElementById('edit-form-admin-fields');
+  
+  const displayRelation = document.getElementById('display-form-relation');
+  const displayMrn = document.getElementById('display-form-mrn');
+  const displayDate = document.getElementById('display-form-date');
+  const displayDoctor = document.getElementById('display-form-doctor');
+  
+  const editRelationInput = document.getElementById('edit-form-relation-input');
+  const editMrnInput = document.getElementById('edit-form-mrn-input');
+  const editDateInput = document.getElementById('edit-form-date-input');
+  const editDoctorSelect = document.getElementById('edit-form-doctor-select');
+  const editDoctorGroup = document.getElementById('edit-form-doctor-group');
+
+  isEditingCard = !isEditingCard;
+  
+  if (isEditingCard) {
+    if (editDoctorGroup) editDoctorGroup.style.display = 'flex';
+    // Switch to edit mode
+    if (cardViewMode) cardViewMode.style.display = 'none';
+    if (cardEditMode) cardEditMode.style.display = 'flex';
+    
+    if (state.isAdmin) {
+      if (editAdminFields) editAdminFields.style.display = 'none';
+      if (editRelationInput && displayRelation) editRelationInput.value = displayRelation.textContent.trim();
+      if (editMrnInput && displayMrn) editMrnInput.value = displayMrn.textContent.trim();
+    } else {
+      if (editAdminFields) editAdminFields.style.display = 'none';
+    }
+    
+    if (editDateInput && displayDate) {
+      // Convert YYYY-MM-DD HH:MM:SS.SSS to YYYY-MM-DDTHH:MM
+      const currentVal = displayDate.textContent.trim();
+      editDateInput.value = currentVal.substring(0, 16).replace(' ', 'T');
+    }
+    
+    // Set doctor select value to match current doctor account
+    if (editDoctorSelect) {
+      const origDate = document.getElementById('edit-form-orig-date').value;
+      const f = state.currentForms.find(form => form.checkout_date === origDate);
+      if (f) {
+        editDoctorSelect.value = f.doctor_account;
+      }
+    }
+    
+    // Change edit button icon to checkmark
+    if (icon) icon.innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
+    if (btn) btn.style.backgroundColor = '#fbbf24'; // Orange/Yellow when editing
+  } else {
+    // Validate inputs
+    let relationVal = displayRelation ? displayRelation.textContent.trim() : '本人';
+    let mrnVal = displayMrn ? displayMrn.textContent.trim() : '';
+    
+    if (state.isAdmin) {
+      if (editRelationInput) relationVal = editRelationInput.value.trim();
+      if (editMrnInput) mrnVal = editMrnInput.value.trim();
+      if (!mrnVal) {
+        alert('病歷號不能為空');
+        isEditingCard = true;
+        return;
+      }
+      if (!relationVal) {
+        alert('關係不能為空');
+        isEditingCard = true;
+        return;
+      }
+    }
+    
+    let dateVal = editDateInput ? editDateInput.value : '';
+    if (!dateVal) {
+      alert('就診日期不能為空');
+      isEditingCard = true;
+      return;
+    }
+    dateVal = dateVal.replace('T', ' ').trim();
+    if (dateVal.length >= 16) {
+      let secondsPart = ":00";
+      if (dateVal.length >= 19) {
+        secondsPart = dateVal.substring(16, 19);
+      }
+      dateVal = dateVal.substring(0, 16) + secondsPart + ".000";
+    }
+
+    if (state.isAdmin) {
+      if (displayRelation) displayRelation.textContent = relationVal;
+      if (displayMrn) displayMrn.textContent = mrnVal;
+    }
+    
+    if (displayDate) displayDate.textContent = dateVal;
+    
+    if (editDoctorSelect && displayDoctor) {
+      const currentDr = state.doctors.find(dr => dr.account_name === editDoctorSelect.value);
+      if (currentDr) {
+        displayDoctor.textContent = currentDr.doctor_name;
+      } else {
+        displayDoctor.textContent = editDoctorSelect.value || '—';
+      }
+    }
+    
+    if (editDoctorGroup) editDoctorGroup.style.display = 'none';
+    // Switch to view mode
+    if (cardViewMode) cardViewMode.style.display = 'block';
+    if (cardEditMode) cardEditMode.style.display = 'none';
+    
+    // Change edit button icon back to pencil
+    if (icon) {
+      icon.innerHTML = `
+        <path d="M12 20h9"></path>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+      `;
+    }
+    if (btn) btn.style.backgroundColor = '#06C755';
   }
 }
 
@@ -2147,99 +2394,141 @@ async function selectFormVisit(idx, el) {
 
   document.getElementById('edit-form-mrn').value          = mrn;
   document.getElementById('edit-form-orig-date').value    = f.checkout_date;
-  document.getElementById('edit-form-mrn-show').value     = mrn;
-  document.getElementById('edit-form-date').value         = f.checkout_date;
-  document.getElementById('form-edit-error').textContent   = '';
+  
+  // Reset inline edit states
+  isEditingCard = false;
+  
+  // Ensure we are in view mode
+  const cardViewMode = document.getElementById('card-view-mode');
+  const cardEditMode = document.getElementById('card-edit-mode');
+  const editAdminFields = document.getElementById('edit-form-admin-fields');
+  
+  if (cardViewMode) cardViewMode.style.display = 'block';
+  if (cardEditMode) cardEditMode.style.display = 'none';
+  if (editAdminFields) editAdminFields.style.display = 'none';
+  
+  // Reset edit button style and icon to pencil
+  const btnEditCard = document.getElementById('btn-edit-card');
+  if (btnEditCard) {
+    btnEditCard.style.backgroundColor = '#06C755';
+    const icon = document.getElementById('edit-card-icon');
+    if (icon) {
+      icon.innerHTML = `
+        <path d="M12 20h9"></path>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+      `;
+    }
+  }
+  
+  document.getElementById('form-edit-error').textContent = '';
 
-  // Hide empty state, show form container
+  // Populate values
+  const patientObj = state.allFormPatients.find(p => p.medical_record_num === mrn);
+  const relationText = patientObj ? (patientObj.relation || '本人') : '本人';
+  
+  const displayRelation = document.getElementById('display-form-relation');
+  const displayMrn = document.getElementById('display-form-mrn');
+  const displayDate = document.getElementById('display-form-date');
+  
+  if (displayRelation) displayRelation.textContent = relationText;
+  if (displayMrn) displayMrn.textContent = mrn;
+  if (displayDate) displayDate.textContent = f.checkout_date;
+  
+  const editRelationInput = document.getElementById('edit-form-relation-input');
+  const editMrnInput = document.getElementById('edit-form-mrn-input');
+  const editDateInput = document.getElementById('edit-form-date-input');
+  
+  if (editRelationInput) editRelationInput.value = relationText;
+  if (editMrnInput) editMrnInput.value = mrn;
+  if (editDateInput) editDateInput.value = f.checkout_date.substring(0, 16).replace(' ', 'T');
+
+  // Show container, hide empty
   document.getElementById('form-edit-empty').style.display = 'none';
   document.getElementById('form-edit-container').style.display = 'block';
+  const saveBtnWrapper = document.getElementById('form-edit-save-btn-wrapper');
+  if (saveBtnWrapper) saveBtnWrapper.style.display = 'block';
 
   // 初始化人體圖狀態
   selectedTopics = new Set(f.symptoms || []);
   closePopover();
   renderConfirmedChips(true);
 
-  // 填充醫師下拉選單（管理員才顯示）
-  const docGroup = document.getElementById('edit-form-doctor-group');
-  if (state.isAdmin) {
-    docGroup.style.display = '';
-    const sel = document.getElementById('edit-form-doctor');
-    if (!state.doctors.length) {
-      const list = await api('GET', '/api/doctors');
-      state.doctors = Array.isArray(list) ? list : [];
-    }
-    sel.innerHTML = state.doctors.map(dr =>
-      `<option value="${esc(dr.account_name)}" ${dr.account_name === f.doctor_account ? 'selected' : ''}>
-        ${esc(dr.account_name)} — ${esc(dr.doctor_name)}
-      </option>`
-    ).join('');
-  } else {
-    docGroup.style.display = 'none';
+  // Populate Doctor select
+  const sel = document.getElementById('edit-form-doctor-select');
+  if (!state.doctors.length) {
+    const list = await api('GET', '/api/doctors');
+    state.doctors = Array.isArray(list) ? list : [];
   }
-}
+  sel.innerHTML = state.doctors.map(dr =>
+    `<option value="${esc(dr.account_name)}" ${dr.account_name === f.doctor_account ? 'selected' : ''}>
+      ${esc(dr.account_name)} — ${esc(dr.doctor_name)}
+    </option>`
+  ).join('');
+  
+  // Update display doctor name
+  const displayDoctor = document.getElementById('display-form-doctor');
+  const currentDr = state.doctors.find(dr => dr.account_name === f.doctor_account);
+  if (displayDoctor) {
+    if (currentDr) {
+      displayDoctor.textContent = currentDr.doctor_name;
+    } else {
+      displayDoctor.textContent = f.doctor_account || '—';
+    }
+  }}
 
 async function saveFormEdit() {
+  // If still in edit mode, toggle back to view mode to validate and read inputs
+  if (isEditingCard) {
+    toggleCardEditMode();
+  }
+  if (isEditingCard) return;
+
   const mrn      = document.getElementById('edit-form-mrn').value;
   const origDate = document.getElementById('edit-form-orig-date').value;
-  const newDate  = document.getElementById('edit-form-date').value;
-  const doctor   = state.isAdmin ? document.getElementById('edit-form-doctor').value : undefined;
+  
+  const displayMrn = document.getElementById('display-form-mrn').textContent.trim();
+  const displayRelation = document.getElementById('display-form-relation').textContent.trim();
+  const displayDate = document.getElementById('display-form-date').textContent.trim();
+  
+  const doctorSelect = document.getElementById('edit-form-doctor-select');
+  const doctor = doctorSelect.value;
   const symptoms = Array.from(selectedTopics);
   const errEl    = document.getElementById('form-edit-error');
   errEl.textContent = '';
 
-  if (!newDate) { errEl.textContent = '請填寫出院日期'; return; }
+  if (state.isAdmin && !displayMrn) { errEl.textContent = '請填寫病歷號'; return; }
+  if (state.isAdmin && !displayRelation) { errEl.textContent = '請填寫關係'; return; }
+  if (!displayDate) { errEl.textContent = '請填寫就診日期'; return; }
   if (symptoms.length === 0) { errEl.textContent = '請至少選擇一項衛教資料'; return; }
 
-  const payload = { checkout_date: newDate, symptoms };
+  const payload = { checkout_date: displayDate, symptoms };
+  if (state.isAdmin) {
+    payload.medical_record_num = displayMrn;
+    payload.relation = displayRelation;
+  }
   if (doctor) payload.doctor_account = doctor;
 
   const res = await api('PUT', `/api/forms/${encodeURIComponent(mrn)}/${encodeURIComponent(origDate)}`, payload);
   if (res.success) {
     showToast('✅ 表單已儲存', 'ok');
     
-    // 重新載入表單資料並更新第二欄
-    try {
-      const d = await api('GET', '/api/chats/' + encodeURIComponent(mrn));
-      if (!d.error) {
-        state.currentForms = d.forms || [];
-        
-        const body = document.getElementById('form-visit-list-body');
-        const forms = state.currentForms || [];
-        document.getElementById('form-visit-count').textContent = forms.length;
-        
-        if (forms.length) {
-          const sortedForms = [...forms].sort((a, b) => b.checkout_date.localeCompare(a.checkout_date));
-          
-          let selectIndex = sortedForms.findIndex(f => f.checkout_date === newDate);
-          if (selectIndex === -1) selectIndex = 0;
-          
-          body.innerHTML = sortedForms.map((f, index) => {
-            const origIdx = forms.findIndex(fa => fa.checkout_date === f.checkout_date);
-            return `
-              <div class="visit-item${index === selectIndex ? ' active' : ''}" id="form-visit-item-${index}" onclick="selectFormVisit(${origIdx}, this)">
-                <div class="visit-title">${esc(f.checkout_date)}</div>
-                <div class="visit-meta">
-                  <span class="badge badge-blue">${esc(f.specialty)}</span>
-                </div>
-              </div>
-            `;
-          }).join('');
-          
-          const origIdx = forms.findIndex(fa => fa.checkout_date === sortedForms[selectIndex].checkout_date);
-          selectFormVisit(origIdx, body.querySelector(`#form-visit-item-${selectIndex}`));
-        } else {
-          body.innerHTML = `<div class="empty-state" style="padding:32px 0;"><div class="empty-icon">📋</div><p>無就診紀錄</p></div>`;
-          document.getElementById('form-edit-empty').style.display = 'block';
-          document.getElementById('form-edit-container').style.display = 'none';
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    // Reload patients list in Column 1
+    await loadFormsPatientList();
+    
+    const targetMrn = state.isAdmin ? displayMrn : mrn;
+    state.formCurrentMrn = targetMrn;
+    
+    // Find the patient element to set active
+    const patientItemEl = Array.from(document.querySelectorAll('#form-patient-list-body .patient-item'))
+                               .find(item => item.textContent.includes(targetMrn));
+                               
+    // Reload visit list (Column 2) and select the modified visit
+    await loadFormDetail(targetMrn, patientItemEl, displayDate);
     
     // 同步更新聊天紀錄列表
-    if (state.currentMrn === mrn) loadDetail(mrn, null);
+    if (state.currentMrn === mrn || state.currentMrn === displayMrn) {
+      loadDetail(targetMrn, null);
+    }
   } else {
     errEl.textContent = res.error || '儲存失敗';
   }

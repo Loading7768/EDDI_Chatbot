@@ -24,7 +24,7 @@ verification_codes = {
         "expires_at": time.time() + 3600
     },
     "223344": {
-        "user_id": "U223344",
+        "user_id": "U2e3f4g5h6",
         "user_name": "楚中天",
         "expires_at": time.time() + 3600
     }

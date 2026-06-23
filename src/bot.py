@@ -84,15 +84,14 @@ def reset_user_state(line_id):
 # ── 2. 動態 Prompt 與 RAG 檢索 ────────────────────────────────────────────────
 def get_prompt_version() -> str:
     """讀取 prompt 配置文件中的當前版本"""
-    paths = os.path.join(BASE_DIR, 'data', 'prompt_config.json')
-    for p in paths:
-        if os.path.exists(p):
-            try:
-                with open(p, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    return config.get("current_version", "prompt_001.md") # 如果找不到 "current_version" 就直接給 "prompt_001.md"
-            except Exception:
-                pass
+    path = os.path.join(BASE_DIR, 'data', 'prompt_config.json')
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get("current_version", "prompt_001.md") # 如果找不到 "current_version" 就直接給 "prompt_001.md"
+        except Exception:
+            pass
     return "prompt_001.md"
 
 def load_prompt_template(version: str) -> str:
@@ -372,27 +371,32 @@ def handle_message(event):
         line_bot_api = MessagingApi(api_client)
         user_message = event.message.text.strip()
         user_id = event.source.user_id
+        user_profile = line_bot_api.get_profile(user_id)
+        user_name = user_profile.display_name
 
         # 1. 修改病患表單 (這是 app.py 原有的邏輯)
         if user_message == '修改病患表單':
-            from form_handle import verification_codes, cleanup_expired_codes
+            from form_handle import load_verification_codes, save_verification_codes, cleanup_expired_codes
             import random
             import time
             
             cleanup_expired_codes()
-            for code, data in list(verification_codes.items()):
+            codes = load_verification_codes()
+            for code, data in list(codes.items()):
                 if data["user_id"] == user_id:
-                    del verification_codes[code]
+                    del codes[code]
                     break
             while True:
                 random_number = str(random.randint(100000, 999999))
-                if random_number not in verification_codes:
+                if random_number not in codes:
                     break
             expires_at = time.time() + 600
-            verification_codes[random_number] = {
+            codes[random_number] = {
                 "user_id": user_id,
+                "user_name": user_name,
                 "expires_at": expires_at
             }
+            save_verification_codes(codes)
             formatted_expiry = datetime.fromtimestamp(expires_at, tz=tw_tz).strftime("%Y-%m-%d %H:%M:%S")
             reply_text = f"您的驗證碼是：{random_number}\n此驗證碼將於 10 分鐘後失效（{formatted_expiry}）"
             

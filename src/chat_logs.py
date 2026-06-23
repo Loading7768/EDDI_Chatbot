@@ -127,11 +127,13 @@ def save_chat_to_json(mrn, role, content, current_time=None):
     
     # 1. 讀取目前尚未結算的活躍對話 (active_session)
     if os.path.exists(active_file_path):
-        with open(active_file_path, 'r', encoding='utf-8') as f:
-            try:
-                session_data = json.load(f)
-            except json.JSONDecodeError:
-                pass # 若檔案毀損或為空，維持預設結構
+        try:
+            with open(active_file_path, 'r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+                if isinstance(loaded_data, dict):
+                    session_data = loaded_data
+        except Exception:
+            pass # 若檔案毀損或格式不符，維持預設結構
 
     messages = session_data.get("messages", [])
 
@@ -139,8 +141,17 @@ def save_chat_to_json(mrn, role, content, current_time=None):
     if messages:
         last_msg_time_str = messages[-1].get('timestamp')
         if last_msg_time_str:
-            last_msg_time = datetime.fromisoformat(last_msg_time_str)
-            time_diff = (now - last_msg_time).total_seconds()
+            try:
+                last_msg_time = datetime.fromisoformat(last_msg_time_str)
+                # 解決時區不匹配的問題 (offset-naive 與 offset-aware 比較)
+                if last_msg_time.tzinfo is None and now.tzinfo is not None:
+                    last_msg_time = last_msg_time.replace(tzinfo=tw_tz)
+                elif last_msg_time.tzinfo is not None and now.tzinfo is None:
+                    last_msg_time = last_msg_time.replace(tzinfo=None)
+                time_diff = (now - last_msg_time).total_seconds()
+            except Exception as te:
+                print(f"[ChatLog Time Error] Failed to parse or subtract times: {te}")
+                time_diff = 0
 
             if time_diff > 3600:
                 # 觸發結算！以該 Session 第一則訊息的時間作為歸檔日期基準
@@ -208,8 +219,11 @@ def finalize_session(mrn):
     
     if os.path.exists(active_file_path):
         try:
+            session_data = {}
             with open(active_file_path, 'r', encoding='utf-8') as f:
-                session_data = json.load(f)
+                loaded_data = json.load(f)
+                if isinstance(loaded_data, dict):
+                    session_data = loaded_data
             messages = session_data.get("messages", [])
             if messages:
                 first_msg_time = datetime.fromisoformat(messages[0]['timestamp'])

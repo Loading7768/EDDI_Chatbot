@@ -1670,6 +1670,12 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// Helper to parse date strings securely
+function parseDate(str) {
+  if (!str) return null;
+  return new Date(str.trim().replace(' ', 'T'));
+}
+
 // ── state ──
 const state = { isAdmin: false, currentMrn: null, formCurrentMrn: null, doctors: [], currentForms: [], currentSessions: [], allPatients: [], allFormPatients: [] };
 
@@ -1967,8 +1973,10 @@ function renderVisits() {
     const v_next = nextForm ? nextForm.checkout_date : null;
     
     const hasLogs = state.currentSessions.some(s => {
-      const sDate = s.start_time ? s.start_time.substring(0, 10) : '';
-      return sDate >= v_current && (!v_next || sDate < v_next);
+      const sTime = parseDate(s.start_time);
+      const vCurrent = parseDate(v_current);
+      const vNext = parseDate(v_next);
+      return sTime && vCurrent && sTime >= vCurrent && (!vNext || sTime < vNext);
     });
     
     return `
@@ -2003,8 +2011,10 @@ function selectVisit(checkoutDate, el) {
   const v_next = nextForm ? nextForm.checkout_date : null;
   
   const matchedSessions = state.currentSessions.filter(s => {
-    const sDate = s.start_time ? s.start_time.substring(0, 10) : '';
-    return sDate >= v_current && (!v_next || sDate < v_next);
+    const sTime = parseDate(s.start_time);
+    const vCurrent = parseDate(v_current);
+    const vNext = parseDate(v_next);
+    return sTime && vCurrent && sTime >= vCurrent && (!vNext || sTime < vNext);
   });
   
   matchedSessions.sort((a, b) => a.start_time.localeCompare(b.start_time));

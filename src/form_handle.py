@@ -3,63 +3,40 @@ import time
 import sqlite3 # --- 新增註解：引入 sqlite3 以操作資料庫 ---
 import os      # --- 新增註解：引入 os 處理路徑 ---
 import json    # --- 新增註解：引入 json 處理陣列格式轉換 ---
-from pathlib import Path
 
 # 建立一個名為 form_bp 的 Blueprint
 form_bp = Blueprint('form_bp', __name__)
 
 # --- 新增註解：取得專案根目錄並設定連接資料庫的輔助函式 ---
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = os.getcwd()
 
 def get_db(name: str) -> sqlite3.Connection:
-    path = os.path.join(str(BASE_DIR), 'database', name)
+    path = os.path.join(BASE_DIR, 'database', name)
     return sqlite3.connect(path)
 
-# --- 驗證碼暫存檔案路徑 ---
-VERIFICATION_FILE = BASE_DIR / 'data' / 'verification_codes.json'
-
-def load_verification_codes() -> dict:
-    if VERIFICATION_FILE.exists():
-        try:
-            with open(VERIFICATION_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            pass
-    # 預設提供初始測試資料
-    default_codes = {
-        "112233": {
-            "user_id": "U3i4j5k6l7",
-            "user_name": "曾宇晨",
-            "expires_at": time.time() + 3600
-        },
-        "223344": {
-            "user_id": "U2e3f4g5h6",
-            "user_name": "楚中天",
-            "expires_at": time.time() + 3600
-        }
+# --- 驗證碼暫存區 ---
+# 將原本在 app.py 的暫存區移到這裡統一管理
+# 格式: { "123456": {"user_id": "Uxxxx...", "expires_at": 1690000000} }
+verification_codes = {
+    "112233": {
+        "user_id": "U3i4j5k6l7",
+        # "user_id": "U1a2b3c4d5",
+        "user_name": "曾宇晨",
+        "expires_at": time.time() + 3600
+    },
+    "223344": {
+        "user_id": "U2e3f4g5h6",
+        "user_name": "楚中天",
+        "expires_at": time.time() + 3600
     }
-    save_verification_codes(default_codes)
-    return default_codes
-
-def save_verification_codes(codes: dict):
-    try:
-        VERIFICATION_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(VERIFICATION_FILE, 'w', encoding='utf-8') as f:
-            json.dump(codes, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"[Verification File Error] Failed to save: {e}")
+}
 
 # 清理過期驗證碼的輔助函式
 def cleanup_expired_codes():
     current_time = time.time()
-    codes = load_verification_codes()
-    expired_keys = [code for code, data in codes.items() if current_time > data["expires_at"]]
-    if expired_keys:
-        for k in expired_keys:
-            del codes[k]
-        save_verification_codes(codes)
+    expired_keys = [code for code, data in verification_codes.items() if current_time > data["expires_at"]]
+    for k in expired_keys:
+        del verification_codes[k]
 
 # ================= 網頁路由 =================
 
@@ -90,22 +67,19 @@ def verify_code():
         return jsonify({"success": False, "message": "帳號或密碼錯誤，或此醫師未啟用"})
 
     # 2. 尋找驗證碼記錄
-    codes = load_verification_codes()
-    record = codes.get(code)
+    record = verification_codes.get(code)
     if not record:
         return jsonify({"success": False, "message": "驗證碼錯誤或不存在"})
 
     # 3. 檢查是否過期
     if time.time() > record["expires_at"]:
-        del codes[code] # 過期就刪除
-        save_verification_codes(codes)
+        del verification_codes[code] # 過期就刪除
         return jsonify({"success": False, "message": "驗證碼已逾時(超過10分鐘)，請回 LINE 重新取得"})
 
     # 驗證成功：取得 ID 與 名字
     user_id = record["user_id"]
     user_name = record.get("user_name", "未知用戶")
-    del codes[code]
-    save_verification_codes(codes)
+    del verification_codes[code]
 
     # --- 修改：存入 session ---
     session['form_verified'] = True

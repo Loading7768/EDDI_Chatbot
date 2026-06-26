@@ -590,6 +590,7 @@ def handle_message(event):
             
             chat_logs.save_chat_to_json(mrn, "user", user_message, now)
             reply_text = generate_gemini_reply(user_id, mrn, relation, user_message)
+            # 儲存助手回覆。若回覆內容中包含「回診」字眼，後端管理系統會判定該病患「需回診」並於 UI 標記紅標。
             chat_logs.save_chat_to_json(mrn, "assistant", reply_text, datetime.now(tw_tz))
             
             state["last_interaction"] = datetime.now(tw_tz).isoformat()
@@ -618,6 +619,7 @@ def handle_message(event):
                 
                 chat_logs.save_chat_to_json(mrn, "user", user_message, now)
                 reply_text = generate_gemini_reply(user_id, mrn, relation, user_message)
+                # 儲存助手回覆。若回覆內容中包含「回診」字眼，後端管理系統會判定該病患「需回診」並於 UI 標記紅標。
                 chat_logs.save_chat_to_json(mrn, "assistant", reply_text, datetime.now(tw_tz))
                 
                 send_reply_with_optional_change_button(line_bot_api, event.reply_token, reply_text, len(bound_patients))
@@ -655,6 +657,7 @@ def handle_postback(event):
             opening_prompt = "請開始對話，進行自我介紹並詢問病患目前最不舒服的症狀。"
             chat_logs.save_chat_to_json(mrn, "user", opening_prompt, now)
             reply_text = generate_gemini_reply(user_id, mrn, relation, opening_prompt)
+            # 儲存助手回覆。若回覆內容中包含「回診」字眼，後端管理系統會判定該病患「需回診」並於 UI 標記紅標。
             chat_logs.save_chat_to_json(mrn, "assistant", reply_text, datetime.now(tw_tz))
             
             bound_patients = chat_logs.get_patients_for_line_id(user_id)

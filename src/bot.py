@@ -222,51 +222,172 @@ def generate_history_summary(older_messages: list[dict], model_name: str) -> str
 
 def get_chat_history_and_summary(mrn: str, prompt_ver: str, model_name: str) -> tuple[list[dict], str]:
     """
-    從 active_session.json 重構對話歷史，並處理 Token 限制。
-    保留最近 5 次對話 (10 條訊息)，並將更早之前的對話生成精簡總結 (Summary)。
-    注意：此處需將最後一條剛寫入的 user 訊息剔除，只載入先前的歷史。
+    從 chat_logs/<mrn>/ 下所有 *.json 重構對話歷史，並處理 Token 限制。
+    當 tokens 不足時，完整傳給 LLM 的只剩下最新的 5 次對話（5 個 json 檔），
+    其餘的 json 則生成精簡總結 (Summary)。
+    注意：此處需將最新一條剛寫入的 user 訊息剔除，只載入先前的歷史。
     """
-    log_path = os.path.join(BASE_DIR, 'chat_logs', mrn, 'active_session.json')
-    if not os.path.exists(log_path):
+    import glob
+    log_dir = os.path.join(BASE_DIR, 'chat_logs', mrn)
+    if not os.path.isdir(log_dir):
         return [], ""
-        
-    try:
-        with open(log_path, 'r', encoding='utf-8') as f:
-            session_data = json.load(f)
-    except Exception:
-        return [], ""
-        
-    messages = session_data.get("messages", [])
-    if not messages:
-        return [], ""
-        
-    # 最新的一則 user 訊息不放入歷史（因為即將透過 chat.send_message 送出）
-    history_messages = messages[:-1]
-    
-    if len(history_messages) <= 10:
-        gemini_history = []
-        for msg in history_messages:
-            role = "model" if msg.get("role") == "assistant" else "user"
-            gemini_history.append({
-                "role": role,
-                "parts": [msg.get("content", "")]
+
+    sessions = []
+    for filepath in glob.glob(os.path.join(log_dir, '*.json')):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            messages = data.get("messages", [])
+            if not messages:
+                continue
+                
+            meta = data.get("metadata", {})
+            start_time_str = meta.get("start_time", "")
+            if not start_time_str:
+                try:
+                    mtime = os.path.getmtime(filepath)
+                    start_time = datetime.fromtimestamp(mtime, tz=tw_tz)
+                except Exception:
+                    start_time = datetime.min.replace(tzinfo=tw_tz)
+            else:
+                try:
+                    start_time = datetime.fromisoformat(start_time_str)
+                except Exception:
+                    start_time = datetime.min.replace(tzinfo=tw_tz)
+                    
+            sessions.append({
+                "filepath": filepath,
+                "filename": os.path.basename(filepath),
+                "start_time": start_time,
+                "messages": messages
             })
-        return gemini_history, ""
-        
-    # 超過 5 次對話 (10 條訊息)，進行總結
-    recent_messages = history_messages[-10:]
-    older_messages = history_messages[:-10]
-    
+        except Exception as e:
+            print(f"[ChatLog Load Error] Failed to read {os.path.basename(filepath)}: {e}")
+
+    if not sessions:
+        return [], ""
+
+    # 依時間由舊到新排序
+    sessions.sort(key=lambda s: s["start_time"])
+
+    # 最新的一則訊息剔除（因為即將透過 chat.send_message 送出）
+    # 最新對話是最後一個 session (sessions[-1])
+    all_candidate_messages = []
+    for i, s in enumerate(sessions):
+        msgs = s["messages"]
+        if i == len(sessions) - 1:
+            all_candidate_messages.extend(msgs[:-1])
+        else:
+            all_candidate_messages.extend(msgs)
+
+    # 轉為 Gemini 歷史格式
     gemini_history = []
-    for msg in recent_messages:
+    for msg in all_candidate_messages:
         role = "model" if msg.get("role") == "assistant" else "user"
         gemini_history.append({
             "role": role,
             "parts": [msg.get("content", "")]
         })
-        
-    summary_text = generate_history_summary(older_messages, model_name)
-    return gemini_history, summary_text
+
+    # 計算 Token 數
+    MAX_HISTORY_TOKENS = 6000
+    token_count = 0
+    model = None
+    if gemini_history:
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(model_name=model_name)
+            token_count = model.count_tokens(gemini_history).total_tokens
+        except Exception as e:
+            print(f"[Token Count Error] Failed to count tokens: {e}")
+            # 備用估算：中文/英文字數除以 1.5
+            total_chars = sum(len(msg.get("content", "")) for msg in all_candidate_messages)
+            token_count = int(total_chars / 1.5)
+
+    # 判斷是否需要進行總結 (當 token 超過限制時)
+    if token_count > MAX_HISTORY_TOKENS:
+        chosen_k = 0
+        # 嘗試從 min(5, len(sessions)) 遞減至 0
+        for k in range(min(5, len(sessions)), -1, -1):
+            if k == 0:
+                chosen_k = 0
+                break
+                
+            recent_sessions = sessions[-k:]
+            recent_candidate_messages = []
+            for idx, s in enumerate(recent_sessions):
+                msgs = s["messages"]
+                if idx == len(recent_sessions) - 1:
+                    recent_candidate_messages.extend(msgs[:-1])
+                else:
+                    recent_candidate_messages.extend(msgs)
+                    
+            k_gemini_history = []
+            for msg in recent_candidate_messages:
+                role = "model" if msg.get("role") == "assistant" else "user"
+                k_gemini_history.append({
+                    "role": role,
+                    "parts": [msg.get("content", "")]
+                })
+                
+            k_token_count = 0
+            if k_gemini_history:
+                if model is not None:
+                    try:
+                        k_token_count = model.count_tokens(k_gemini_history).total_tokens
+                    except Exception as e:
+                        print(f"[Token Count Error] Failed to count tokens in loop: {e}")
+                        total_chars = sum(len(msg.get("content", "")) for msg in recent_candidate_messages)
+                        k_token_count = int(total_chars / 1.5)
+                else:
+                    total_chars = sum(len(msg.get("content", "")) for msg in recent_candidate_messages)
+                    k_token_count = int(total_chars / 1.5)
+                    
+            if k_token_count <= MAX_HISTORY_TOKENS:
+                chosen_k = k
+                break
+
+        # 根據 chosen_k 分配完整對話歷史與摘要內容
+        if chosen_k > 0:
+            recent_sessions = sessions[-chosen_k:]
+            older_sessions = sessions[:-chosen_k]
+            
+            recent_candidate_messages = []
+            for idx, s in enumerate(recent_sessions):
+                msgs = s["messages"]
+                if idx == len(recent_sessions) - 1:
+                    recent_candidate_messages.extend(msgs[:-1])
+                else:
+                    recent_candidate_messages.extend(msgs)
+                    
+            gemini_history = []
+            for msg in recent_candidate_messages:
+                role = "model" if msg.get("role") == "assistant" else "user"
+                gemini_history.append({
+                    "role": role,
+                    "parts": [msg.get("content", "")]
+                })
+                
+            older_messages = []
+            for s in older_sessions:
+                older_messages.extend(s["messages"])
+        else:
+            # chosen_k == 0, 不留下任何完整歷史對話
+            gemini_history = []
+            older_messages = []
+            for idx, s in enumerate(sessions):
+                msgs = s["messages"]
+                if idx == len(sessions) - 1:
+                    older_messages.extend(msgs[:-1])
+                else:
+                    older_messages.extend(msgs)
+                    
+        summary_text = generate_history_summary(older_messages, model_name)
+        return gemini_history, summary_text
+    else:
+        # 不需要進行總結
+        return gemini_history, ""
 
 # ── 4. Gemini 回覆產生器 ─────────────────────────────────────────────────────
 def generate_gemini_reply(user_id: str, mrn: str, relation: str, user_message: str) -> str:

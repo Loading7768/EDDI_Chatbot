@@ -94,7 +94,7 @@ def run_extended_test():
     
     print("\n【模擬 45 分鐘後回覆 (5/21 00:15)，未滿1小時，應與昨夜對話合併在 active_session】")
     today_early = yesterday_night + timedelta(minutes=45) # 2026-05-21 00:15
-    save_chat_to_json(TEST_PATIENT_ID, "assistant", "發燒請先量測體溫，若超過 38.5 度請服用退燒藥。", current_time=today_early)
+    save_chat_to_json(TEST_PATIENT_ID, "assistant", "發燒請先量測體溫，若超過 38.5 度請服用退燒藥，並回診。", current_time=today_early)
     print_current_logs()
 
     # -----------------------------------------------------------------

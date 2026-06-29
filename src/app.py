@@ -41,7 +41,7 @@ if current_dir not in sys.path:
 
 # 引入其他 .py 檔案
 from bot import get_ai_response
-from form_handle import form_bp, verification_codes, cleanup_expired_codes
+from form_handler import form_bp, pairing_codes, cleanup_expired_codes
 from admin_server import admin_bp
 from chat_logs import save_chat_to_json
 
@@ -124,26 +124,26 @@ def handle_message(event):
         profile = line_bot_api.get_profile(user_id)
         user_name = profile.display_name
         
-        if user_message == '修改病患表單': 
+        if user_message == '綁定病患': 
             cleanup_expired_codes() # 順手清理過期的舊驗證碼
             
             # 若同一個 user 重複產生驗證碼，留最新的驗證碼即可
-            for code, data in list(verification_codes.items()): # 這裡加了 list() 避免字典在迴圈中被修改而報錯
+            for code, data in list(pairing_codes.items()): # 這裡加了 list() 避免字典在迴圈中被修改而報錯
                 if data["user_id"] == user_id:
-                    del verification_codes[code]
+                    del pairing_codes[code]
                     break
                     
             # 產生一個不重複的 6 位數亂數
             while True:
                 random_number = str(random.randint(100000, 999999))
-                if random_number not in verification_codes:
+                if random_number not in pairing_codes:
                     break
             
             # 設定過期時間為現在時間 + 600秒 (10分鐘)
             expires_at = time.time() + 600
             
             # 用驗證碼當 Key 存起來
-            verification_codes[random_number] = {
+            pairing_codes[random_number] = {
                 "user_id": user_id,
                 "user_name": user_name,
                 "expires_at": expires_at
@@ -154,7 +154,7 @@ def handle_message(event):
             dt_object = datetime.fromtimestamp(expires_at, tz=tw_tz)
             formatted_expiry = dt_object.strftime("%Y-%m-%d %H:%M:%S")
             
-            reply_text = f"您的驗證碼是：{random_number}\n此驗證碼將於 10 分鐘後失效（{formatted_expiry}）"
+            reply_text = f"您的配對碼是：{random_number}\n此配對碼將於 10 分鐘後失效（{formatted_expiry}）"
 
             line_bot_api.reply_message(
                 ReplyMessageRequest(

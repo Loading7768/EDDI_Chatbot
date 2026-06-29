@@ -8,7 +8,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Alpine.js Core (no longer need collapse plugin since we use CSS morphing) -->
+    <!-- Alpine.js Core -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <style>
@@ -24,21 +24,76 @@
 </head>
 <body class="bg-slate-950 text-white font-sans h-screen w-screen overflow-hidden m-0 relative">
 
-    <!-- Alpine App Container -->
-    <!-- Prohibit manual scrolling by using h-screen and overflow-hidden -->
     <div x-data="{ 
             active: 1, 
+            lastActive: null,
             formData: {1: '', 2: '', 3: '', 4: '', 5: ''},
             translateY: 0,
             animFrame: null,
+            
+            // Login State
+            loginAccount: '',
+            loginPassword: '',
+            loginLoading: false,
+            loginError: '',
+            showLoginSuccess: false,
+            showLogoutConfirm: false,
+            
+            async doLogin() {
+                this.loginLoading = true;
+                this.loginError = '';
+                try {
+                    const res = await fetch('/api/form_login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ account: this.loginAccount, password: this.loginPassword })
+                    });
+                    const data = await res.json();
+                    if(data.success) {
+                        this.showLoginSuccess = true;
+                        this.formData[1] = `您好 ${data.department} - ${data.doctor_name} 醫師`;
+                        setTimeout(() => {
+                            this.showLoginSuccess = false;
+                            this.active = 2; 
+                        }, 1200);
+                    } else {
+                        this.loginError = data.message;
+                    }
+                } catch(e) {
+                    this.loginError = '網路錯誤，請稍後再試';
+                }
+                this.loginLoading = false;
+            },
+            
+            async doLogout() {
+                try {
+                    await fetch('/api/form_logout', { method: 'POST' });
+                } catch(e) {}
+                this.formData[1] = '';
+                this.loginAccount = '';
+                this.loginPassword = '';
+                this.showLogoutConfirm = false;
+                this.active = 1; 
+            },
+
+            init() {
+                const doctor = {{ doctor_info | tojson | safe }};
+                if (doctor) {
+                    this.formData[1] = `您好 ${doctor.department} - ${doctor.doctor_name} 醫師`;
+                    this.active = 2;
+                }
+                this.$watch('active', () => this.centerActive());
+                this.centerActive();
+                window.addEventListener('resize', () => this.centerActive());
+            },
+
             centerActive() {
                 if (!this.active) return;
                 
-                // Cancel any previous animation frame
                 if (this.animFrame) cancelAnimationFrame(this.animFrame);
                 
                 let start = performance.now();
-                const duration = 600; // Match morph duration
+                const duration = 600; 
                 
                 const step = (now) => {
                     const el = document.getElementById('step-' + this.active);
@@ -48,7 +103,6 @@
                         const targetCenter = window.innerHeight / 2;
                         const diff = targetCenter - elCenter;
                         
-                        // We lock the center of the active element to the center of the screen
                         this.translateY += diff;
                     }
                     if (now - start < duration) {
@@ -58,37 +112,49 @@
                 this.animFrame = requestAnimationFrame(step);
             }
          }" 
-         x-init="$watch('active', () => centerActive()); centerActive(); window.addEventListener('resize', () => centerActive());"
          class="w-full h-full relative">
 
         <!-- Moving Wrapper -->
         <div :style="`transform: translateY(${translateY}px);`" 
              class="absolute top-0 left-0 right-0 mx-auto w-full max-w-md flex flex-col items-center px-4 will-change-transform">
              
-            <!-- Add some top padding so the first element starts somewhere reasonable before js kicks in -->
             <div class="h-[50vh]"></div>
 
             <template x-for="i in 5" :key="i">
-                <!-- Wrapper for each step, with an ID for centering logic -->
                 <div :id="'step-' + i" class="w-full flex flex-col items-center">
                     
-                    <!-- The Morphing Container -->
                     <div class="py-2 w-full flex justify-center">
-                        <div @click="if(active !== i) active = i"
-                             class="relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                        <!-- Removed @click from container to prohibit card switching outside of buttons -->
+                        <div class="relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
                              :class="active === i 
                                 ? 'w-full h-[55vh] max-h-[60vh] bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-700 cursor-default' 
                                 : (!formData[i] 
-                                    ? 'w-14 h-14 rounded-[2rem] bg-slate-800 border-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)] cursor-pointer hover:bg-slate-700 shrink-0' 
-                            : 'w-auto max-w-full min-w-[4rem] h-14 rounded-[2rem] bg-slate-800 border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)] cursor-pointer hover:bg-slate-700 shrink-0')">
+                                    ? 'w-14 h-14 rounded-[2rem] bg-slate-800 border-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)] shrink-0' 
+                                    : 'w-auto max-w-full min-w-[4rem] h-14 rounded-[2rem] bg-slate-800 border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)] shrink-0')">
                              
                             <!-- Inner Node/Pill Content -->
-                            <div class="flex items-center justify-center h-full transition-opacity duration-300"
+                            <div class="flex items-center justify-between h-full w-full transition-opacity duration-300"
                                  :class="active !== i ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'">
                                 
-                                <span x-show="!formData[i]" x-text="i" class="font-bold text-indigo-400 text-lg"></span>
+                                <div x-show="!formData[i]" class="w-full flex justify-center">
+                                    <span x-text="i" class="font-bold text-indigo-400 text-lg"></span>
+                                </div>
                                 
-                                <span x-show="formData[i]" class="font-semibold text-emerald-400 truncate px-6" x-text="formData[i]"></span>
+                                <div x-show="formData[i]" class="flex items-center justify-between w-full pl-6 pr-2">
+                                    <span class="font-semibold text-emerald-400 truncate mr-4" x-text="formData[i]"></span>
+                                    
+                                    <!-- Dedicated Button on Pill -->
+                                    <template x-if="i === 1">
+                                        <button @click="lastActive = active; showLogoutConfirm = true; active = 1;" class="w-10 h-10 shrink-0 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500/30 transition-colors focus:outline-none">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                        </button>
+                                    </template>
+                                    <template x-if="i !== 1">
+                                        <button @click="active = i" class="w-10 h-10 shrink-0 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-600 transition-colors focus:outline-none">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                        </button>
+                                    </template>
+                                </div>
                             </div>
 
                             <!-- Inner Card Content -->
@@ -98,45 +164,105 @@
                                 <!-- Card Header -->
                                 <div class="flex justify-between items-center mb-6 shrink-0">
                                     <div class="flex items-center space-x-3">
-                                        <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-colors"
-                                             :class="formData[i] ? 'bg-emerald-600 shadow-emerald-600/50' : 'bg-indigo-600 shadow-indigo-600/50'">
-                                            <span x-text="i" class="font-bold text-white"></span>
+                                        <h2 class="text-2xl font-semibold text-slate-100">
+                                            <template x-if="i === 1 && !showLogoutConfirm">
+                                                <span>請登入醫師帳號</span>
+                                            </template>
+                                            <template x-if="i === 1 && showLogoutConfirm">
+                                                <span>確認登出？</span>
+                                            </template>
+                                            <template x-if="i !== 1">
+                                                <span>Step <span x-text="i"></span></span>
+                                            </template>
+                                        </h2>
+                                    </div>
+                                    <!-- Removed the 'close card' button here -->
+                                </div>
+
+                                <!-- Card Body: Login -->
+                                <template x-if="i === 1 && !showLogoutConfirm && !showLoginSuccess">
+                                    <div class="flex-grow flex flex-col justify-center overflow-y-auto w-full">
+                                        <div class="space-y-6 w-full">
+                                            <div class="relative">
+                                                <input type="text" id="account" x-model="loginAccount" class="block rounded-xl px-4 pt-6 pb-2 w-full text-white bg-slate-800 border border-slate-600 appearance-none focus:outline-none focus:ring-0 focus:border-indigo-500 peer" placeholder=" " />
+                                                <label for="account" class="absolute text-slate-400 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] start-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 peer-focus:text-indigo-500">帳號</label>
+                                            </div>
+                                            <div class="relative">
+                                                <input type="password" id="password" x-model="loginPassword" class="block rounded-xl px-4 pt-6 pb-2 w-full text-white bg-slate-800 border border-slate-600 appearance-none focus:outline-none focus:ring-0 focus:border-indigo-500 peer" placeholder=" " />
+                                                <label for="password" class="absolute text-slate-400 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] start-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 peer-focus:text-indigo-500">密碼</label>
+                                            </div>
+                                            <div x-show="loginError" x-transition class="text-red-400 text-sm font-medium text-center" x-text="loginError"></div>
                                         </div>
-                                        <h2 class="text-2xl font-semibold text-slate-100">Step <span x-text="i"></span></h2>
                                     </div>
-                                    <button @click.stop="active = null" class="text-slate-400 hover:text-white bg-slate-800 rounded-full w-8 h-8 flex items-center justify-center focus:outline-none transition-colors">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                    </button>
-                                </div>
+                                </template>
 
-                                <!-- Card Body -->
-                                <div class="flex-grow flex flex-col justify-center overflow-y-auto">
-                                    <p class="text-slate-400 text-left mb-6">Provide the necessary details for step <span x-text="i"></span> to proceed.</p>
-                                    
-                                    <div class="space-y-4">
-                                        <!-- Model is bound to formData[i] -->
-                                        <input type="text" x-model="formData[i]" 
-                                               class="w-full bg-slate-800 border border-slate-600 rounded-xl p-4 text-white placeholder-slate-500 focus:ring-2 focus:outline-none transition-all"
-                                               :class="formData[i] ? 'focus:ring-emerald-500 focus:border-emerald-500' : 'focus:ring-indigo-500 focus:border-indigo-500'"
-                                               placeholder="Enter information...">
+                                <!-- Card Body: Login Success -->
+                                <template x-if="i === 1 && showLoginSuccess">
+                                    <div class="flex-grow flex flex-col items-center justify-center">
+                                        <svg class="w-24 h-24 text-emerald-500 animate-[bounce_1s_ease-in-out]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <p class="mt-4 text-emerald-400 font-bold text-xl">登入成功</p>
                                     </div>
-                                </div>
+                                </template>
 
-                                <!-- Card Footer -->
-                                <div class="mt-auto pt-6 shrink-0">
-                                    <button @click.stop="if(i < 5) active = i + 1; else active = null" 
-                                            class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900"
-                                            :class="formData[i] ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 focus:ring-indigo-500'">
-                                        <span x-text="i < 5 ? 'Continue' : 'Complete'"></span>
-                                    </button>
-                                </div>
+                                <!-- Card Body: Logout Confirm -->
+                                <template x-if="i === 1 && showLogoutConfirm">
+                                    <div class="flex-grow flex flex-col items-center justify-center">
+                                        <svg class="w-24 h-24 text-red-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                        <p class="text-slate-400 text-center font-medium">未送出資料將不會保存</p>
+                                    </div>
+                                </template>
+
+                                <!-- Card Body: Other Steps -->
+                                <template x-if="i !== 1">
+                                    <div class="flex-grow flex flex-col justify-center overflow-y-auto w-full">
+                                        <p class="text-slate-400 text-left mb-6">Provide the necessary details for step <span x-text="i"></span> to proceed.</p>
+                                        <div class="space-y-4">
+                                            <input type="text" x-model="formData[i]" 
+                                                   class="w-full bg-slate-800 border border-slate-600 rounded-xl p-4 text-white placeholder-slate-500 focus:ring-2 focus:outline-none transition-all"
+                                                   :class="formData[i] ? 'focus:ring-emerald-500 focus:border-emerald-500' : 'focus:ring-indigo-500 focus:border-indigo-500'"
+                                                   placeholder="Enter information...">
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Card Footer: Login -->
+                                <template x-if="i === 1 && !showLogoutConfirm && !showLoginSuccess">
+                                    <div class="mt-auto pt-6 shrink-0">
+                                        <button @click="doLogin" :disabled="loginLoading"
+                                                class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-lg text-white shadow-lg shadow-indigo-600/30 transition-all flex justify-center items-center focus:outline-none">
+                                            <span x-show="!loginLoading">登入</span>
+                                            <svg x-show="loginLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <!-- Card Footer: Logout Confirm -->
+                                <template x-if="i === 1 && showLogoutConfirm">
+                                    <div class="mt-auto pt-6 shrink-0 flex space-x-4">
+                                        <button @click="showLogoutConfirm = false; active = lastActive || 2;" class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-lg text-white transition-all focus:outline-none">取消</button>
+                                        <button @click="doLogout" class="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-xl font-bold text-lg text-white shadow-lg shadow-red-600/30 transition-all focus:outline-none">登出</button>
+                                    </div>
+                                </template>
+
+                                <!-- Card Footer: Other Steps -->
+                                <template x-if="i !== 1">
+                                    <div class="mt-auto pt-6 shrink-0">
+                                        <button @click.stop="if(i < 5) active = i + 1; else active = null" 
+                                                class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900"
+                                                :class="formData[i] ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 focus:ring-indigo-500'">
+                                            <span x-text="i < 5 ? 'Continue' : 'Complete'"></span>
+                                        </button>
+                                    </div>
+                                </template>
 
                             </div>
                         </div>
                     </div>
 
                     <!-- Link: 5 dots -->
-                    <!-- Only show links between nodes (i < 5) -->
                     <div x-show="i < 5" class="flex flex-col items-center justify-evenly py-1 h-5 w-full opacity-60">
                         <template x-for="dot in 3">
                             <div class="w-1.5 h-1.5 rounded-full transition-colors"
@@ -147,7 +273,6 @@
                 </div>
             </template>
             
-            <!-- Bottom padding to ensure the last node can hit the center without running out of wrapper height -->
             <div class="h-[50vh]"></div>
 
         </div>

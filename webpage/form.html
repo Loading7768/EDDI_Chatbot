@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Form Flow</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js Core (no longer need collapse plugin since we use CSS morphing) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <style>
+        /* Custom scrollbar for inner card content if it overflows */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white font-sans h-screen w-screen overflow-hidden m-0 relative">
+
+    <!-- Alpine App Container -->
+    <!-- Prohibit manual scrolling by using h-screen and overflow-hidden -->
+    <div x-data="{ 
+            active: 1, 
+            formData: {1: '', 2: '', 3: '', 4: '', 5: ''},
+            translateY: 0,
+            animFrame: null,
+            centerActive() {
+                if (!this.active) return;
+                
+                // Cancel any previous animation frame
+                if (this.animFrame) cancelAnimationFrame(this.animFrame);
+                
+                let start = performance.now();
+                const duration = 600; // Match morph duration
+                
+                const step = (now) => {
+                    const el = document.getElementById('step-' + this.active);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        const elCenter = rect.top + (rect.height / 2);
+                        const targetCenter = window.innerHeight / 2;
+                        const diff = targetCenter - elCenter;
+                        
+                        // We lock the center of the active element to the center of the screen
+                        this.translateY += diff;
+                    }
+                    if (now - start < duration) {
+                        this.animFrame = requestAnimationFrame(step);
+                    }
+                };
+                this.animFrame = requestAnimationFrame(step);
+            }
+         }" 
+         x-init="$watch('active', () => centerActive()); centerActive(); window.addEventListener('resize', () => centerActive());"
+         class="w-full h-full relative">
+
+        <!-- Moving Wrapper -->
+        <div :style="`transform: translateY(${translateY}px);`" 
+             class="absolute top-0 left-0 right-0 mx-auto w-full max-w-md flex flex-col items-center px-4 will-change-transform">
+             
+            <!-- Add some top padding so the first element starts somewhere reasonable before js kicks in -->
+            <div class="h-[50vh]"></div>
+
+            <template x-for="i in 5" :key="i">
+                <!-- Wrapper for each step, with an ID for centering logic -->
+                <div :id="'step-' + i" class="w-full flex flex-col items-center">
+                    
+                    <!-- The Morphing Container -->
+                    <div class="py-2 w-full flex justify-center">
+                        <div @click="if(active !== i) active = i"
+                             class="relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                             :class="active === i 
+                                ? 'w-full h-[55vh] max-h-[60vh] bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-700 cursor-default' 
+                                : (!formData[i] 
+                                    ? 'w-14 h-14 rounded-[2rem] bg-slate-800 border-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)] cursor-pointer hover:bg-slate-700 shrink-0' 
+                            : 'w-auto max-w-full min-w-[4rem] h-14 rounded-[2rem] bg-slate-800 border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)] cursor-pointer hover:bg-slate-700 shrink-0')">
+                             
+                            <!-- Inner Node/Pill Content -->
+                            <div class="flex items-center justify-center h-full transition-opacity duration-300"
+                                 :class="active !== i ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'">
+                                
+                                <span x-show="!formData[i]" x-text="i" class="font-bold text-indigo-400 text-lg"></span>
+                                
+                                <span x-show="formData[i]" class="font-semibold text-emerald-400 truncate px-6" x-text="formData[i]"></span>
+                            </div>
+
+                            <!-- Inner Card Content -->
+                            <div class="absolute inset-0 flex flex-col p-6 transition-opacity duration-300"
+                                 :class="active === i ? 'opacity-100 delay-200' : 'opacity-0 pointer-events-none'">
+                                
+                                <!-- Card Header -->
+                                <div class="flex justify-between items-center mb-6 shrink-0">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-colors"
+                                             :class="formData[i] ? 'bg-emerald-600 shadow-emerald-600/50' : 'bg-indigo-600 shadow-indigo-600/50'">
+                                            <span x-text="i" class="font-bold text-white"></span>
+                                        </div>
+                                        <h2 class="text-2xl font-semibold text-slate-100">Step <span x-text="i"></span></h2>
+                                    </div>
+                                    <button @click.stop="active = null" class="text-slate-400 hover:text-white bg-slate-800 rounded-full w-8 h-8 flex items-center justify-center focus:outline-none transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+
+                                <!-- Card Body -->
+                                <div class="flex-grow flex flex-col justify-center overflow-y-auto">
+                                    <p class="text-slate-400 text-left mb-6">Provide the necessary details for step <span x-text="i"></span> to proceed.</p>
+                                    
+                                    <div class="space-y-4">
+                                        <!-- Model is bound to formData[i] -->
+                                        <input type="text" x-model="formData[i]" 
+                                               class="w-full bg-slate-800 border border-slate-600 rounded-xl p-4 text-white placeholder-slate-500 focus:ring-2 focus:outline-none transition-all"
+                                               :class="formData[i] ? 'focus:ring-emerald-500 focus:border-emerald-500' : 'focus:ring-indigo-500 focus:border-indigo-500'"
+                                               placeholder="Enter information...">
+                                    </div>
+                                </div>
+
+                                <!-- Card Footer -->
+                                <div class="mt-auto pt-6 shrink-0">
+                                    <button @click.stop="if(i < 5) active = i + 1; else active = null" 
+                                            class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900"
+                                            :class="formData[i] ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 focus:ring-indigo-500'">
+                                        <span x-text="i < 5 ? 'Continue' : 'Complete'"></span>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Link: 5 dots -->
+                    <!-- Only show links between nodes (i < 5) -->
+                    <div x-show="i < 5" class="flex flex-col items-center justify-evenly py-1 h-5 w-full opacity-60">
+                        <template x-for="dot in 3">
+                            <div class="w-1.5 h-1.5 rounded-full transition-colors"
+                                 :class="formData[i] && formData[i+1] ? 'bg-emerald-500/50' : 'bg-indigo-500/50'"></div>
+                        </template>
+                    </div>
+
+                </div>
+            </template>
+            
+            <!-- Bottom padding to ensure the last node can hit the center without running out of wrapper height -->
+            <div class="h-[50vh]"></div>
+
+        </div>
+    </div>
+
+</body>
+</html>

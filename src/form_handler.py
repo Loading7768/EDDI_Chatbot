@@ -1,5 +1,6 @@
 from flask import Blueprint, request, render_template, jsonify, session, redirect
 import time
+import datetime
 import sqlite3 # --- 新增註解：引入 sqlite3 以操作資料庫 ---
 import os      # --- 新增註解：引入 os 處理路徑 ---
 import json    # --- 新增註解：引入 json 處理陣列格式轉換 ---
@@ -71,6 +72,7 @@ def form_login():
     session['doctor_id'] = doctor[0]
     session['doctor_name'] = doctor[1]
     session['doctor_department'] = doctor[2]
+    session['login_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     
     return jsonify({
         "success": True, 
@@ -207,3 +209,75 @@ def form_discharge():
     symptoms = data.get('symptoms', [])
     session['symptoms'] = symptoms
     return jsonify({"success": True})
+
+@form_bp.route('/api/form_submit', methods=['POST'])
+def form_submit():
+    data = request.json
+    medical_record_num = data.get("medical_record_num")
+    relation = data.get("relation")
+    
+    doctor_id = session.get('doctor_id')
+    line_id = session.get('line_uuid')
+    topics = session.get('symptoms', [])
+    discharge_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    
+    if not doctor_id or not line_id or not medical_record_num or not relation:
+        return jsonify({"success": False, "message": "資料不全，無法進行綁定"})
+        
+    conn = None
+    try:
+        conn = get_db('hospital.db')
+        c = conn.cursor()
+        c.execute('BEGIN TRANSACTION')
+        
+        # -- patients table
+        c.execute('''
+            INSERT OR IGNORE INTO patients (medical_record_number, has_chatted) 
+            VALUES (?, 0)
+        ''', (medical_record_num,))
+        
+        # -- Retrieve patient_id safely
+        c.execute('''
+            SELECT patient_id FROM patients WHERE medical_record_number = ?
+        ''', (medical_record_num,))
+        patient_row = c.fetchone()
+        if not patient_row:
+            raise Exception("無法取得 patient_id")
+        patient_id = patient_row[0]
+        
+        # -- line_patient_pairs table
+        c.execute('''
+            INSERT OR IGNORE INTO line_patient_pairs (patient_id, line_uuid, relation)
+            VALUES (?, ?, ?)
+        ''', (patient_id, line_id, relation))
+        
+        # -- Retrieve line_patient_pairs_id
+        c.execute('''
+            SELECT line_patient_pairs_id FROM line_patient_pairs 
+            WHERE line_uuid = ? AND patient_id = ?
+        ''', (line_id, patient_id))
+        pair_row = c.fetchone()
+        if not pair_row:
+            raise Exception("無法取得 line_patient_pairs_id")
+        pair_id = pair_row[0]
+        
+        # -- records table
+        symptoms_json = json.dumps(topics, ensure_ascii=False)
+        c.execute('''
+            INSERT INTO record (line_patient_pairs_id, checkout_date, doctor_id, symptoms)
+            VALUES (?, ?, ?, ?)
+        ''', (pair_id, discharge_date, doctor_id, symptoms_json))
+        
+        conn.commit()
+        conn.close()
+        
+        # Clear session
+        session.clear()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        print(f"Transaction failed: {e}")
+        return jsonify({"success": False, "message": f"資料傳送失敗，請再試一次"})

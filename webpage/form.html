@@ -312,6 +312,11 @@
             doctorName: '',
             doctorDept: '',
             sessionLoaded: false,
+            submitLoading: false,
+            submitError: '',
+            todayStr: '',
+            loginSuccess: false,
+            pairSuccess: false,
             lastActive: null,
             formData: {1: '', 2: '', 3: '', 4: '', 5: ''},
             translateY: 0,
@@ -490,6 +495,36 @@
                 }
             },
             
+            async submitForm() {
+                if (!this.selectedRelation) return;
+                this.submitLoading = true;
+                this.submitError = '';
+                
+                const mrc = this.selectedRelation.mrc;
+                const relation = this.selectedRelation.type === 'self' ? '帳號本人' : this.selectedRelation.relation;
+                
+                try {
+                    const res = await fetch('/api/form_submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            medical_record_num: mrc,
+                            relation: relation
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.formData[4] = '確認無誤';
+                        this.active = 5;
+                    } else {
+                        this.submitError = data.message || '資料傳送失敗，請再試一次';
+                    }
+                } catch (e) {
+                    this.submitError = '資料傳送失敗，請再試一次';
+                }
+                this.submitLoading = false;
+            },
+            
             async doLogin() {
                 this.loginLoading = true;
                 this.loginError = '';
@@ -501,14 +536,14 @@
                     });
                     const data = await res.json();
                     if(data.success) {
-                        this.showLoginSuccess = true;
+                        this.loginSuccess = true;
                         this.doctorName = data.doctor_name;
                         this.doctorDept = data.department;
                         this.formData[1] = `您好 ${data.department} - ${data.doctor_name} 醫師`;
                         setTimeout(() => {
-                            this.showLoginSuccess = false;
+                            this.loginSuccess = false;
                             this.active = 2; 
-                        }, 1200);
+                        }, 1000);
                     } else {
                         this.loginError = data.message;
                     }
@@ -560,12 +595,12 @@
                     const data = await res.json();
                     
                     if (data.success) {
-                        this.showPairSuccess = true;
+                        this.pairSuccess = true;
                         this.lineUname = data.line_uname;
                         this.lineUuid = data.line_uuid;
                         this.relations = data.relations || [];
                         setTimeout(() => {
-                            this.showPairSuccess = false;
+                            this.pairSuccess = false;
                             this.showPairSelect = true;
                             
                             const hasSelf = this.relations.some(r => r.relation === '帳號本人');
@@ -577,7 +612,7 @@
                             } else {
                                 this.selectedRelation = this.draftInputs.new;
                             }
-                        }, 1200);
+                        }, 1000);
                     } else {
                         this.pairError = data.message;
                         this.pairCodeStr = '';
@@ -621,6 +656,12 @@
                     }
                 }
                 
+                const now = new Date();
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                this.todayStr = `${yyyy}/${mm}/${dd}`;
+                
                 this.$watch('active', () => this.centerActive());
                 this.centerActive();
                 window.addEventListener('resize', () => this.centerActive());
@@ -628,47 +669,47 @@
 
             centerActive() {
                 if (!this.active) return;
-                
-                if (this.animFrame) cancelAnimationFrame(this.animFrame);
-                
-                let start = performance.now();
-                const duration = 600; 
-                
-                const step = (now) => {
+                this.$nextTick(() => {
                     const el = document.getElementById('step-' + this.active);
-                    if (el) {
+                    const container = document.getElementById('scroll-container');
+                    if (el && container) {
                         const rect = el.getBoundingClientRect();
-                        const elCenter = rect.top + (rect.height / 2);
+                        const elCenter = rect.top + container.scrollTop + (rect.height / 2);
                         const targetCenter = window.innerHeight / 2;
-                        const diff = targetCenter - elCenter;
-                        
-                        this.translateY += diff;
+                        const targetScroll = Math.max(0, elCenter - targetCenter);
+                        container.scrollTo({
+                            top: targetScroll,
+                            behavior: 'smooth'
+                        });
                     }
-                    if (now - start < duration) {
-                        this.animFrame = requestAnimationFrame(step);
-                    }
-                };
-                this.animFrame = requestAnimationFrame(step);
+                });
             }
-         }" 
-         class="w-full h-full relative">
+         }" class="w-full h-full relative scroll-smooth" id="scroll-container"
+         :class="active <= 3 ? 'overflow-y-auto' : 'overflow-hidden'">
 
-        <!-- Moving Wrapper -->
-        <div :style="`transform: translateY(${translateY}px);`" 
-             class="absolute top-0 left-0 right-0 mx-auto w-full max-w-md flex flex-col items-center px-4 will-change-transform">
-             
-            <div class="h-[50vh]"></div>
+         <!-- Page Title at the top of background -->
+         <div class="w-full text-center pt-12 pb-6 shrink-0 select-none">
+             <h1 class="text-4xl font-extrabold tracking-widest text-slate-100/90 mb-16">
+                病患衛教同步
+             </h1>
+         </div>
+
+        <!-- Main Content Wrapper -->
+        <div class="mx-auto w-full max-w-md flex flex-col items-center px-4">
 
             <template x-for="i in 5" :key="i">
                 <div :id="'step-' + i" class="w-full flex flex-col items-center">
                     
                     <div class="py-2 w-full flex justify-center">
                         <div class="relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col"
-                             :class="active === i 
-                                ? 'w-full h-auto min-h-[55vh] max-h-[75vh] bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-700 cursor-default' 
-                                : (!formData[i] 
-                                    ? 'w-14 h-14 rounded-[2rem] bg-slate-800 border-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)] shrink-0' 
-                                    : 'w-auto max-w-full min-w-[4rem] h-14 rounded-[2rem] bg-slate-800 border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)] shrink-0')">
+                             :class="[
+                                 active === i 
+                                    ? 'w-full h-auto min-h-[55vh] max-h-[75vh] bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-700 cursor-default' 
+                                    : (!formData[i] 
+                                        ? 'w-14 h-14 rounded-[2rem] bg-slate-800 border-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)] shrink-0' 
+                                        : 'w-auto max-w-full min-w-[4rem] h-14 rounded-[2rem] bg-slate-800 border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)] shrink-0'),
+                                 (active >= 4 && active !== i) ? 'blur-[4px] opacity-30 scale-95 pointer-events-none' : ''
+                              ]">
                              
                             <!-- Inner Node/Pill Content -->
                             <div class="flex items-center justify-between transition-opacity duration-300"
@@ -681,7 +722,10 @@
                                     <template x-if="i === 3">
                                         <span class="material-symbols-outlined text-indigo-400 text-[1.25rem]">list</span>
                                     </template>
-                                    <template x-if="i !== 2 && i !== 3">
+                                    <template x-if="i === 4">
+                                        <span class="material-symbols-outlined text-indigo-400 text-[1.25rem]">preview</span>
+                                    </template>
+                                    <template x-if="i !== 2 && i !== 3 && i !== 4">
                                         <span x-text="i" class="font-bold text-indigo-400 text-[1.25rem]"></span>
                                     </template>
                                 </div>
@@ -698,8 +742,15 @@
                                         </div>
                                     </template>
                                     
-                                    <!-- Regular label for steps 4 and 5 -->
-                                    <template x-if="i > 3">
+                                    <!-- Status display for step 4 pill -->
+                                    <template x-if="i === 4">
+                                        <div class="flex items-center space-x-2 mr-4 min-w-0">
+                                            <span class="material-symbols-outlined text-[20px] text-emerald-400 shrink-0">preview</span>
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- Regular label for step 5 -->
+                                    <template x-if="i === 5">
                                         <span class="font-semibold text-emerald-400 truncate mr-4" x-text="formData[i]"></span>
                                     </template>
                                     
@@ -727,7 +778,7 @@
                                             <span class="material-symbols-outlined text-[1.25rem]">logout</span>
                                         </button>
                                     </template>
-                                    <template x-if="i !== 1 && i !== 3">
+                                    <template x-if="i === 2">
                                         <button @click="active = i" class="w-10 h-10 shrink-0 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-600 transition-colors focus:outline-none">
                                             <span class="material-symbols-outlined text-[1.25rem]">edit</span>
                                         </button>
@@ -737,7 +788,7 @@
 
                             <!-- Inner Card Content -->
                             <div class="flex flex-col p-6 transition-opacity duration-300 w-full min-h-0"
-                                 :class="active === i ? 'opacity-100 delay-200 relative flex-grow max-h-full min-h-0' : 'absolute inset-0 opacity-0 pointer-events-none'">
+                                 :class="active === i ? 'opacity-100 delay-200 relative flex-grow min-h-0' : 'absolute inset-0 opacity-0 pointer-events-none'">
                                 
                                 <!-- Card Header -->
                                 <div class="flex justify-between items-center mb-6 shrink-0">
@@ -748,7 +799,8 @@
                                             <template x-if="i === 2 && !showPairSelect"><span>請配對LINE帳號</span></template>
                                             <template x-if="i === 2 && showPairSelect"><span>請選擇本次聊天病患</span></template>
                                             <template x-if="i === 3"><span>請選擇要提供的衛教資料</span></template>
-                                            <template x-if="i > 3"><span>Step <span x-text="i"></span></span></template>
+                                            <template x-if="i === 4"><span>綁定確認</span></template>
+                                            <template x-if="i === 5"><span>綁定成功</span></template>
                                         </h2>
                                     </div>
                                 </div>
@@ -776,13 +828,7 @@
                                     </div>
                                 </template>
 
-                                <!-- Card Body: Login Success -->
-                                <template x-if="i === 1 && showLoginSuccess">
-                                    <div class="flex-grow flex flex-col items-center justify-center">
-                                        <span class="material-symbols-outlined text-[6rem] text-emerald-500 animate-[bounce_1s_ease-in-out]">check_circle</span>
-                                        <p class="mt-4 text-emerald-400 font-bold text-xl">登入成功</p>
-                                    </div>
-                                </template>
+
 
                                 <!-- Card Body: Logout Confirm -->
                                 <template x-if="i === 1 && showLogoutConfirm">
@@ -793,7 +839,7 @@
                                 </template>
 
                                 <!-- Card Body: Pairing -->
-                                <template x-if="i === 2 && !showPairSuccess && !showPairSelect">
+                                <template x-if="i === 2 && !showPairSelect">
                                     <div class="flex-grow flex flex-col justify-center items-center overflow-y-auto w-full">
                                         <div class="space-y-6 w-full">
                                             <p class="text-slate-400 text-center font-medium">請輸入6位配對碼</p>
@@ -812,14 +858,6 @@
                                             </div>
                                             <div x-show="pairError" x-transition class="text-red-400 text-sm font-medium text-center" x-text="pairError"></div>
                                         </div>
-                                    </div>
-                                </template>
-
-                                <!-- Card Body: Pair Success -->
-                                <template x-if="i === 2 && showPairSuccess && !showPairSelect">
-                                    <div class="flex-grow flex flex-col items-center justify-center">
-                                        <span class="material-symbols-outlined text-[6rem] text-emerald-500 animate-[bounce_1s_ease-in-out]">check_circle</span>
-                                        <p class="mt-4 text-emerald-400 font-bold text-xl">成功連結LINE帳號</p>
                                     </div>
                                 </template>
 
@@ -860,7 +898,7 @@
                                         </div>
 
                                         <!-- Selection list wrapped in a container with full border and rounded corners -->
-                                        <div class="flex flex-col gap-3 min-h-0 w-full pb-1">
+                                        <div class="flex flex-col gap-3 min-h-0 w-full pb-1 overflow-y-auto pr-1">
                                             
                                             <!-- SELF -->
                                             <div x-show="!relations.some(r => r.relation === '帳號本人')" 
@@ -1005,50 +1043,109 @@
                                                             <span class="text-slate-500 text-sm p-2">此區域無相關衛教資料。</span>
                                                         </template>
                                                     </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Selected symptoms chip box at the bottom -->
+                                    <div class="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 shrink-0" x-show="selectedSymptoms.length > 0">
+                                        <div x-show="showPrefillMsg" x-transition class="text-xs text-emerald-400 mb-2 font-medium">已根據上次紀錄自動選擇</div>
+                                        <div class="chip-list flex flex-wrap gap-1.5">
+                                            <template x-for="topic in selectedSymptoms" :key="topic">
+                                                <div class="chip active cursor-pointer bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium py-1 px-2.5 rounded-full inline-flex items-center" @click="toggleSymptom(topic)">
+                                                    <span class="mr-1">✓</span>
+                                                    <span x-text="topic"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                                <!-- Card Body: Step 4 (Confirmation) -->
+                                <template x-if="i === 4">
+                                    <div class="flex-grow flex flex-col justify-between w-full min-h-0 select-none overflow-y-auto pr-1">
+                                        <div class="space-y-4">
+                                            <!-- Section: Patient -->
+                                            <div class="space-y-2">
+                                                <span class="text-xs font-semibold text-indigo-400 tracking-wider uppercase">綁定病患</span>
+                                                <div class="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl relative">
+                                                    <!-- LINE side -->
+                                                    <div class="flex items-center space-x-3 w-1/2">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 30 30" fill="#06C755" class="shrink-0">
+                                                            <path d="M 6 4 C 4.895 4 4 4.895 4 6 L 4 24 C 4 25.105 4.895 26 6 26 L 24 26 C 25.105 26 26 25.105 26 24 L 26 6 C 26 4.895 25.105 4 24 4 L 6 4 z M 15.003906 7.6660156 C 19.720906 7.6660156 23.558594 10.780375 23.558594 14.609375 C 23.558594 16.142375 22.964609 17.523813 21.724609 18.882812 C 19.929609 20.948812 15.916906 23.464609 15.003906 23.849609 C 14.091906 24.233609 14.225719 23.604672 14.261719 23.388672 C 14.283719 23.260672 14.384766 22.65625 14.384766 22.65625 C 14.413766 22.43725 14.442469 22.099812 14.355469 21.882812 C 14.258469 21.645813 13.880563 21.520937 13.601562 21.460938 C 9.4895625 20.916937 6.4472656 18.041375 6.4472656 14.609375 C 6.4472656 10.781375 10.286906 7.6660156 15.003906 7.6660156 z M 12.626953 12.910156 C 12.375953 12.910156 12.171875 13.107656 12.171875 13.347656 L 12.171875 16.652344 C 12.171875 16.894344 12.375953 17.089844 12.626953 17.089844 C 12.877953 17.089844 13.082031 16.893344 13.082031 16.652344 L 13.082031 13.347656 C 13.082031 13.107656 12.877953 12.910156 12.626953 12.910156 z M 14.5625 12.910156 C 14.5175 12.910156 14.470781 12.915641 14.425781 12.931641 C 14.248781 12.991641 14.128906 13.157703 14.128906 13.345703 L 14.128906 16.650391 C 14.128906 16.892391 14.3225 17.089844 14.5625 17.089844 C 14.8025 17.089844 14.996094 16.890391 14.996094 16.650391 L 14.996094 14.605469 L 16.679688 16.914062 C 16.760687 17.024063 16.889391 17.089844 17.025391 17.089844 C 17.072391 17.089844 17.118109 17.082406 17.162109 17.066406 C 17.340109 17.006406 17.460938 16.840344 17.460938 16.652344 L 17.457031 16.652344 L 17.457031 13.347656 C 17.457031 13.107656 17.263391 12.910156 17.025391 12.910156 C 16.787391 12.910156 16.591797 13.107656 16.591797 13.347656 L 16.591797 15.392578 L 14.908203 13.085938 C 14.827203 12.975938 14.6985 12.910156 14.5625 12.910156 z M 18.929688 12.910156 C 18.678688 12.910156 18.474609 13.107656 18.474609 13.347656 L 18.474609 14.998047 L 18.474609 15 L 18.474609 16.650391 C 18.474609 16.892391 18.678687 17.089844 18.929688 17.089844 L 20.654297 17.089844 C 20.906297 17.089844 21.111328 16.892344 21.111328 16.652344 C 21.111328 16.412344 20.905297 16.216797 20.654297 16.216797 L 19.384766 16.216797 L 19.384766 15.435547 L 20.654297 15.435547 C 20.906297 15.435547 21.111328 15.24 21.111328 15 C 21.111328 14.758 20.905297 14.5625 20.654297 14.5625 L 19.384766 14.564453 L 19.384766 13.783203 L 20.654297 13.783203 C 20.906297 13.783203 21.111328 13.588656 21.111328 13.347656 C 21.111328 13.107656 20.905297 12.910156 20.654297 12.910156 L 18.929688 12.910156 z M 9.34375 12.912109 C 9.09275 12.912109 8.8886719 13.106656 8.8886719 13.347656 L 8.8886719 16.652344 C 8.8886719 16.894344 9.09275 17.089844 9.34375 17.089844 L 11.068359 17.089844 C 11.320359 17.089844 11.522438 16.893297 11.523438 16.654297 C 11.523437 16.414297 11.319359 16.21875 11.068359 16.21875 L 9.7988281 16.21875 L 9.7988281 13.347656 C 9.7988281 13.107656 9.59475 12.912109 9.34375 12.912109 z"></path>
+                                                        </svg>
+                                                        <span class="font-bold text-slate-100 text-sm truncate" x-text="lineUname"></span>
+                                                    </div>
+                                                    <!-- Chain icon -->
+                                                    <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                                                        <span class="material-symbols-outlined text-slate-500 text-[18px]">link</span>
+                                                    </div>
+                                                    <!-- Patient side -->
+                                                    <div class="flex items-center justify-end space-x-2 w-1/2">
+                                                         <div class="flex flex-col text-right">
+                                                             <span class="font-bold text-slate-100 text-sm" x-text="selectedRelation?.type === 'self' ? '帳號本人' : (selectedRelation?.relation || '新增')"></span>
+                                                             <span class="text-xs text-slate-400" x-text="selectedRelation?.mrc || ''"></span>
+                                                         </div>
+                                                         <span class="material-symbols-outlined text-[24px] text-slate-300 shrink-0">account_circle</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <!-- Selected symptoms chip box at the bottom -->
-                                        <div class="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 shrink-0" x-show="selectedSymptoms.length > 0">
-                                            <div x-show="showPrefillMsg" x-transition class="text-xs text-emerald-400 mb-2 font-medium">已根據上次紀錄自動選擇</div>
-                                            <div class="chip-list">
-                                                <template x-for="topic in selectedSymptoms" :key="topic">
-                                                    <div class="chip active" @click="toggleSymptom(topic)">
-                                                        <span class="icon">✓</span>
-                                                        <span x-text="topic"></span>
+                                            <!-- Divider / Vertical Line Spacer -->
+                                            <div class="border-t border-slate-800 my-2"></div>
+
+                                            <!-- Section: Discharge Materials -->
+                                            <div class="space-y-2">
+                                                <span class="text-xs font-semibold text-emerald-400 tracking-wider uppercase">提供衛教資料</span>
+                                                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                                                    <div class="chip-list flex flex-wrap gap-1.5">
+                                                        <template x-for="topic in selectedSymptoms" :key="topic">
+                                                            <div class="chip active cursor-default bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium py-1 px-2.5 rounded-full inline-flex items-center">
+                                                                <span x-text="topic"></span>
+                                                            </div>
+                                                        </template>
                                                     </div>
-                                                </template>
+                                                </div>
+                                            </div>
+
+                                            <!-- Divider / Vertical Line Spacer -->
+                                            <div class="border-t border-slate-800 my-2"></div>
+
+                                            <!-- Section: Date -->
+                                            <div class="flex items-center justify-center space-x-2 text-slate-400 py-1 font-medium">
+                                                <span class="material-symbols-outlined text-[20px] text-indigo-400">calendar_today</span>
+                                                <span x-text="todayStr"></span>
+                                            </div>
+                                            
+                                            <!-- Error display -->
+                                            <div x-show="submitError" x-transition class="text-sm text-red-400 text-center font-medium bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+                                                <span x-text="submitError"></span>
                                             </div>
                                         </div>
-
                                     </div>
                                 </template>
 
-                                <!-- Card Body: Other Steps -->
-                                <template x-if="i > 3">
-                                    <div class="flex-grow flex flex-col justify-center overflow-y-auto w-full">
-                                        <p class="text-slate-400 text-left mb-6">Provide the necessary details for step <span x-text="i"></span> to proceed.</p>
-                                        <div class="space-y-4">
-                                            <input type="text" x-model="formData[i]" 
-                                                   class="w-full bg-slate-800 border border-slate-600 rounded-xl p-4 text-white placeholder-slate-500 focus:ring-2 focus:outline-none transition-all"
-                                                   :class="formData[i] ? 'focus:ring-emerald-500 focus:border-emerald-500' : 'focus:ring-indigo-500 focus:border-indigo-500'"
-                                                   placeholder="Enter information...">
+                                <template x-if="i === 5">
+                                    <div class="flex-grow flex flex-col items-center justify-center py-8 select-none w-full">
+                                        <div class="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(16,185,129,0.2)] animate-bounce">
+                                            <span class="material-symbols-outlined text-emerald-400 text-[48px]">check</span>
                                         </div>
+                                        <p class="text-slate-400 text-center text-sm">您可以關閉此分頁</p>
                                     </div>
                                 </template>
 
                                 <!-- Card Footer: Login -->
-                                <template x-if="i === 1 && !showLogoutConfirm && !showLoginSuccess">
+                                <template x-if="i === 1 && !showLogoutConfirm">
                                     <div class="mt-auto pt-6 shrink-0">
-                                        <button @click="doLogin" :disabled="loginLoading || !loginAccount.trim() || !loginPassword.trim()"
+                                        <button @click="doLogin" :disabled="loginLoading || loginSuccess || !loginAccount.trim() || !loginPassword.trim()"
                                                 class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all flex justify-center items-center focus:outline-none"
-                                                :class="(loginAccount.trim() && loginPassword.trim()) ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
-                                            <span x-show="!loginLoading">登入</span>
+                                                :class="loginSuccess ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 cursor-pointer' : ((loginAccount.trim() && loginPassword.trim()) ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50')">
+                                            <span x-show="!loginLoading && !loginSuccess">登入</span>
                                             <svg x-show="loginLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                             </svg>
+                                            <span x-show="loginSuccess" class="material-symbols-outlined text-white text-[1.5rem] animate-[bounce_0.5s_ease-in-out]">check</span>
                                         </button>
                                     </div>
                                 </template>
@@ -1062,16 +1159,17 @@
                                 </template>
 
                                 <!-- Card Footer: Pairing -->
-                                <template x-if="i === 2 && !showPairSuccess && !showPairSelect">
+                                <template x-if="i === 2 && !showPairSelect">
                                     <div class="mt-auto pt-6 shrink-0">
-                                        <button @click="doPair" :disabled="pairLoading || pairCodeStr.length < 6"
+                                        <button @click="doPair" :disabled="pairLoading || pairSuccess || pairCodeStr.length < 6"
                                                 class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all flex justify-center items-center focus:outline-none"
-                                                :class="pairCodeStr.length === 6 ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
-                                            <span x-show="!pairLoading">配對</span>
+                                                :class="pairSuccess ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 cursor-pointer' : (pairCodeStr.length === 6 ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50')">
+                                            <span x-show="!pairLoading && !pairSuccess">配對</span>
                                             <svg x-show="pairLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                             </svg>
+                                            <span x-show="pairSuccess" class="material-symbols-outlined text-white text-[1.5rem] animate-[bounce_0.5s_ease-in-out]">check</span>
                                         </button>
                                     </div>
                                 </template>
@@ -1098,13 +1196,20 @@
                                     </div>
                                 </template>
 
-                                <!-- Card Footer: Other Steps -->
-                                <template x-if="i > 3">
-                                    <div class="mt-auto pt-6 shrink-0">
-                                        <button @click.stop="if(i < 5) active = i + 1; else active = null" :disabled="!formData[i] || !formData[i].trim()"
-                                                class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900"
-                                                :class="(formData[i] && formData[i].trim()) ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
-                                            <span x-text="i < 5 ? 'Continue' : 'Complete'"></span>
+                                <!-- Card Footer: Step 4 (Confirmation) -->
+                                <template x-if="i === 4">
+                                    <div class="mt-auto pt-6 shrink-0 flex space-x-3 w-full">
+                                        <button @click="active = 3" :disabled="submitLoading"
+                                                class="flex-1 py-4 rounded-xl font-bold text-lg text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all focus:outline-none disabled:opacity-50">
+                                            <span>取消</span>
+                                        </button>
+                                        <button @click="submitForm()" :disabled="submitLoading"
+                                                class="flex-1 py-4 rounded-xl font-bold text-lg text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 transition-all focus:outline-none flex justify-center items-center">
+                                            <span x-show="!submitLoading">確認</span>
+                                            <svg x-show="submitLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
                                         </button>
                                     </div>
                                 </template>
@@ -1124,8 +1229,8 @@
 
                 </div>
             </template>
-            
-            <div class="h-[50vh]"></div>
+            <!-- Dynamic Bottom Spacer to clamp centering scroll range -->
+            <div :style="`height: calc(50vh - ${active === 1 ? '200px' : active === 2 ? '250px' : '300px'});`" class="w-full shrink-0 transition-all duration-300"></div>
 
         </div>
     </div>

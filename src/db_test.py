@@ -33,8 +33,8 @@ def insert_test_data():
     
     # line_patient_pairs: give 'U2e3f4g5h6' 5 different relations.
     line_pairs_data = [
-        (1, 'U1a2b3c4d5', 1, '本人'),
-        (2, 'U2e3f4g5h6', 2, '本人'),
+        (1, 'U1a2b3c4d5', 1, '帳號本人'),
+        (2, 'U2e3f4g5h6', 2, '帳號本人'),
         (3, 'U3i4j5k6l7', 3, '媽媽'),
         (4, 'U4m5n6o7p8', 4, '丈夫'),
         (5, 'U2e3f4g5h6', 5, '爸爸'),

@@ -17,15 +17,24 @@ def get_db(name: str) -> sqlite3.Connection:
 # 將原本在 app.py 的暫存區移到這裡統一管理
 # 格式: { "123456": {"user_id": "Uxxxx...", "expires_at": 1690000000} }
 pairing_codes = {
-    "112233": {
-        "user_id": "U3i4j5k6l7",
-        # "user_id": "U1a2b3c4d5",
-        "user_name": "曾宇晨",
+    "000000": {
+        "line_uuid": "U0000000", # new account
+        "line_uname": "新人",
         "expires_at": time.time() + 3600
     },
-    "223344": {
-        "user_id": "U2e3f4g5h6",
-        "user_name": "楚中天",
+    "111111": {
+        "line_uuid": "U1a2b3c4d5", # self only
+        "line_uname": "孤兒",
+        "expires_at": time.time() + 3600
+    },
+    "222222": {
+        "line_uuid": "U2e3f4g5h6", # self + many relations
+        "line_uname": "關係複雜",
+        "expires_at": time.time() + 3600
+    },
+    "333333": {
+        "line_uuid": "U3i4j5k6l7", # one relation, no self
+        "line_uname": "小幫手",
         "expires_at": time.time() + 3600
     }
 }
@@ -83,4 +92,78 @@ def form_page():
             'doctor_name': session.get('doctor_name'),
             'department': session.get('doctor_department')
         }
-    return render_template('form.html', doctor_info=doctor_info)
+        
+    pairing_info = None
+    if 'line_uuid' in session:
+        relations = []
+        try:
+            conn = get_db('hospital.db')
+            c = conn.cursor()
+            c.execute('''
+                SELECT lpp.line_patient_pairs_id, lpp.relation, p.medical_record_number
+                FROM line_patient_pairs lpp
+                JOIN patients p ON lpp.patient_id = p.patient_id
+                WHERE lpp.line_uuid = ?
+            ''', (session.get('line_uuid'),))
+            rows = c.fetchall()
+            for r in rows:
+                relations.append({
+                    'pair_id': r[0],
+                    'relation': r[1],
+                    'medical_record_num': r[2]
+                })
+            conn.close()
+        except Exception as e:
+            print(f"Error fetching relations: {e}")
+            
+        pairing_info = {
+            'line_uuid': session.get('line_uuid'),
+            'line_uname': session.get('line_uname'),
+            'relations': relations
+        }
+        
+    return render_template('form.html', doctor_info=doctor_info, pairing_info=pairing_info)
+
+@form_bp.route('/api/form_pair', methods=['POST'])
+def form_pair():
+    data = request.json
+    code = data.get('code')
+    
+    cleanup_expired_codes()
+    
+    if code in pairing_codes:
+        pairing_data = pairing_codes[code]
+        session['line_uuid'] = pairing_data['line_uuid']
+        session['line_uname'] = pairing_data['line_uname']
+        session['form_paired'] = True
+        
+        # Fetch patients
+        relations = []
+        try:
+            conn = get_db('hospital.db')
+            c = conn.cursor()
+            c.execute('''
+                SELECT lpp.line_patient_pairs_id, lpp.relation, p.medical_record_number
+                FROM line_patient_pairs lpp
+                JOIN patients p ON lpp.patient_id = p.patient_id
+                WHERE lpp.line_uuid = ?
+            ''', (pairing_data['line_uuid'],))
+            rows = c.fetchall()
+            for r in rows:
+                relations.append({
+                    'pair_id': r[0],
+                    'relation': r[1],
+                    'medical_record_num': r[2]
+                })
+            conn.close()
+        except Exception as e:
+            print(f"Error fetching relations: {e}")
+            
+        return jsonify({
+            "success": True,
+            "line_uname": pairing_data['line_uname'],
+            "line_uuid": pairing_data['line_uuid'],
+            "relations": relations
+        })
+    else:
+        return jsonify({"success": False, "message": "配對碼錯誤或不存在"})

@@ -129,7 +129,7 @@ def handle_message(event):
             
             # 若同一個 user 重複產生驗證碼，留最新的驗證碼即可
             for code, data in list(pairing_codes.items()): # 這裡加了 list() 避免字典在迴圈中被修改而報錯
-                if data["user_id"] == user_id:
+                if data["line_uuid"] == user_id:
                     del pairing_codes[code]
                     break
                     
@@ -144,8 +144,8 @@ def handle_message(event):
             
             # 用驗證碼當 Key 存起來
             pairing_codes[random_number] = {
-                "user_id": user_id,
-                "user_name": user_name,
+                "line_uuid": user_id,
+                "line_uname": user_name,
                 "expires_at": expires_at
             }
 

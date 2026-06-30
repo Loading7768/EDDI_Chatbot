@@ -8,6 +8,9 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    
     <!-- Alpine.js Core -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
@@ -21,6 +24,10 @@
             border-radius: 4px;
         }
     </style>
+    <script>
+        window.doctorInfo = {{ doctor_info | tojson | safe if doctor_info else 'null' }};
+        window.pairingInfo = {{ pairing_info | tojson | safe if pairing_info else 'null' }};
+    </script>
 </head>
 <body class="bg-slate-950 text-white font-sans h-screen w-screen overflow-hidden m-0 relative">
 
@@ -38,6 +45,60 @@
             loginError: '',
             showLoginSuccess: false,
             showLogoutConfirm: false,
+            
+            // Pairing State
+            pairCodeStr: '',
+            pairLoading: false,
+            pairError: '',
+            pairSelectError: '',
+            showPairSuccess: false,
+            showPairSelect: false,
+            lineUname: '',
+            lineUuid: '',
+            relations: [],
+            selectedRelation: null,
+            draftInputs: {
+                self: { type: 'self', relation: '帳號本人', mrc: '' },
+                new: { type: 'new', relation: '', mrc: '' }
+            },
+            existingScrolled: false,
+            
+            async doSelectPatient() {
+                if (!this.selectedRelation) return;
+                this.pairSelectError = '';
+                
+                // If new, validate inputs
+                if (this.selectedRelation.type === 'self' && !this.selectedRelation.mrc) return;
+                if (this.selectedRelation.type === 'new' && (!this.selectedRelation.mrc || !this.selectedRelation.relation)) return;
+                
+                if (this.selectedRelation.type === 'self' || this.selectedRelation.type === 'new') {
+                    const rel = this.selectedRelation.type === 'self' ? '帳號本人' : this.selectedRelation.relation.trim();
+                    const mrc = this.selectedRelation.mrc.trim();
+                    
+                    if (this.selectedRelation.type === 'new' && (rel === '新增' || rel === '帳號本人')) {
+                        this.pairSelectError = '稱呼和病歷號不可重複';
+                        return;
+                    }
+                    
+                    const isDup = this.relations.some(r => r.relation === rel || r.medical_record_num === mrc);
+                    if (isDup) {
+                        this.pairSelectError = '稱呼和病歷號不可重複';
+                        return;
+                    }
+                }
+                
+                let text = '';
+                if (this.selectedRelation.type.startsWith('existing')) {
+                    text = this.selectedRelation.relation;
+                } else if (this.selectedRelation.type === 'self') {
+                    text = '帳號本人';
+                } else {
+                    text = this.selectedRelation.relation || '？？？';
+                }
+                
+                this.formData[2] = `病患: ${text}`;
+                this.active = 3;
+            },
             
             async doLogin() {
                 this.loginLoading = true;
@@ -70,18 +131,91 @@
                     await fetch('/api/form_logout', { method: 'POST' });
                 } catch(e) {}
                 this.formData[1] = '';
+                this.formData[2] = '';
+                this.showPairSelect = false;
+                this.lineUname = '';
                 this.loginAccount = '';
                 this.loginPassword = '';
+                this.pairCodeStr = '';
+                this.selectedRelation = null;
+                this.relations = [];
                 this.showLogoutConfirm = false;
                 this.active = 1; 
+                this.draftInputs.self.mrc = '';
+                this.draftInputs.new.relation = '';
+                this.draftInputs.new.mrc = '';
+                this.existingScrolled = false;
+            },
+            
+            async doPair() {
+                if (this.pairCodeStr.length < 6) return;
+                
+                this.pairLoading = true;
+                this.pairError = '';
+                
+                try {
+                    const res = await fetch('/api/form_pair', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code: this.pairCodeStr })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        this.showPairSuccess = true;
+                        this.lineUname = data.line_uname;
+                        this.lineUuid = data.line_uuid;
+                        this.relations = data.relations || [];
+                        setTimeout(() => {
+                            this.showPairSuccess = false;
+                            this.showPairSelect = true;
+                            
+                            const hasSelf = this.relations.some(r => r.relation === '帳號本人');
+                            if (!hasSelf) {
+                                this.selectedRelation = this.draftInputs.self;
+                            } else if (this.relations.length > 0) {
+                                const sorted = [...this.relations].sort((a,b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                                this.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
+                            } else {
+                                this.selectedRelation = this.draftInputs.new;
+                            }
+                        }, 1200);
+                    } else {
+                        this.pairError = data.message;
+                        this.pairCodeStr = '';
+                        setTimeout(() => { this.$refs.pairInput?.focus(); }, 100);
+                    }
+                } catch(e) {
+                    this.pairError = '網路錯誤，請稍後再試';
+                }
+                this.pairLoading = false;
             },
 
             init() {
-                const doctor = {{ doctor_info | tojson | safe }};
+                const doctor = window.doctorInfo;
                 if (doctor) {
                     this.formData[1] = `您好 ${doctor.department} - ${doctor.doctor_name} 醫師`;
                     this.active = 2;
                 }
+                
+                const pairing = window.pairingInfo;
+                if (pairing) {
+                    this.lineUname = pairing.line_uname;
+                    this.lineUuid = pairing.line_uuid;
+                    this.relations = pairing.relations || [];
+                    this.showPairSelect = true;
+                    
+                    const hasSelf = this.relations.some(r => r.relation === '帳號本人');
+                    if (!hasSelf) {
+                        this.selectedRelation = this.draftInputs.self;
+                    } else if (this.relations.length > 0) {
+                        const sorted = [...this.relations].sort((a,b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                        this.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
+                    } else {
+                        this.selectedRelation = this.draftInputs.new;
+                    }
+                }
+                
                 this.$watch('active', () => this.centerActive());
                 this.centerActive();
                 window.addEventListener('resize', () => this.centerActive());
@@ -124,64 +258,83 @@
                 <div :id="'step-' + i" class="w-full flex flex-col items-center">
                     
                     <div class="py-2 w-full flex justify-center">
-                        <!-- Removed @click from container to prohibit card switching outside of buttons -->
-                        <div class="relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                        <div class="relative overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col"
                              :class="active === i 
-                                ? 'w-full h-[55vh] max-h-[60vh] bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-700 cursor-default' 
+                                ? 'w-full h-auto min-h-[55vh] max-h-[75vh] bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-700 cursor-default' 
                                 : (!formData[i] 
                                     ? 'w-14 h-14 rounded-[2rem] bg-slate-800 border-2 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)] shrink-0' 
                                     : 'w-auto max-w-full min-w-[4rem] h-14 rounded-[2rem] bg-slate-800 border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)] shrink-0')">
                              
                             <!-- Inner Node/Pill Content -->
-                            <div class="flex items-center justify-between h-full w-full transition-opacity duration-300"
-                                 :class="active !== i ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'">
+                            <div class="flex items-center justify-between transition-opacity duration-300"
+                                 :class="active !== i ? 'w-full h-full opacity-100 delay-300' : 'absolute inset-0 opacity-0 pointer-events-none'">
                                 
                                 <div x-show="!formData[i]" class="w-full flex justify-center">
-                                    <span x-text="i" class="font-bold text-indigo-400 text-lg"></span>
+                                    <template x-if="i !== 2">
+                                        <span x-text="i" class="font-bold text-indigo-400 text-[1.25rem]"></span>
+                                    </template>
+                                    <template x-if="i === 2">
+                                        <span class="material-symbols-outlined text-indigo-400 text-[1.25rem]">link</span>
+                                    </template>
                                 </div>
                                 
-                                <div x-show="formData[i]" class="flex items-center justify-between w-full pl-6 pr-2">
-                                    <span class="font-semibold text-emerald-400 truncate mr-4" x-text="formData[i]"></span>
+                                <div x-show="formData[i]" class="flex items-center justify-between w-full"
+                                     :class="i === 2 ? 'pl-4 pr-2' : 'pl-6 pr-2'">
+                                    
+                                    <!-- Regular label for steps other than 2 -->
+                                    <template x-if="i !== 2">
+                                        <span class="font-semibold text-emerald-400 truncate mr-4" x-text="formData[i]"></span>
+                                    </template>
+                                    
+                                    <!-- Status display for step 2 pill -->
+                                    <template x-if="i === 2">
+                                        <div class="flex items-center space-x-2 mr-4 min-w-0">
+                                            <span class="material-symbols-outlined text-[20px] text-slate-300 shrink-0">account_circle</span>
+                                            <span class="font-bold text-emerald-400 truncate" x-text="selectedRelation?.type === 'self' ? '帳號本人' : (selectedRelation?.relation || '？？？')"></span>
+                                            <span class="text-sm text-slate-400 truncate" x-text="selectedRelation?.mrc || ''"></span>
+                                        </div>
+                                    </template>
                                     
                                     <!-- Dedicated Button on Pill -->
                                     <template x-if="i === 1">
                                         <button @click="lastActive = active; showLogoutConfirm = true; active = 1;" class="w-10 h-10 shrink-0 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500/30 transition-colors focus:outline-none">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                            <span class="material-symbols-outlined text-[1.25rem]">logout</span>
                                         </button>
                                     </template>
                                     <template x-if="i !== 1">
                                         <button @click="active = i" class="w-10 h-10 shrink-0 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-600 transition-colors focus:outline-none">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            <span class="material-symbols-outlined text-[1.25rem]">edit</span>
                                         </button>
                                     </template>
                                 </div>
                             </div>
 
                             <!-- Inner Card Content -->
-                            <div class="absolute inset-0 flex flex-col p-6 transition-opacity duration-300"
-                                 :class="active === i ? 'opacity-100 delay-200' : 'opacity-0 pointer-events-none'">
+                            <div class="flex flex-col p-6 transition-opacity duration-300 w-full"
+                                 :class="active === i ? 'opacity-100 delay-200 relative flex-grow' : 'absolute inset-0 opacity-0 pointer-events-none'">
                                 
                                 <!-- Card Header -->
                                 <div class="flex justify-between items-center mb-6 shrink-0">
                                     <div class="flex items-center space-x-3">
                                         <h2 class="text-2xl font-semibold text-slate-100">
-                                            <template x-if="i === 1 && !showLogoutConfirm">
-                                                <span>請登入醫師帳號</span>
-                                            </template>
-                                            <template x-if="i === 1 && showLogoutConfirm">
-                                                <span>確認登出？</span>
-                                            </template>
-                                            <template x-if="i !== 1">
-                                                <span>Step <span x-text="i"></span></span>
-                                            </template>
+                                            <template x-if="i === 1 && !showLogoutConfirm"><span>請登入醫師帳號</span></template>
+                                            <template x-if="i === 1 && showLogoutConfirm"><span>確認登出？</span></template>
+                                            <template x-if="i === 2 && !showPairSelect"><span>請配對LINE帳號</span></template>
+                                            <template x-if="i === 2 && showPairSelect"><span>請選擇本次聊天病患</span></template>
+                                            <template x-if="i > 2"><span>Step <span x-text="i"></span></span></template>
                                         </h2>
                                     </div>
-                                    <!-- Removed the 'close card' button here -->
                                 </div>
 
                                 <!-- Card Body: Login -->
                                 <template x-if="i === 1 && !showLogoutConfirm && !showLoginSuccess">
                                     <div class="flex-grow flex flex-col justify-center overflow-y-auto w-full">
+                                        
+                                        <!-- Stethoscope Icon -->
+                                        <div class="flex justify-center mb-6">
+                                            <span class="material-symbols-outlined text-[6rem] text-indigo-500 opacity-90">stethoscope</span>
+                                        </div>
+
                                         <div class="space-y-6 w-full">
                                             <div class="relative">
                                                 <input type="text" id="account" x-model="loginAccount" class="block rounded-xl px-4 pt-6 pb-2 w-full text-white bg-slate-800 border border-slate-600 appearance-none focus:outline-none focus:ring-0 focus:border-indigo-500 peer" placeholder=" " />
@@ -199,7 +352,7 @@
                                 <!-- Card Body: Login Success -->
                                 <template x-if="i === 1 && showLoginSuccess">
                                     <div class="flex-grow flex flex-col items-center justify-center">
-                                        <svg class="w-24 h-24 text-emerald-500 animate-[bounce_1s_ease-in-out]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <span class="material-symbols-outlined text-[6rem] text-emerald-500 animate-[bounce_1s_ease-in-out]">check_circle</span>
                                         <p class="mt-4 text-emerald-400 font-bold text-xl">登入成功</p>
                                     </div>
                                 </template>
@@ -207,13 +360,164 @@
                                 <!-- Card Body: Logout Confirm -->
                                 <template x-if="i === 1 && showLogoutConfirm">
                                     <div class="flex-grow flex flex-col items-center justify-center">
-                                        <svg class="w-24 h-24 text-red-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                        <span class="material-symbols-outlined text-[6rem] text-red-500 mb-6">logout</span>
                                         <p class="text-slate-400 text-center font-medium">未送出資料將不會保存</p>
                                     </div>
                                 </template>
 
+                                <!-- Card Body: Pairing -->
+                                <template x-if="i === 2 && !showPairSuccess && !showPairSelect">
+                                    <div class="flex-grow flex flex-col justify-center items-center overflow-y-auto w-full">
+                                        <div class="space-y-6 w-full">
+                                            <p class="text-slate-400 text-center font-medium">請輸入6位配對碼</p>
+                                            <div class="relative flex justify-between w-full px-2 mb-6" dir="ltr" @click="$refs.pairInput.focus()">
+                                                <input x-ref="pairInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                                                       x-model="pairCodeStr"
+                                                       @input="pairCodeStr = pairCodeStr.replace(/[^0-9]/g, '')"
+                                                       class="absolute inset-0 w-full h-full opacity-0 cursor-text z-10" />
+                                                       
+                                                <template x-for="idx in [0,1,2,3,4,5]" :key="idx">
+                                                    <div class="w-10 h-14 sm:w-12 sm:h-16 flex items-center justify-center text-2xl font-bold text-white bg-transparent border-b-2 transition-colors"
+                                                         :class="pairCodeStr.length === idx ? 'border-indigo-500' : 'border-slate-600'">
+                                                        <span x-text="pairCodeStr[idx] || ''"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div x-show="pairError" x-transition class="text-red-400 text-sm font-medium text-center" x-text="pairError"></div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Card Body: Pair Success -->
+                                <template x-if="i === 2 && showPairSuccess && !showPairSelect">
+                                    <div class="flex-grow flex flex-col items-center justify-center">
+                                        <span class="material-symbols-outlined text-[6rem] text-emerald-500 animate-[bounce_1s_ease-in-out]">check_circle</span>
+                                        <p class="mt-4 text-emerald-400 font-bold text-xl">成功連結LINE帳號</p>
+                                    </div>
+                                </template>
+
+                                <!-- Card Body: Pair Select -->
+                                <template x-if="i === 2 && showPairSelect">
+                                    <div class="flex-grow flex flex-col w-full overflow-hidden relative min-h-0">
+                                        <!-- Status display -->
+                                        <div class="flex items-center justify-between mt-6 mb-12 shrink-0 px-6 relative z-10">
+                                            <!-- LINE side -->
+                                            <div class="flex items-center space-x-3 w-1/2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30" fill="#06C755" class="shrink-0">
+                                                    <path d="M 6 4 C 4.895 4 4 4.895 4 6 L 4 24 C 4 25.105 4.895 26 6 26 L 24 26 C 25.105 26 26 25.105 26 24 L 26 6 C 26 4.895 25.105 4 24 4 L 6 4 z M 15.003906 7.6660156 C 19.720906 7.6660156 23.558594 10.780375 23.558594 14.609375 C 23.558594 16.142375 22.964609 17.523813 21.724609 18.882812 C 19.929609 20.948812 15.916906 23.464609 15.003906 23.849609 C 14.091906 24.233609 14.225719 23.604672 14.261719 23.388672 C 14.283719 23.260672 14.384766 22.65625 14.384766 22.65625 C 14.413766 22.43725 14.442469 22.099812 14.355469 21.882812 C 14.258469 21.645813 13.880563 21.520937 13.601562 21.460938 C 9.4895625 20.916937 6.4472656 18.041375 6.4472656 14.609375 C 6.4472656 10.781375 10.286906 7.6660156 15.003906 7.6660156 z M 12.626953 12.910156 C 12.375953 12.910156 12.171875 13.107656 12.171875 13.347656 L 12.171875 16.652344 C 12.171875 16.894344 12.375953 17.089844 12.626953 17.089844 C 12.877953 17.089844 13.082031 16.893344 13.082031 16.652344 L 13.082031 13.347656 C 13.082031 13.107656 12.877953 12.910156 12.626953 12.910156 z M 14.5625 12.910156 C 14.5175 12.910156 14.470781 12.915641 14.425781 12.931641 C 14.248781 12.991641 14.128906 13.157703 14.128906 13.345703 L 14.128906 16.650391 C 14.128906 16.892391 14.3225 17.089844 14.5625 17.089844 C 14.8025 17.089844 14.996094 16.890391 14.996094 16.650391 L 14.996094 14.605469 L 16.679688 16.914062 C 16.760687 17.024063 16.889391 17.089844 17.025391 17.089844 C 17.072391 17.089844 17.118109 17.082406 17.162109 17.066406 C 17.340109 17.006406 17.460938 16.840344 17.460938 16.652344 L 17.457031 16.652344 L 17.457031 13.347656 C 17.457031 13.107656 17.263391 12.910156 17.025391 12.910156 C 16.787391 12.910156 16.591797 13.107656 16.591797 13.347656 L 16.591797 15.392578 L 14.908203 13.085938 C 14.827203 12.975938 14.6985 12.910156 14.5625 12.910156 z M 18.929688 12.910156 C 18.678688 12.910156 18.474609 13.107656 18.474609 13.347656 L 18.474609 14.998047 L 18.474609 15 L 18.474609 16.650391 C 18.474609 16.892391 18.678687 17.089844 18.929688 17.089844 L 20.654297 17.089844 C 20.906297 17.089844 21.111328 16.892344 21.111328 16.652344 C 21.111328 16.412344 20.905297 16.216797 20.654297 16.216797 L 19.384766 16.216797 L 19.384766 15.435547 L 20.654297 15.435547 C 20.906297 15.435547 21.111328 15.24 21.111328 15 C 21.111328 14.758 20.905297 14.5625 20.654297 14.5625 L 19.384766 14.564453 L 19.384766 13.783203 L 20.654297 13.783203 C 20.906297 13.783203 21.111328 13.588656 21.111328 13.347656 C 21.111328 13.107656 20.905297 12.910156 20.654297 12.910156 L 18.929688 12.910156 z M 9.34375 12.912109 C 9.09275 12.912109 8.8886719 13.106656 8.8886719 13.347656 L 8.8886719 16.652344 C 8.8886719 16.894344 9.09275 17.089844 9.34375 17.089844 L 11.068359 17.089844 C 11.320359 17.089844 11.522438 16.893297 11.523438 16.654297 C 11.523437 16.414297 11.319359 16.21875 11.068359 16.21875 L 9.7988281 16.21875 L 9.7988281 13.347656 C 9.7988281 13.107656 9.59475 12.912109 9.34375 12.912109 z"></path>
+                                                </svg>
+                                                <span class="font-bold text-slate-100 truncate" x-text="lineUname"></span>
+                                            </div>
+                                            <!-- Chain icon (absolute center) -->
+                                            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                                                <span class="material-symbols-outlined text-slate-500">link</span>
+                                            </div>
+                                            <!-- Patient side -->
+                                            <div class="flex items-center justify-end space-x-3 w-1/2">
+                                                <div class="flex flex-col text-right">
+                                                    <template x-if="selectedRelation && (selectedRelation.relation || selectedRelation.type === 'self')">
+                                                        <span class="font-bold text-slate-100 text-sm" x-text="selectedRelation.type === 'self' ? '帳號本人' : selectedRelation.relation || '新增'"></span>
+                                                    </template>
+                                                    <template x-if="!(selectedRelation && (selectedRelation.relation || selectedRelation.type === 'self'))">
+                                                        <span class="font-bold text-slate-400 text-sm">???</span>
+                                                    </template>
+                                                    <template x-if="selectedRelation && selectedRelation.mrc">
+                                                        <span class="text-xs text-slate-400" x-text="selectedRelation.mrc"></span>
+                                                    </template>
+                                                    <template x-if="!(selectedRelation && selectedRelation.mrc)">
+                                                        <span class="text-xs text-slate-500">???</span>
+                                                    </template>
+                                                </div>
+                                                <span class="material-symbols-outlined text-[30px] text-slate-300 shrink-0">account_circle</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Selection list wrapped in a container with full border and rounded corners -->
+                                        <div class="flex flex-col gap-3 min-h-0 w-full pb-1">
+                                            
+                                            <!-- SELF -->
+                                            <div x-show="!relations.some(r => r.relation === '帳號本人')" 
+                                                 class="transition-colors cursor-pointer p-4 shrink-0 border border-slate-700 rounded-xl"
+                                                 :class="selectedRelation?.type === 'self' ? 'bg-emerald-500/10 border-emerald-500' : 'bg-slate-800 hover:bg-slate-700'"
+                                                 @click="if(!selectedRelation || selectedRelation.type !== 'self') selectedRelation = draftInputs.self;">
+                                                 <div class="flex items-center">
+                                                     <!-- Icon -->
+                                                     <div x-show="selectedRelation?.type === 'self'" class="mr-2 shrink-0 flex items-center justify-center">
+                                                         <span class="material-symbols-outlined text-emerald-500 text-[20px]">add</span>
+                                                     </div>
+                                                     <!-- Title & Input -->
+                                                     <div class="flex-grow min-w-0">
+                                                         <div class="font-bold text-slate-200">帳號本人</div>
+                                                         <div x-show="selectedRelation?.type === 'self'" class="mt-2" @click.stop>
+                                                             <input type="text" x-model="draftInputs.self.mrc" placeholder="病歷號" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                            </div>
+
+                                            <!-- EXISTING (scrollable) wrapper with gradient fade -->
+                                            <div x-show="relations.length > 0" class="relative w-full shrink-0">
+                                                <!-- Scrollable list -->
+                                                <div class="max-h-[170px] overflow-y-auto flex flex-col gap-3"
+                                                     :class="relations.length >= 3 ? 'pb-6 pr-1' : ''"
+                                                     @scroll="existingScrolled = $el.scrollTop > 0">
+                                                    <template x-for="(r, idx) in [...relations].sort((a,b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0)" :key="idx">
+                                                        <div class="transition-colors cursor-pointer p-4 border border-slate-700 shrink-0"
+                                                             :class="[
+                                                                  selectedRelation?.type === 'existing_' + idx ? 'bg-emerald-500/10 border-emerald-500' : 'bg-slate-800 hover:bg-slate-700', 'rounded-xl'
+                                                             ]"
+                                                             @click="selectedRelation = { type: 'existing_' + idx, relation: r.relation, mrc: r.medical_record_num };">
+                                                             <div class="flex items-center">
+                                                                 <template x-if="selectedRelation?.type === 'existing_' + idx">
+                                                                     <span class="material-symbols-outlined text-emerald-500 mr-2 text-[20px]">check_small</span>
+                                                                 </template>
+                                                                 <!-- Existing item layout: (align left){relation}(align right){MRC} -->
+                                                                 <div class="flex-grow flex justify-between items-center">
+                                                                     <div class="font-bold text-slate-200" x-text="r.relation"></div>
+                                                                     <div class="text-sm text-slate-400" x-text="r.medical_record_num"></div>
+                                                                 </div>
+                                                             </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                                <!-- Top fade -->
+                                                <div x-show="relations.length >= 3 && existingScrolled" x-transition class="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none z-10"></div>
+                                                <!-- Bottom fade -->
+                                                <div x-show="relations.length >= 3" class="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none z-10"></div>
+                                            </div>
+
+                                            <!-- NEW -->
+                                            <div class="transition-colors cursor-pointer p-4 shrink-0 border border-slate-700 rounded-xl"
+                                                 :class="selectedRelation?.type === 'new' ? 'bg-emerald-500/10 border-emerald-500' : 'bg-slate-800 hover:bg-slate-700'"
+                                                 @click="if(!selectedRelation || selectedRelation.type !== 'new') selectedRelation = draftInputs.new;">
+                                                 
+                                                 <!-- When NOT selected -->
+                                                 <div x-show="selectedRelation?.type !== 'new'" class="flex items-center">
+                                                     <div class="font-bold text-slate-200">新增</div>
+                                                 </div>
+                                                 
+                                                 <!-- When selected -->
+                                                 <div x-show="selectedRelation?.type === 'new'" class="flex items-center" @click.stop>
+                                                     <!-- Icon -->
+                                                     <div class="mr-2 shrink-0 flex items-center justify-center">
+                                                         <span class="material-symbols-outlined text-emerald-500 text-[20px]">add</span>
+                                                     </div>
+                                                     <!-- Two input fields -->
+                                                     <div class="flex-grow flex flex-col space-y-2 min-w-0">
+                                                         <input type="text" x-model="draftInputs.new.relation" placeholder="稱呼" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                                         <input type="text" x-model="draftInputs.new.mrc" placeholder="病歷號" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                                     </div>
+                                                 </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Error msg display -->
+                                        <div x-show="pairSelectError" x-transition class="text-red-400 text-sm font-medium text-center mt-2 shrink-0" x-text="pairSelectError"></div>
+                                    </div>
+                                </template>
+
                                 <!-- Card Body: Other Steps -->
-                                <template x-if="i !== 1">
+                                <template x-if="i > 2">
                                     <div class="flex-grow flex flex-col justify-center overflow-y-auto w-full">
                                         <p class="text-slate-400 text-left mb-6">Provide the necessary details for step <span x-text="i"></span> to proceed.</p>
                                         <div class="space-y-4">
@@ -228,8 +532,9 @@
                                 <!-- Card Footer: Login -->
                                 <template x-if="i === 1 && !showLogoutConfirm && !showLoginSuccess">
                                     <div class="mt-auto pt-6 shrink-0">
-                                        <button @click="doLogin" :disabled="loginLoading"
-                                                class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-lg text-white shadow-lg shadow-indigo-600/30 transition-all flex justify-center items-center focus:outline-none">
+                                        <button @click="doLogin" :disabled="loginLoading || !loginAccount.trim() || !loginPassword.trim()"
+                                                class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all flex justify-center items-center focus:outline-none"
+                                                :class="(loginAccount.trim() && loginPassword.trim()) ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
                                             <span x-show="!loginLoading">登入</span>
                                             <svg x-show="loginLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -247,12 +552,38 @@
                                     </div>
                                 </template>
 
-                                <!-- Card Footer: Other Steps -->
-                                <template x-if="i !== 1">
+                                <!-- Card Footer: Pairing -->
+                                <template x-if="i === 2 && !showPairSuccess && !showPairSelect">
                                     <div class="mt-auto pt-6 shrink-0">
-                                        <button @click.stop="if(i < 5) active = i + 1; else active = null" 
+                                        <button @click="doPair" :disabled="pairLoading || pairCodeStr.length < 6"
+                                                class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all flex justify-center items-center focus:outline-none"
+                                                :class="pairCodeStr.length === 6 ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
+                                            <span x-show="!pairLoading">配對</span>
+                                            <svg x-show="pairLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <!-- Card Footer: Pair Select -->
+                                <template x-if="i === 2 && showPairSelect">
+                                    <div class="mt-auto pt-6 shrink-0">
+                                        <button @click="doSelectPatient" :disabled="!(selectedRelation && ((selectedRelation.type === 'self' && draftInputs.self.mrc.trim()) || (selectedRelation.type === 'new' && draftInputs.new.relation.trim() && draftInputs.new.mrc.trim()) || selectedRelation.type.startsWith('existing')))"
                                                 class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900"
-                                                :class="formData[i] ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30 focus:ring-indigo-500'">
+                                                :class="(selectedRelation && ((selectedRelation.type === 'self' && draftInputs.self.mrc.trim()) || (selectedRelation.type === 'new' && draftInputs.new.relation.trim() && draftInputs.new.mrc.trim()) || selectedRelation.type.startsWith('existing'))) ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
+                                            <span>選擇病患</span>
+                                        </button>
+                                    </div>
+                                </template>
+
+                                <!-- Card Footer: Other Steps -->
+                                <template x-if="i > 2">
+                                    <div class="mt-auto pt-6 shrink-0">
+                                        <button @click.stop="if(i < 5) active = i + 1; else active = null" :disabled="!formData[i] || !formData[i].trim()"
+                                                class="w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900"
+                                                :class="(formData[i] && formData[i].trim()) ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 focus:ring-emerald-500 cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed shadow-none opacity-50'">
                                             <span x-text="i < 5 ? 'Continue' : 'Complete'"></span>
                                         </button>
                                     </div>

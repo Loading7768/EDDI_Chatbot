@@ -107,10 +107,26 @@ def form_page():
             ''', (session.get('line_uuid'),))
             rows = c.fetchall()
             for r in rows:
+                c.execute('''
+                    SELECT r.symptoms FROM record r
+                    JOIN doctors d ON r.doctor_id = d.doctor_id
+                    WHERE r.line_patient_pairs_id = ?
+                      AND d.department = ?
+                    ORDER BY r.checkout_date DESC, r.record_id DESC
+                    LIMIT 1
+                ''', (r[0], session.get('doctor_department', '')))
+                recent_record = c.fetchone()
+                prefilled = []
+                if recent_record and recent_record[0]:
+                    try:
+                        prefilled = json.loads(recent_record[0])
+                    except:
+                        pass
                 relations.append({
                     'pair_id': r[0],
                     'relation': r[1],
-                    'medical_record_num': r[2]
+                    'medical_record_num': r[2],
+                    'prefilled_symptoms': prefilled
                 })
             conn.close()
         except Exception as e:
@@ -119,7 +135,8 @@ def form_page():
         pairing_info = {
             'line_uuid': session.get('line_uuid'),
             'line_uname': session.get('line_uname'),
-            'relations': relations
+            'relations': relations,
+            'symptoms': session.get('symptoms')
         }
         
     return render_template('form.html', doctor_info=doctor_info, pairing_info=pairing_info)
@@ -150,10 +167,26 @@ def form_pair():
             ''', (pairing_data['line_uuid'],))
             rows = c.fetchall()
             for r in rows:
+                c.execute('''
+                    SELECT r.symptoms FROM record r
+                    JOIN doctors d ON r.doctor_id = d.doctor_id
+                    WHERE r.line_patient_pairs_id = ?
+                      AND d.department = ?
+                    ORDER BY r.checkout_date DESC, r.record_id DESC
+                    LIMIT 1
+                ''', (r[0], session.get('doctor_department', '')))
+                recent_record = c.fetchone()
+                prefilled = []
+                if recent_record and recent_record[0]:
+                    try:
+                        prefilled = json.loads(recent_record[0])
+                    except:
+                        pass
                 relations.append({
                     'pair_id': r[0],
                     'relation': r[1],
-                    'medical_record_num': r[2]
+                    'medical_record_num': r[2],
+                    'prefilled_symptoms': prefilled
                 })
             conn.close()
         except Exception as e:
@@ -167,3 +200,10 @@ def form_pair():
         })
     else:
         return jsonify({"success": False, "message": "配對碼錯誤或不存在"})
+
+@form_bp.route('/api/form_discharge', methods=['POST'])
+def form_discharge():
+    data = request.json
+    symptoms = data.get('symptoms', [])
+    session['symptoms'] = symptoms
+    return jsonify({"success": True})

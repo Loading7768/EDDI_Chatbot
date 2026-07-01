@@ -9,7 +9,6 @@ form_bp = Blueprint('form_bp', __name__)
 
 # --- 新增註解：取得專案根目錄並設定連接資料庫的輔助函式 ---
 BASE_DIR = os.getcwd()
-
 def get_db(name: str) -> sqlite3.Connection:
     path = os.path.join(BASE_DIR, 'database', name)
     return sqlite3.connect(path)

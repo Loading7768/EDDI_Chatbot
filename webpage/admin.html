@@ -410,7 +410,30 @@
   .save-status.fail { color: var(--danger); }
 
   /* ── DOCTORS ── */
+  #section-doctors {
+    max-width: 900px;
+    margin: 0 auto;
+  }
   .doctor-table-wrap { margin-top: 20px; overflow-x: auto; }
+  #doctor-table th {
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+  #doctor-table td {
+    font-size: 15px;
+    padding: 12px 16px;
+  }
+  #doctor-table code {
+    font-size: 14px;
+  }
+  #doctor-table .badge {
+    font-size: 12px;
+    padding: 3px 10px;
+  }
+  #doctor-table .btn-xs {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
   table { width: 100%; border-collapse: collapse; background: var(--card);
           border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
   th { background: var(--bg); font-size: 12px; font-weight: 700; color: var(--muted);
@@ -1724,7 +1747,7 @@
     </div>
     <div class="form-group">
       <label>科別</label>
-      <select id="edit-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'edit-doctor-specialty-custom-group', 'edit-doctor-specialty')" style="padding: 8px 12px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; width: 100%; box-sizing: border-box; background: var(--bg, #fff); color: var(--text, #333);">
+      <select id="edit-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'edit-doctor-specialty-custom-group', 'edit-doctor-specialty')">
         <!-- Will be loaded dynamically -->
       </select>
     </div>
@@ -1773,13 +1796,13 @@
       </div>
       <div class="form-group">
         <label>科別</label>
-        <select id="add-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'add-doctor-specialty-custom-group', 'add-doctor-specialty')" style="padding: 8px 12px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; width: 100%; box-sizing: border-box; background: var(--bg, #fff); color: var(--text, #333);">
+        <select id="add-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'add-doctor-specialty-custom-group', 'add-doctor-specialty')">
           <!-- Will be loaded dynamically -->
         </select>
       </div>
       <div class="form-group" id="add-doctor-specialty-custom-group" style="display: none;">
         <label>自訂科別名稱</label>
-        <input type="text" id="add-doctor-specialty" placeholder="例如: 骨科" style="padding: 8px 12px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; width: 100%; box-sizing: border-box; background: var(--bg, #fff); color: var(--text, #333);">
+        <input type="text" id="add-doctor-specialty" placeholder="例如: 骨科">
       </div>
       <div class="form-group">
         <label>狀態</label>

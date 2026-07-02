@@ -975,6 +975,17 @@ def update_doctor(account: str):
     new_specialty   = data.get('specialty', row['department'])
     new_password    = data.get('new_password', '').strip()
 
+    # 檢查若管理員欲將自己改成一般醫師，系統是否仍有其他管理員帳號
+    current_admin = session.get('account')
+    if account == current_admin and new_is_admin == 0:
+        other_admin_exists = conn.execute(
+            'SELECT 1 FROM doctors WHERE is_admin = 1 AND account_name != ? LIMIT 1',
+            (account,)
+        ).fetchone()
+        if not other_admin_exists:
+            conn.close()
+            return jsonify({'error': '無法修改角色：系統必須保留至少一位管理員，無法將自己修改為一般醫師'}), 400
+
     try:
         if new_password:
             conn.execute(

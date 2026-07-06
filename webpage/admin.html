@@ -333,8 +333,15 @@
   .bubble-row { display: flex; margin-bottom: 10px; }
   .bubble-row.user      { justify-content: flex-end; }
   .bubble-row.assistant { justify-content: flex-start; }
+  .bubble-row > div {
+    max-width: 72%;
+    display: flex;
+    flex-direction: column;
+  }
+  .bubble-row.user > div      { align-items: flex-end; }
+  .bubble-row.assistant > div { align-items: flex-start; }
   .bubble {
-    max-width: 72%; padding: 10px 14px; border-radius: 16px;
+    padding: 10px 14px; border-radius: 16px;
     font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
   }
   .bubble-row.user .bubble {

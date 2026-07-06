@@ -22,6 +22,109 @@ CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
 
 DB_HOSPITAL = os.path.join(BASE_DIR, 'database', 'hospital.db')
 
+import threading
+
+return_visit_lock = threading.Lock()
+DEPARTMENTS_FILE = os.path.join(BASE_DIR, 'data', 'departments.json')
+RETURN_VISIT_RECORDS_FILE = os.path.join(BASE_DIR, 'data', 'return_visit_records.json')
+
+def load_departments() -> list:
+    """讀取科別設定 JSON"""
+    if not os.path.exists(DEPARTMENTS_FILE):
+        initial = [
+            {"name": "急診科", "is_active": True},
+            {"name": "內科", "is_active": True},
+            {"name": "小兒科", "is_active": True}
+        ]
+        os.makedirs(os.path.dirname(DEPARTMENTS_FILE), exist_ok=True)
+        with open(DEPARTMENTS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(initial, f, ensure_ascii=False, indent=4)
+        return initial
+    try:
+        with open(DEPARTMENTS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[Departments Load Error] {e}")
+        return []
+
+def save_departments(deps: list):
+    """寫入科別設定 JSON"""
+    try:
+        os.makedirs(os.path.dirname(DEPARTMENTS_FILE), exist_ok=True)
+        with open(DEPARTMENTS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(deps, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Departments Save Error] {e}")
+
+def load_return_visit_records() -> dict:
+    """讀取已回診時間紀錄 JSON"""
+    if not os.path.exists(RETURN_VISIT_RECORDS_FILE):
+        return {}
+    try:
+        with open(RETURN_VISIT_RECORDS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[Return Visit Records Load Error] {e}")
+        return {}
+
+def save_return_visit_records(records: dict):
+    """寫入已回診時間紀錄 JSON"""
+    try:
+        os.makedirs(os.path.dirname(RETURN_VISIT_RECORDS_FILE), exist_ok=True)
+        with open(RETURN_VISIT_RECORDS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(records, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Return Visit Records Save Error] {e}")
+
+def check_needs_return_visit(mrn: str) -> bool:
+    """
+    判斷 Line bot 歷史訊息中是否曾回覆過該病患需要「回診」，
+    且訊息時間戳晚於最後一次已回診清除時間。
+    """
+    mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
+    if not os.path.isdir(mrn_dir):
+        return False
+        
+    records = load_return_visit_records()
+    last_clear_str = records.get(mrn)
+    
+    last_clear_time = None
+    if last_clear_str:
+        try:
+            last_clear_time = datetime.fromisoformat(last_clear_str)
+        except Exception:
+            pass
+            
+    for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            for msg in data.get('messages', []):
+                if msg.get('role') == 'assistant' and '回診' in msg.get('content', ''):
+                    ts_str = msg.get('timestamp', '')
+                    if ts_str:
+                        try:
+                            msg_time = datetime.fromisoformat(ts_str)
+                            if last_clear_time:
+                                # 統一時區進行比較
+                                if msg_time.tzinfo is not None and last_clear_time.tzinfo is None:
+                                    last_clear_time = last_clear_time.replace(tzinfo=msg_time.tzinfo)
+                                elif msg_time.tzinfo is None and last_clear_time.tzinfo is not None:
+                                    msg_time = msg_time.replace(tzinfo=last_clear_time.tzinfo)
+                                
+                                if msg_time > last_clear_time:
+                                    return True
+                            else:
+                                return True
+                        except Exception as te:
+                            print(f"[check_needs_return_visit] 解析時間失敗: {te}")
+                            if not last_clear_time:
+                                return True
+        except Exception as e:
+            print(f'[check_needs_return_visit] 讀取失敗 {os.path.basename(filepath)}: {e}')
+            
+    return False
+
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -493,6 +596,7 @@ def get_chats():
                 'latest_checkout':    row['latest_checkout'],
                 'specialty':          specialty,
                 'specialties':        specialties,
+                'needs_return_visit': check_needs_return_visit(mrn),
             })
 
         conn.close()
@@ -527,7 +631,7 @@ def get_chat_detail(mrn: str):
             return jsonify({'error': '無查看權限'}), 403
 
     patient = conn.execute('''
-        SELECT p.medical_record_number, MIN(lpp.line_uuid) AS line_uuid
+        SELECT p.medical_record_number, MIN(lpp.line_uuid) AS line_uuid, MIN(lpp.relation) AS relation
         FROM patients p
         LEFT JOIN line_patient_pairs lpp ON p.patient_id = lpp.patient_id
         WHERE p.medical_record_number = ?
@@ -571,10 +675,14 @@ def get_chat_detail(mrn: str):
         for r in forms
     ]
 
+    # 增加：獲取回診標記
+    needs_return_visit = check_needs_return_visit(mrn)
     return jsonify({
         'patient': {
             'medical_record_num': patient['medical_record_number'],
             'line_id':            patient['line_uuid'],
+            'relation':           patient['relation'] if patient['relation'] else '本人',
+            'needs_return_visit': needs_return_visit
         },
         'forms':    forms_list,
         'sessions': sessions_list,
@@ -621,20 +729,9 @@ def update_form(mrn: str, checkout_date: str):
                 conn.close()
                 return jsonify({'error': '無修改權限'}), 403
 
-        data               = request.get_json() or {}
-        new_checkout_date  = data.get('checkout_date', checkout_date)
-        new_doctor_account = data.get('doctor_account', '')
-        new_mrn            = data.get('medical_record_num')
-        new_relation       = data.get('relation')
-
-        # 3. 就診日期格式化與防重複
-        new_checkout_date = new_checkout_date.replace('T', ' ').strip()
-        if len(new_checkout_date) >= 16:
-            base_time = new_checkout_date[:16]
-            seconds_part = ":00"
-            if len(new_checkout_date) >= 19:
-                seconds_part = new_checkout_date[16:19]
-            new_checkout_date = base_time + seconds_part + ".000"
+        data         = request.get_json() or {}
+        new_mrn      = data.get('medical_record_num')
+        new_relation = data.get('relation')
 
         # 獲取原始的配對與病患資料
         current_pair = conn.execute('''
@@ -651,45 +748,55 @@ def update_form(mrn: str, checkout_date: str):
 
         original_mrn = current_pair['medical_record_number']
         original_relation = current_pair['relation']
-        line_uuid = current_pair['line_uuid']
         original_patient_id = current_pair['patient_id']
 
         # 預設為原配對 ID
         final_pair_id = conn.execute('SELECT line_patient_pairs_id FROM record WHERE record_id = ?', (record_id,)).fetchone()[0]
 
-        # 4. 修改病歷號與關係 (目前限制不能修改)
+        # 4. 修改病歷號與關係
         mrn_changed = new_mrn and new_mrn.strip() != original_mrn
         relation_changed = new_relation is not None and new_relation.strip() != original_relation
 
-        if mrn_changed or relation_changed:
+        # 關係修改不需要管理員權限即可修改，但修改病歷號必須是管理員
+        if mrn_changed and not is_admin:
             conn.close()
-            return jsonify({'error': '目前不開放修改病歷號與關係。'}), 400
+            return jsonify({'error': '修改病歷號僅限管理員權限。'}), 403
 
-        # 嚴格驗證五：防就診日期重複（同病患在同一時間點不可有兩筆紀錄）
-        # 獲取此表單最終關聯的 patient_id
-        final_patient_id = conn.execute('''
-            SELECT patient_id FROM line_patient_pairs WHERE line_patient_pairs_id = ?
-        ''', (final_pair_id,)).fetchone()[0]
-
-        conflict_date = conn.execute('''
-            SELECT r.record_id FROM record r
-            JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
-            WHERE lpp.patient_id = ? AND r.checkout_date = ? AND r.record_id != ?
-        ''', (final_patient_id, new_checkout_date, record_id)).fetchone()
-
-        if conflict_date:
-            conn.close()
-            return jsonify({'error': f'修改失敗：該病患於 {new_checkout_date} 已有就診紀錄，就診時間不可重複。'}), 400
-
-                        # 5. 醫師更新
-        if new_doctor_account:
-            new_doc = conn.execute('SELECT doctor_id FROM doctors WHERE account_name = ?', (new_doctor_account,)).fetchone()
-            if not new_doc:
+        if mrn_changed:
+            new_mrn_str = new_mrn.strip()
+            # 檢查新病歷號是否已存在
+            conflict = conn.execute('SELECT 1 FROM patients WHERE medical_record_number = ? AND patient_id != ?', (new_mrn_str, original_patient_id)).fetchone()
+            if conflict:
                 conn.close()
-                return jsonify({'error': f'找不到指定帳號的醫師 ({new_doctor_account})'}), 400
-            new_doctor_id = new_doc['doctor_id']
-        else:
-            new_doctor_id = row['doctor_id']
+                return jsonify({'error': '該病歷號已存在於系統中，無法修改為此號碼。'}), 400
+            
+            # 更新資料庫 patients 表
+            conn.execute('UPDATE patients SET medical_record_number = ? WHERE patient_id = ?', (new_mrn_str, original_patient_id))
+            
+            # 搬移對話紀錄資料夾
+            old_log_dir = os.path.join(CHAT_LOGS_DIR, original_mrn)
+            new_log_dir = os.path.join(CHAT_LOGS_DIR, new_mrn_str)
+            if os.path.isdir(old_log_dir) and old_log_dir != new_log_dir:
+                try:
+                    os.rename(old_log_dir, new_log_dir)
+                    # 更新所有 JSON 檔案 metadata 的病歷號
+                    for filepath in glob.glob(os.path.join(new_log_dir, '*.json')):
+                        try:
+                            with open(filepath, 'r+', encoding='utf-8') as f:
+                                file_data = json.load(f)
+                                if 'metadata' in file_data:
+                                    file_data['metadata']['medical_record_num'] = new_mrn_str
+                                    f.seek(0)
+                                    json.dump(file_data, f, ensure_ascii=False, indent=4)
+                                    f.truncate()
+                        except Exception as je:
+                            print(f"[Update JSON Metadata Error] Failed to update {os.path.basename(filepath)}: {je}")
+                except Exception as re:
+                    print(f"[Rename Directory Error] {re}")
+
+        if relation_changed:
+            new_rel_str = new_relation.strip()
+            conn.execute('UPDATE line_patient_pairs SET relation = ? WHERE line_patient_pairs_id = ?', (new_rel_str, final_pair_id))
 
         # 6. 症狀更新
         symptoms_raw = data.get('symptoms', None)
@@ -702,12 +809,12 @@ def update_form(mrn: str, checkout_date: str):
         else:
             new_symptoms = row['symptoms']
 
-        # 7. 更新 record 內容
+        # 7. 更新 record 內容 (就診日期與醫師設為唯讀，不進行更新)
         conn.execute('''
             UPDATE record 
-            SET checkout_date = ?, doctor_id = ?, symptoms = ? 
+            SET symptoms = ? 
             WHERE record_id = ?
-        ''', (new_checkout_date, new_doctor_id, new_symptoms, record_id))
+        ''', (new_symptoms, record_id))
 
         # 提交事務
         conn.commit()
@@ -796,6 +903,19 @@ def create_doctor():
             (account, hashed, name, active, admin, specialty)
         )
         conn.commit()
+        
+        # 同步更新科別 JSON
+        deps = load_departments()
+        found = False
+        for d in deps:
+            if d['name'] == specialty:
+                d['is_active'] = True  # 確保啟用
+                found = True
+                break
+        if not found:
+            deps.append({"name": specialty, "is_active": True})
+        save_departments(deps)
+
         conn.close()
         return jsonify({'success': True, 'password': generated_password})
     except Exception as e:
@@ -855,6 +975,17 @@ def update_doctor(account: str):
     new_specialty   = data.get('specialty', row['department'])
     new_password    = data.get('new_password', '').strip()
 
+    # 檢查若管理員欲將自己改成一般醫師，系統是否仍有其他管理員帳號
+    current_admin = session.get('account')
+    if account == current_admin and new_is_admin == 0:
+        other_admin_exists = conn.execute(
+            'SELECT 1 FROM doctors WHERE is_admin = 1 AND account_name != ? LIMIT 1',
+            (account,)
+        ).fetchone()
+        if not other_admin_exists:
+            conn.close()
+            return jsonify({'error': '無法修改角色：系統必須保留至少一位管理員，無法將自己修改為一般醫師'}), 400
+
     try:
         if new_password:
             conn.execute(
@@ -868,6 +999,19 @@ def update_doctor(account: str):
                 (new_doctor_name, new_is_active, new_is_admin, new_specialty, account)
             )
         conn.commit()
+        
+        # 同步更新科別 JSON
+        deps = load_departments()
+        found = False
+        for d in deps:
+            if d['name'] == new_specialty:
+                d['is_active'] = True  # 確保啟用
+                found = True
+                break
+        if not found:
+            deps.append({"name": new_specialty, "is_active": True})
+        save_departments(deps)
+
         conn.close()
         return jsonify({'success': True})
     except Exception as e:
@@ -1104,3 +1248,147 @@ def save_prompt_nickname():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ── 已回診清除與科別管理 ────────────────────────────────────────────────────────
+
+@admin_bp.route('/api/patients/<mrn>/clear_return_visit', methods=['POST'])
+@login_required
+def clear_return_visit(mrn: str):
+    mrn = mrn.strip()
+    now_str = datetime.now().isoformat()
+    
+    with return_visit_lock:
+        records = load_return_visit_records()
+        records[mrn] = now_str
+        save_return_visit_records(records)
+        
+    return jsonify({'success': True, 'cleared_at': now_str})
+
+
+@admin_bp.route('/api/departments', methods=['GET'])
+@login_required
+def get_departments():
+    deps = load_departments()
+    conn = get_db()
+    try:
+        rows = conn.execute('SELECT DISTINCT department FROM doctors').fetchall()
+        used_deps = {r['department'].strip() for r in rows if r['department']}
+    except Exception:
+        used_deps = set()
+    finally:
+        conn.close()
+        
+    result = []
+    for d in deps:
+        result.append({
+            'name': d['name'],
+            'is_active': d.get('is_active', True),
+            'is_used': d['name'].strip() in used_deps
+        })
+    return jsonify(result)
+
+
+@admin_bp.route('/api/departments', methods=['POST'])
+@admin_required
+def create_department():
+    data = request.get_json() or {}
+    name = data.get('name', '').strip()
+    
+    if not name:
+        return jsonify({'error': '科別名稱不可空白'}), 400
+        
+    deps = load_departments()
+    # 檢查是否已存在
+    for d in deps:
+        if d['name'] == name:
+            if not d.get('is_active', True):
+                # 重新啟用
+                d['is_active'] = True
+                save_departments(deps)
+                return jsonify({'success': True, 'message': '該科別已重新啟用'})
+            return jsonify({'error': '該科別已存在'}), 400
+            
+    deps.append({"name": name, "is_active": True})
+    save_departments(deps)
+    return jsonify({'success': True, 'message': '科別新增成功'})
+
+
+@admin_bp.route('/api/departments/<old_name>', methods=['PUT'])
+@admin_required
+def update_department(old_name: str):
+    old_name = old_name.strip()
+    data = request.get_json() or {}
+    new_name = data.get('name', '').strip()
+    is_active = data.get('is_active', None)
+    
+    deps = load_departments()
+    
+    dep_item = None
+    for d in deps:
+        if d['name'] == old_name:
+            dep_item = d
+            break
+            
+    if not dep_item:
+        return jsonify({'error': '找不到該科別'}), 404
+        
+    # 如果有傳入新名稱，且不等於舊名稱
+    if new_name and new_name != old_name:
+        # 檢查新名稱是否衝突
+        for d in deps:
+            if d['name'] == new_name:
+                return jsonify({'error': '該科別名稱已存在'}), 400
+                
+        # 更新 JSON 中的名稱
+        dep_item['name'] = new_name
+        
+        # 透過 SQL 更新 doctors 關聯科別
+        try:
+            conn = get_db()
+            conn.execute('UPDATE doctors SET department = ? WHERE department = ?', (new_name, old_name))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            return jsonify({'error': f'更新醫師科別欄位失敗: {e}'}), 500
+            
+    if is_active is not None:
+        dep_item['is_active'] = bool(is_active)
+        
+    save_departments(deps)
+    return jsonify({'success': True})
+
+
+@admin_bp.route('/api/departments/<name>', methods=['DELETE'])
+@admin_required
+def delete_or_disable_department(name: str):
+    name = name.strip()
+    deps = load_departments()
+    
+    dep_item = None
+    for d in deps:
+        if d['name'] == name:
+            dep_item = d
+            break
+            
+    if not dep_item:
+        return jsonify({'error': '找不到該科別'}), 404
+        
+    # 檢查是否有醫師使用該科別
+    try:
+        conn = get_db()
+        used = conn.execute('SELECT 1 FROM doctors WHERE department = ? LIMIT 1', (name,)).fetchone()
+        conn.close()
+    except Exception as e:
+        return jsonify({'error': f'查詢資料庫科別關聯失敗: {e}'}), 500
+        
+    if used:
+        # 已被使用：改為停用 (is_active = false)
+        dep_item['is_active'] = False
+        save_departments(deps)
+        return jsonify({'success': True, 'action': 'disabled', 'message': '該科別已被醫師使用，已轉為停用狀態。'})
+    else:
+        # 未被使用：完全刪除
+        deps = [d for d in deps if d['name'] != name]
+        save_departments(deps)
+        return jsonify({'success': True, 'action': 'deleted', 'message': '科別已成功刪除。'})

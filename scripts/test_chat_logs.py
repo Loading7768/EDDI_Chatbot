@@ -2,6 +2,21 @@ import os
 import json
 import shutil
 from datetime import datetime, timedelta, timezone
+import sys
+from pathlib import Path
+
+# ============== 強制讓測試腳本看得到 src 資料夾 ==============
+# 1. 取得目前這個測試腳本的專案根目錄
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 2. 定義出 src 資料夾的絕對路徑
+src_path = os.path.join(BASE_DIR, 'src')
+
+# 3. 如果不在搜尋路徑中，就把它塞進去
+if src_path not in sys.path:
+    sys.path.append(src_path)
+# ==========================================================
+
 from chat_logs import save_chat_to_json, BASE_DIR
 
 TEST_LINE_ID = "U1a2b3c4d5" 
@@ -65,8 +80,8 @@ def run_extended_test():
     print("\n【情境一：模擬前天的對話】")
     day1_time = base_today - timedelta(days=2) # 5/19 22:00
     
-    save_chat_to_json(TEST_LINE_ID, "user", "前天測試：我覺得傷口有點紅腫。", current_time=day1_time)
-    save_chat_to_json(TEST_LINE_ID, "assistant", "收到，請問紅腫範圍有擴大嗎？", current_time=day1_time + timedelta(seconds=5))
+    save_chat_to_json(TEST_PATIENT_ID, "user", "前天測試：我覺得傷口有點紅腫。", current_time=day1_time)
+    save_chat_to_json(TEST_PATIENT_ID, "assistant", "收到，請問紅腫範圍有擴大嗎？", current_time=day1_time + timedelta(seconds=5))
     
     print("-> 已寫入前天對話，並將時間戳記設為前天。")
 
@@ -75,11 +90,11 @@ def run_extended_test():
     # -----------------------------------------------------------------
     print("\n【情境二：模擬昨天深夜訊息 (預期觸發情境一結算為 20260519_01.json)】")
     yesterday_night = base_today.replace(hour=23, minute=30) - timedelta(days=1) # 2026-05-20 23:30
-    save_chat_to_json(TEST_LINE_ID, "user", "昨天深夜測試：醫生，不好意思半夜打擾，我發燒了。", current_time=yesterday_night)
+    save_chat_to_json(TEST_PATIENT_ID, "user", "昨天深夜測試：醫生，不好意思半夜打擾，我發燒了。", current_time=yesterday_night)
     
     print("\n【模擬 45 分鐘後回覆 (5/21 00:15)，未滿1小時，應與昨夜對話合併在 active_session】")
     today_early = yesterday_night + timedelta(minutes=45) # 2026-05-21 00:15
-    save_chat_to_json(TEST_LINE_ID, "assistant", "發燒請先量測體溫，若超過 38.5 度請服用退燒藥。", current_time=today_early)
+    save_chat_to_json(TEST_PATIENT_ID, "assistant", "發燒請先量測體溫，若超過 38.5 度請服用退燒藥，並回診。", current_time=today_early)
     print_current_logs()
 
     # -----------------------------------------------------------------
@@ -91,7 +106,7 @@ def run_extended_test():
     
     # 這則訊息進來時，會去結算 active 裡的跨天對話。
     # 跨天對話的第一則訊息時間是昨天的 23:30，所以結算檔名必須是昨天的日期！
-    save_chat_to_json(TEST_LINE_ID, "user", "今天早上測試：我早上量 37.2 度，退燒了。", current_time=today_morning)
+    save_chat_to_json(TEST_PATIENT_ID, "user", "今天早上測試：我早上量 37.2 度，退燒了。", current_time=today_morning)
     
     print_current_logs()
 
@@ -102,14 +117,14 @@ def run_extended_test():
     # 模擬今天下午 14:00 傳訊息（距離早上 09:00 超過 1 小時）
     today_afternoon = base_today.replace(hour=14, minute=0) # 5/21 14:00
     
-    save_chat_to_json(TEST_LINE_ID, "user", "今天下午測試：我想要修改我的病患表單。", current_time=today_afternoon)
+    save_chat_to_json(TEST_PATIENT_ID, "user", "今天下午測試：我想要修改我的病患表單。", current_time=today_afternoon)
     
     print_current_logs()
     
     print("\n【情境五：傍晚再次傳訊息，強迫結算下午的對話（預期成為今天第 2 個檔案）】")
     # 模擬傍晚 18:00 傳訊息
     today_evening = base_today.replace(hour=21, minute=58) # 5/21 21:58
-    save_chat_to_json(TEST_LINE_ID, "user", "今天傍晚測試：我的驗證碼好像過期了。", current_time=today_evening)
+    save_chat_to_json(TEST_PATIENT_ID, "user", "今天傍晚測試：我的驗證碼好像過期了。", current_time=today_evening)
     
     print_current_logs()
 

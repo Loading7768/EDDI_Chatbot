@@ -1,0 +1,14 @@
+[
+    {
+        "name": "急診科",
+        "is_active": true
+    },
+    {
+        "name": "內科",
+        "is_active": true
+    },
+    {
+        "name": "小兒科",
+        "is_active": true
+    }
+]

@@ -1,22 +1,22 @@
 {
     "metadata": {
         "medical_record_num": "P2026001",
-        "session_date": "2026-06-12",
+        "session_date": "2026-06-24",
         "session_sequence": 1,
         "message_count": 2,
-        "start_time": "2026-06-12T22:00:00+08:00",
-        "end_time": "2026-06-12T22:00:05+08:00"
+        "start_time": "2026-06-24T22:00:00+08:00",
+        "end_time": "2026-06-24T22:00:05+08:00"
     },
     "messages": [
         {
             "role": "user",
             "content": "前天測試：我覺得傷口有點紅腫。",
-            "timestamp": "2026-06-12T22:00:00+08:00"
+            "timestamp": "2026-06-24T22:00:00+08:00"
         },
         {
             "role": "assistant",
             "content": "收到，請問紅腫範圍有擴大嗎？",
-            "timestamp": "2026-06-12T22:00:05+08:00"
+            "timestamp": "2026-06-24T22:00:05+08:00"
         }
     ]
 }

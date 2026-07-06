@@ -1,22 +1,22 @@
 {
     "metadata": {
         "medical_record_num": "P2026001",
-        "session_date": "2026-06-13",
+        "session_date": "2026-06-25",
         "session_sequence": 1,
         "message_count": 2,
-        "start_time": "2026-06-13T23:30:00+08:00",
-        "end_time": "2026-06-14T00:15:00+08:00"
+        "start_time": "2026-06-25T23:30:00+08:00",
+        "end_time": "2026-06-26T00:15:00+08:00"
     },
     "messages": [
         {
             "role": "user",
             "content": "昨天深夜測試：醫生，不好意思半夜打擾，我發燒了。",
-            "timestamp": "2026-06-13T23:30:00+08:00"
+            "timestamp": "2026-06-25T23:30:00+08:00"
         },
         {
             "role": "assistant",
-            "content": "發燒請先量測體溫，若超過 38.5 度請服用退燒藥。",
-            "timestamp": "2026-06-14T00:15:00+08:00"
+            "content": "發燒請先量測體溫，若超過 38.5 度請服用退燒藥，並回診。",
+            "timestamp": "2026-06-26T00:15:00+08:00"
         }
     ]
 }

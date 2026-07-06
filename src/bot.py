@@ -491,6 +491,11 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         user_message = event.message.text.strip()
+        
+        # 0. 忽略「選擇詢問對象：」的文字訊息，避免與 PostbackEvent 重複處理
+        if user_message.startswith("選擇詢問對象："):
+            return
+
         user_id = event.source.user_id
         user_profile = line_bot_api.get_profile(user_id)
         user_name = user_profile.display_name
@@ -653,34 +658,16 @@ def handle_postback(event):
             }
             save_user_state(user_id, state)
             
-            # 開始諮詢，觸發 AI 的開場白
-            opening_prompt = "請開始對話，進行自我介紹並詢問病患目前最不舒服的症狀。"
-            chat_logs.save_chat_to_json(mrn, "user", opening_prompt, now)
-            reply_text = generate_gemini_reply(user_id, mrn, relation, opening_prompt)
+            # 開始諮詢，結合選擇訊息與隱藏 prompt
+            user_msg = f"選擇詢問對象：{relation}"
+            combined_prompt = f"{user_msg}\n請開始對話，進行自我介紹並詢問病患目前最不舒服的症狀。"
+            chat_logs.save_chat_to_json(mrn, "user", user_msg, now)
+            reply_text = generate_gemini_reply(user_id, mrn, relation, combined_prompt)
             # 儲存助手回覆。若回覆內容中包含「回診」字眼，後端管理系統會判定該病患「需回診」並於 UI 標記紅標。
             chat_logs.save_chat_to_json(mrn, "assistant", reply_text, datetime.now(tw_tz))
             
             bound_patients = chat_logs.get_patients_for_line_id(user_id)
             send_reply_with_optional_change_button(line_bot_api, event.reply_token, reply_text, len(bound_patients))
-            
-        elif action == "change_patient":
-            state = get_user_state(user_id)
-            current_mrn = state.get("medical_record_number")
-            if current_mrn:
-                chat_logs.finalize_session(current_mrn)
-                
-            reset_user_state(user_id)
-            bound_patients = chat_logs.get_patients_for_line_id(user_id)
-            
-            if len(bound_patients) >= 2:
-                send_patient_selection_quick_reply(line_bot_api, event.reply_token, bound_patients)
-                new_state = {
-                    "medical_record_number": None,
-                    "relation": None,
-                    "last_interaction": datetime.now(tw_tz).isoformat(),
-                    "status": "SELECTING_PATIENT"
-                }
-                save_user_state(user_id, new_state)
 
 # ── 7. 事件監聽動態註冊方法 ───────────────────────────────────────────────────
 def register_line_handlers(line_handler_instance, config_instance):

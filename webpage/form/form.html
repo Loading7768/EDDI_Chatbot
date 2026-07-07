@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="form/css/style.css">
+
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <div x-data="formApp()" class="max-w-sm mx-auto py-10 px-4 min-h-screen flex flex-col">
+        {% set step_keys = ['auth', 'pair', 'symptoms', 'review'] %}
+        {% for key in step_keys %}
+        <div class="contents" x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] } }">
+
+            <div class="flex items-start gap-3 shrink-0">
+                <!-- Node -->
+                <div class="transition-all duration-300 ease-out overflow-hidden"
+                        :class="nodeClasses(i)">
+
+                    <!-- Incomplete: gery circle, empty -->
+                    <template x-if="i !== currentStep && !step.completed">
+                        <div></div>
+                    </template>
+
+                    <!-- Current: expanded card. or Completed: summary.
+                            Each is in their own respected /parts/file, because the
+                            implementation varies wildly -->
+                    {% include "form/parts/" ~ key ~ ".html" %}
+
+                </div>
+
+                <!-- Edit button: sibling for some completed nodes -->
+                <button x-show="step.completed && i !== currentStep && step.editType"
+                        @click="jumpTo(i)"
+                        class="text-sm text-white px-3 py-1.5 rounded-full my-auto"
+                        :class="step.editType === 'logout' ? 'bg-red-500' : 'bg-blue-500'"
+                        x-text="step.editType"></button>
+            </div>
+
+            <!-- Node links -->
+            <div x-show="i < steps.length - 1"
+                    class="w-px min-h-[8px] flex-1 ml-5 transition-colors duration-300"
+                    :class="step.completed ? 'bg-blue-500' : 'bg-gray-300'"></div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Custom JS, order matters -->
+    <script src="form/js/flip.js"></script>
+    <script src="form/js/state.js"></script>
+    <script src="form/js/app.js"></script>
+
+    <!-- Alpine.js Core -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+</body>
+</html>

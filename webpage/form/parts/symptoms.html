@@ -1,34 +1,142 @@
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
-    <div class="flex flex-col h-full">
+    <div>
 
         <!-- Header -->
-        <div class="shrink-0 px-4 pt-4 pb-2">
-            <div class="font-medium text-gray-800 mb-2">Title</div>
+        <div class="px-4 pt-4 pb-2">
+            <div class="text-2xl font-medium text-gray-800 mb-2">請選擇要提供的衛教資料</div>
         </div>
 
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto px-4">
+        <!-- Body: explicit max-height so overflow-y-auto actually triggers -->
+        <div class="px-4 relative select-none pb-2 overflow-y-auto" style="max-height: calc(75vh - 11rem);"
+            @click.away="step.activeRegion = null">
 
-            <div class="text-sm text-gray-500 mb-4">Content</div>
+            <!-- Image Wrapper -->
+            <div class="image-wrapper shrink-0" id="image-wrapper">
+                <div class="interactive-layout">
+                    <!-- Left Column: Human Body -->
+                    <div class="body-column">
+                        <div class="image-container" id="body-image-container">
+                            <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
+                            <div class="hotspot"
+                                :class="[(step.topicMapping['頭'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '頭' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['頭'] || []).length > 0) ? 'pulse-glow' : '']"
+                                @click.stop="(step.topicMapping['頭'] || []).length > 0 && showPopover('頭', $event, 'body')"
+                                style="top: 2%; left: 15.97%; width: 38.27%; height: 11%;" title="頭"></div>
+                            <div class="hotspot"
+                                :class="[(step.topicMapping['脖子'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '脖子' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['脖子'] || []).length > 0) ? 'pulse-glow' : '']"
+                                @click.stop="(step.topicMapping['脖子'] || []).length > 0 && showPopover('脖子', $event, 'body')"
+                                style="top: 13.5%; left: 22.88%; width: 23.55%; height: 6%;" title="脖子"></div>
+                            <div class="hotspot"
+                                :class="[(step.topicMapping['手'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '手' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['手'] || []).length > 0) ? 'pulse-glow' : '']"
+                                @click.stop="(step.topicMapping['手'] || []).length > 0 && showPopover('手', $event, 'body')"
+                                style="top: 24%; left: 63.94%; width: 32.38%; height: 32%;" title="手"></div>
+                            <div class="hotspot"
+                                :class="[(step.topicMapping['軀幹上半部'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '軀幹上半部' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['軀幹上半部'] || []).length > 0) ? 'pulse-glow' : '']"
+                                @click.stop="(step.topicMapping['軀幹上半部'] || []).length > 0 && showPopover('軀幹上半部', $event, 'body')"
+                                style="top: 20%; left: 5.22%; width: 58.88%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
+                            <div class="hotspot"
+                                :class="[(step.topicMapping['軀幹下半部'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '軀幹下半部' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['軀幹下半部'] || []).length > 0) ? 'pulse-glow' : '']"
+                                @click.stop="(step.topicMapping['軀幹下半部'] || []).length > 0 && showPopover('軀幹下半部', $event, 'body')"
+                                style="top: 38%; left: 2.13%; width: 64.77%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
+                            <div class="hotspot"
+                                :class="[(step.topicMapping['腳'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '腳' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['腳'] || []).length > 0) ? 'pulse-glow' : '']"
+                                @click.stop="(step.topicMapping['腳'] || []).length > 0 && showPopover('腳', $event, 'body')"
+                                style="top: 59%; left: 31.56%; width: 38.27%; height: 39%;" title="腳"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: 3 Buttons -->
+                    <div class="buttons-column">
+                        <div class="hotspot bottom-btn btn-skin"
+                            :class="[(step.topicMapping['皮膚'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '皮膚' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['皮膚'] || []).length > 0) ? 'pulse-glow' : '']"
+                            @click.stop="(step.topicMapping['皮膚'] || []).length > 0 && showPopover('皮膚', $event, 'bottom')">
+                            皮膚</div>
+                        <div class="hotspot bottom-btn btn-mental"
+                            :class="[(step.topicMapping['精神'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '精神' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['精神'] || []).length > 0) ? 'pulse-glow' : '']"
+                            @click.stop="(step.topicMapping['精神'] || []).length > 0 && showPopover('精神', $event, 'bottom')">
+                            精神</div>
+                        <div class="hotspot bottom-btn btn-other"
+                            :class="[(step.topicMapping['其他'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '其他' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['其他'] || []).length > 0) ? 'pulse-glow' : '']"
+                            @click.stop="(step.topicMapping['其他'] || []).length > 0 && showPopover('其他', $event, 'bottom')">
+                            其他</div>
+                    </div>
+                </div>
+
+                <!-- Popover positioned relative to image-wrapper -->
+                <div id="popover" x-show="step.activeRegion !== null"
+                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                    :class="step.popoverArrowClass"
+                    :style="`position: absolute; top: ${step.popoverTop}px; left: ${step.popoverLeft}px; --arrow-top: ${step.arrowTop};`"
+                    class="origin-center">
+                    <div class="popover-content">
+                        <div class="flex justify-between items-center px-4 py-3 border-b border-slate-800 shrink-0">
+                            <span class="font-bold text-slate-100" x-text="step.activeRegion"></span>
+                            <button @click.stop="step.activeRegion = null"
+                                class="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition-colors focus:outline-none">
+                                <span class="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
+                        <div class="pop-checkbox-list">
+                            <template x-for="topic in (step.topicMapping[step.activeRegion] || [])" :key="topic">
+                                <div class="pop-checkbox-item"
+                                    :class="step.selectedSymptoms.includes(topic) ? 'selected' : ''"
+                                    @click.stop="toggleSymptom(topic)">
+                                    <template x-if="step.selectedSymptoms.includes(topic)">
+                                        <span
+                                            class="material-symbols-outlined text-emerald-400 mr-2 text-[18px]">check</span>
+                                    </template>
+                                    <span x-text="topic"></span>
+                                </div>
+                            </template>
+                            <template x-if="!(step.topicMapping[step.activeRegion] || []).length">
+                                <span class="text-slate-500 text-sm p-2">此區域無相關衛教資料。</span>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected symptoms chip box at the bottom -->
+            <div class="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 shrink-0"
+                x-show="step.selectedSymptoms.length > 0">
+                <div x-show="step.showPrefillMsg" x-transition class="text-xs text-emerald-400 mb-2 font-medium">
+                    已根據上次紀錄自動選擇</div>
+                <div class="chip-list flex flex-wrap gap-1.5">
+                    <template x-for="topic in step.selectedSymptoms" :key="topic">
+                        <div class="chip active cursor-pointer bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium py-1 px-2.5 rounded-full inline-flex items-center"
+                            @click="toggleSymptom(topic)">
+                            <span class="mr-1">✓</span>
+                            <span x-text="topic"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
 
         </div>
-        
+
         <!-- Footer -->
-        <div class="shrink-0 px-2 pt-4 pb-4">
-            <button @click="markCompleteAndAdvance(i)"
-                    class="w-full text-sm text-white bg-blue-500 px-3 py-2 rounded-[2rem]">
-                Next
+        <div class="px-2 pt-4 pb-4">
+            <button @click="doDischarge()" :disabled="step.selectedSymptoms.length < 1"
+                class="w-full py-3 rounded-[2rem] font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                選擇
             </button>
         </div>
-    
+
     </div>
 </template>
-    
+
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div>
-        <div class="text-xs text-blue-100" x-text="step.key"></div>
-        <div class="text-sm" x-text="step.value ?? '-'"></div>
+    <div class="flex items-start gap-2">
+        <span class="material-symbols-outlined text-blue-200 text-[20px] shrink-0 mt-0.5">sick</span>
+        <div class="flex flex-wrap gap-1">
+            <template x-for="topic in step.selectedSymptoms" :key="topic">
+                <span
+                    class="text-xs font-medium bg-blue-400/20 text-blue-100 border border-blue-300/30 rounded-full px-2 py-0.5"
+                    x-text="topic"></span>
+            </template>
+        </div>
     </div>
 </template>

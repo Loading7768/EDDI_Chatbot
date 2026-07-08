@@ -634,7 +634,7 @@ def handle_message(event):
             
             cleanup_expired_codes()
             for code, data in list(verification_codes.items()):
-                if data["line_uuid"] == user_id:
+                if data["user_id"] == user_id:
                     del verification_codes[code]
                     break
             while True:
@@ -643,8 +643,8 @@ def handle_message(event):
                     break
             expires_at = time.time() + 600
             verification_codes[random_number] = {
-                "line_uuid": user_id,
-                "line_uname": user_name,
+                "user_id": user_id,
+                "user_name": user_name,
                 "expires_at": expires_at
             }
             formatted_expiry = datetime.fromtimestamp(expires_at, tz=tw_tz).strftime("%Y-%m-%d %H:%M:%S")

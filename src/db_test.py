@@ -18,17 +18,18 @@ def insert_test_data():
     ]
     
     # patients: 10, only this first one has_chatted
+    # status 涵蓋三種狀態: 出院 / 須回診 / 已回診
     patients_data = [
-        (1, 'P2026001', 1),
-        (2, 'P2026002', 0),
-        (3, 'P2026003', 0),
-        (4, 'P2026004', 0),
-        (5, 'P2026005', 0),
-        (6, 'P2026006', 0),
-        (7, 'P2026007', 0),
-        (8, 'P2026008', 0),
-        (9, 'P2026009', 0),
-        (10, 'P2026010', 0),
+        (1, 'P2026001', 1, '須回診'),
+        (2, 'P2026002', 0, '須回診'),
+        (3, 'P2026003', 0, '已回診'),
+        (4, 'P2026004', 0, '出院'),
+        (5, 'P2026005', 0, '須回診'),
+        (6, 'P2026006', 0, '已回診'),
+        (7, 'P2026007', 0, '出院'),
+        (8, 'P2026008', 0, '須回診'),
+        (9, 'P2026009', 0, '已回診'),
+        (10, 'P2026010', 0, '出院'),
     ]
     
     # line_patient_pairs: give 'U2e3f4g5h6' 5 different relations.
@@ -68,7 +69,7 @@ def insert_test_data():
         )
         
         c.executemany(
-            'INSERT INTO patients (patient_id, medical_record_number, has_chatted) VALUES (?,?,?)',
+            'INSERT INTO patients (patient_id, medical_record_number, has_chatted, status) VALUES (?,?,?,?)',
             patients_data
         )
         

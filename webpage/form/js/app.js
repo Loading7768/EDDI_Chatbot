@@ -305,9 +305,13 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    step.completed = true;
-                    step.value = '確認無誤';
-                    this.nextStep();
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        step.completed = true;
+                        step.value = '確認無誤';
+                        this.nextStep();
+                    }
                 } else {
                     step.error = data.message || '資料傳送失敗，請再試一次';
                 }

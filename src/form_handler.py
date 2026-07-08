@@ -58,6 +58,14 @@ def serve_js(filename):
 def serve_parts(filename):
     return send_from_directory(os.path.join(BASE_DIR, 'webpage/form/parts'), filename)
 
+@form_bp.route('/intro')
+def intro_page():
+
+    return send_from_directory(os.path.join(BASE_DIR, 'webpage/form'), 'intro.html')
+@form_bp.route('/complete')
+def complete_page():
+    return send_from_directory(os.path.join(BASE_DIR, 'webpage/form'), 'complete.html')
+
 @form_bp.route('/form')
 def form_page():
     doctor_info = None
@@ -295,7 +303,7 @@ def form_submit():
         # Clear session
         session.clear()
         
-        return jsonify({"success": True})
+        return jsonify({"success": True, "redirect": "/complete"})
     except Exception as e:
         if conn:
             conn.rollback()

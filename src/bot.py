@@ -6,6 +6,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 import google.generativeai as genai
 from dotenv import load_dotenv
+import requests  # 用於地端 Ollama API 呼叫
 
 # 抓取專案根目錄
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -16,6 +17,33 @@ load_dotenv(dotenv_path=env_path)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCQdNuAe3sg13SRi3arsgBjPqWdmZM_nAg")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_KEY_HERE")
+
+# === [Ollama 地端模型設定與 API 呼叫] ===
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")  # "ollama" (地端) 或 "gemini" (雲端)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+
+def call_ollama_chat_api(messages: list[dict], model: str = OLLAMA_MODEL, temperature: float = 0.7) -> str:
+    """呼叫地端 Ollama Chat Completions API (OpenAI 相容)"""
+    url = f"{OLLAMA_BASE_URL.rstrip('/')}/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer ollama"
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        res_json = response.json()
+        return res_json["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"[Ollama Error] API call failed: {e}")
+        return "抱歉，地端 AI 系統暫時無法回應，請確認 Ollama 是否已啟動且已下載 gpt-oss:20b 模型。"
+
 
 # 時區設定
 tw_tz = timezone(timedelta(hours=8))
@@ -197,7 +225,7 @@ def build_rag_context(symptoms: list[str]) -> str:
 
 # ── 3. Token 管理與對話摘要 ──────────────────────────────────────────────────
 def generate_history_summary(older_messages: list[dict], model_name: str) -> str:
-    """呼叫 Gemini 產生較早對話記錄的精簡摘要"""
+    """產生較早對話記錄的精簡摘要 (同時保留原 Gemini 與新地端 Ollama)"""
     formatted_history = []
     for msg in older_messages:
         role_name = "病患" if msg.get("role") == "user" else "衛教助手"
@@ -211,13 +239,19 @@ def generate_history_summary(older_messages: list[dict], model_name: str) -> str
         "請直接輸出總結內容，不要有任何多餘的解釋："
     )
     
+    # === [Ollama 地端模型分支] ===
+    if LLM_PROVIDER == "ollama":
+        messages = [{"role": "user", "content": prompt}]
+        return call_ollama_chat_api(messages, model=OLLAMA_MODEL)
+    
+    # === [原 Gemini 雲端模型分支] ===
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(model_name=model_name)
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        print(f"[Summary Error] Failed to generate summary: {e}")
+        print(f"[Summary Error] Failed to generate summary with Gemini: {e}")
         return "（較早對話記錄因長度限制已被系統簡化）"
 
 def get_chat_history_and_summary(mrn: str, prompt_ver: str, model_name: str) -> tuple[list[dict], str]:
@@ -281,29 +315,44 @@ def get_chat_history_and_summary(mrn: str, prompt_ver: str, model_name: str) -> 
         else:
             all_candidate_messages.extend(msgs)
 
-    # 轉為 Gemini 歷史格式
-    gemini_history = []
+    # 轉為 LLM 歷史格式 (區分 Gemini 與 OpenAI/Ollama 格式)
+    llm_history = []
     for msg in all_candidate_messages:
-        role = "model" if msg.get("role") == "assistant" else "user"
-        gemini_history.append({
-            "role": role,
-            "parts": [msg.get("content", "")]
-        })
+        if LLM_PROVIDER == "ollama":
+            # Ollama 格式 (role: user/assistant, content: str)
+            role = "assistant" if msg.get("role") == "assistant" else "user"
+            llm_history.append({
+                "role": role,
+                "content": msg.get("content", "")
+            })
+        else:
+            # Gemini 格式 (role: user/model, parts: [str])
+            role = "model" if msg.get("role") == "assistant" else "user"
+            llm_history.append({
+                "role": role,
+                "parts": [msg.get("content", "")]
+            })
 
     # 計算 Token 數
     MAX_HISTORY_TOKENS = 6000
     token_count = 0
     model = None
-    if gemini_history:
-        try:
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel(model_name=model_name)
-            token_count = model.count_tokens(gemini_history).total_tokens
-        except Exception as e:
-            print(f"[Token Count Error] Failed to count tokens: {e}")
-            # 備用估算：中文/英文字數除以 1.5
-            total_chars = sum(len(msg.get("content", "")) for msg in all_candidate_messages)
-            token_count = int(total_chars / 1.5)
+    
+    if LLM_PROVIDER == "ollama":
+        # 地端模型使用備用字數估計 (每個 token 約為 1.5 個字元)
+        total_chars = sum(len(msg.get("content", "")) for msg in all_candidate_messages)
+        token_count = int(total_chars / 1.5)
+    else:
+        if llm_history:
+            try:
+                genai.configure(api_key=GEMINI_API_KEY)
+                model = genai.GenerativeModel(model_name=model_name)
+                token_count = model.count_tokens(llm_history).total_tokens
+            except Exception as e:
+                print(f"[Token Count Error] Failed to count tokens: {e}")
+                # 備用估算：中文/英文字數除以 1.5
+                total_chars = sum(len(msg.get("content", "")) for msg in all_candidate_messages)
+                token_count = int(total_chars / 1.5)
 
     # 判斷是否需要進行總結 (當 token 超過限制時)
     if token_count > MAX_HISTORY_TOKENS:
@@ -323,26 +372,37 @@ def get_chat_history_and_summary(mrn: str, prompt_ver: str, model_name: str) -> 
                 else:
                     recent_candidate_messages.extend(msgs)
                     
-            k_gemini_history = []
+            k_llm_history = []
             for msg in recent_candidate_messages:
-                role = "model" if msg.get("role") == "assistant" else "user"
-                k_gemini_history.append({
-                    "role": role,
-                    "parts": [msg.get("content", "")]
-                })
+                if LLM_PROVIDER == "ollama":
+                    role = "assistant" if msg.get("role") == "assistant" else "user"
+                    k_llm_history.append({
+                        "role": role,
+                        "content": msg.get("content", "")
+                    })
+                else:
+                    role = "model" if msg.get("role") == "assistant" else "user"
+                    k_llm_history.append({
+                        "role": role,
+                        "parts": [msg.get("content", "")]
+                    })
                 
             k_token_count = 0
-            if k_gemini_history:
-                if model is not None:
-                    try:
-                        k_token_count = model.count_tokens(k_gemini_history).total_tokens
-                    except Exception as e:
-                        print(f"[Token Count Error] Failed to count tokens in loop: {e}")
-                        total_chars = sum(len(msg.get("content", "")) for msg in recent_candidate_messages)
-                        k_token_count = int(total_chars / 1.5)
-                else:
+            if k_llm_history:
+                if LLM_PROVIDER == "ollama":
                     total_chars = sum(len(msg.get("content", "")) for msg in recent_candidate_messages)
                     k_token_count = int(total_chars / 1.5)
+                else:
+                    if model is not None:
+                        try:
+                            k_token_count = model.count_tokens(k_llm_history).total_tokens
+                        except Exception as e:
+                            print(f"[Token Count Error] Failed to count tokens in loop: {e}")
+                            total_chars = sum(len(msg.get("content", "")) for msg in recent_candidate_messages)
+                            k_token_count = int(total_chars / 1.5)
+                    else:
+                        total_chars = sum(len(msg.get("content", "")) for msg in recent_candidate_messages)
+                        k_token_count = int(total_chars / 1.5)
                     
             if k_token_count <= MAX_HISTORY_TOKENS:
                 chosen_k = k
@@ -361,20 +421,27 @@ def get_chat_history_and_summary(mrn: str, prompt_ver: str, model_name: str) -> 
                 else:
                     recent_candidate_messages.extend(msgs)
                     
-            gemini_history = []
+            llm_history = []
             for msg in recent_candidate_messages:
-                role = "model" if msg.get("role") == "assistant" else "user"
-                gemini_history.append({
-                    "role": role,
-                    "parts": [msg.get("content", "")]
-                })
+                if LLM_PROVIDER == "ollama":
+                    role = "assistant" if msg.get("role") == "assistant" else "user"
+                    llm_history.append({
+                        "role": role,
+                        "content": msg.get("content", "")
+                    })
+                else:
+                    role = "model" if msg.get("role") == "assistant" else "user"
+                    llm_history.append({
+                        "role": role,
+                        "parts": [msg.get("content", "")]
+                    })
                 
             older_messages = []
             for s in older_sessions:
                 older_messages.extend(s["messages"])
         else:
             # chosen_k == 0, 不留下任何完整歷史對話
-            gemini_history = []
+            llm_history = []
             older_messages = []
             for idx, s in enumerate(sessions):
                 msgs = s["messages"]
@@ -384,14 +451,14 @@ def get_chat_history_and_summary(mrn: str, prompt_ver: str, model_name: str) -> 
                     older_messages.extend(msgs)
                     
         summary_text = generate_history_summary(older_messages, model_name)
-        return gemini_history, summary_text
+        return llm_history, summary_text
     else:
         # 不需要進行總結
-        return gemini_history, ""
+        return llm_history, ""
 
-# ── 4. Gemini 回覆產生器 ─────────────────────────────────────────────────────
+# ── 4. AI 回覆產生器 (支援 Gemini 與 Ollama gpt-oss) ─────────────────────────
 def generate_gemini_reply(user_id: str, mrn: str, relation: str, user_message: str) -> str:
-    """整合動態 Prompt、RAG、歷史對話與摘要，呼叫 Gemini API 產生回覆"""
+    """整合動態 Prompt、RAG、歷史對話與摘要，呼叫 LLM 產生回覆 (相容原有名稱以避免外部呼叫報錯)"""
     model_name = "models/gemini-2.5-flash"
     
     # 1. 取得 Prompt 模板
@@ -413,24 +480,37 @@ def generate_gemini_reply(user_id: str, mrn: str, relation: str, user_message: s
         
     # 5. 注入 Metadata
     metadata = {
-        "model_version": model_name,
+        "model_version": OLLAMA_MODEL if LLM_PROVIDER == "ollama" else model_name,
         "prompt_version": prompt_ver
     }
     system_instruction += f"\n\n【對話系統元數據 (System Metadata)】\n{json.dumps(metadata, ensure_ascii=False, indent=2)}"
     
-    # 6. 呼叫 API
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=system_instruction
-        )
-        chat = model.start_chat(history=history)
-        response = chat.send_message(user_message)
-        return response.text
-    except Exception as e:
-        print(f"[Gemini Error] API call failed: {e}")
-        return "抱歉，AI 系統暫時無法回應，請稍後再試。"
+    # 6. 呼叫 API (依 Provider 設定路由)
+    if LLM_PROVIDER == "ollama":
+        # === [Ollama 地端模型分支] ===
+        # 組裝聊天訊息，將 system_instruction 放最前作為系統角色
+        messages = [{"role": "system", "content": system_instruction}]
+        # 加入對話歷史與當前使用者訊息
+        messages.extend(history)
+        messages.append({"role": "user", "content": user_message})
+        
+        return call_ollama_chat_api(messages, model=OLLAMA_MODEL)
+    
+    else:
+        # === [原 Gemini 雲端模型分支] ===
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=system_instruction
+            )
+            chat = model.start_chat(history=history)
+            response = chat.send_message(user_message)
+            return response.text
+        except Exception as e:
+            print(f"[Gemini Error] API call failed: {e}")
+            return "抱歉，AI 系統暫時無法回應，請稍後再試。"
+
 
 # ── 5. LINE Bot 輔助方法 ─────────────────────────────────────────────────────
 def send_patient_selection_quick_reply(line_bot_api, reply_token, bound_patients, text_prefix="請選擇您本次要詢問的病患對象："):
@@ -726,6 +806,21 @@ class OpenAIBot(SmartHealthBotBase):
             messages=self.messages
         )
         reply = response.choices[0].message.content
+        self.messages.append({"role": "assistant", "content": reply})
+        return reply
+
+class OllamaBot(SmartHealthBotBase):
+    """地端 Ollama gpt-oss 相容之 Bot 類別 (CLI/測試使用)"""
+    def __init__(self, model_name: str = OLLAMA_MODEL):
+        self.model_name = model_name
+        self.context = ""
+        self.messages = []
+    def start(self, context: str) -> None:
+        self.context = context
+        self.messages = [{"role": "system", "content": context}]
+    def ask(self, user_input: str) -> str:
+        self.messages.append({"role": "user", "content": user_input})
+        reply = call_ollama_chat_api(self.messages, model=self.model_name)
         self.messages.append({"role": "assistant", "content": reply})
         return reply
 

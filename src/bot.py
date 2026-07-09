@@ -26,7 +26,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
 
 # === [OpenAI 雲端模型設定與 API 呼叫] ===
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
 
 def call_ollama_chat_api(messages: list[dict], model: str = OLLAMA_MODEL, temperature: float = 0.7) -> str:
     """呼叫地端 Ollama Chat Completions API (OpenAI 相容)"""
@@ -41,7 +41,7 @@ def call_ollama_chat_api(messages: list[dict], model: str = OLLAMA_MODEL, temper
         "temperature": temperature
     }
     try:
-        response = requests.post(url, json=payload, timeout=60)
+        response = requests.post(url, json=payload, headers=headers, timeout=60)
         response.raise_for_status()
         res_json = response.json()
         return res_json["choices"][0]["message"]["content"].strip()
@@ -62,7 +62,7 @@ def call_openai_chat_api(messages: list[dict], model: str = OPENAI_MODEL, temper
         "temperature": temperature
     }
     try:
-        response = requests.post(url, json=payload, timeout=60)
+        response = requests.post(url, json=payload, headers=headers, timeout=60)
         response.raise_for_status()
         res_json = response.json()
         return res_json["choices"][0]["message"]["content"].strip()

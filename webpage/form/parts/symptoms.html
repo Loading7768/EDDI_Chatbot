@@ -1,6 +1,6 @@
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
-    <div>
+    <div class="flex flex-col h-full">
 
         <!-- Header -->
         <div class="px-4 pt-4 pb-2">
@@ -8,7 +8,7 @@
         </div>
 
         <!-- Body: explicit max-height so overflow-y-auto actually triggers -->
-        <div class="px-4 relative select-none pb-2 overflow-y-auto" style="max-height: calc(75vh - 11rem);"
+        <div class="px-4 relative select-none pb-2 overflow-y-auto max-h-[50vh]"
             @click.away="step.activeRegion = null">
 
             <!-- Image Wrapper -->
@@ -117,10 +117,22 @@
         </div>
 
         <!-- Footer -->
-        <div class="px-2 pt-4 pb-4">
-            <button @click="doDischarge()" :disabled="step.selectedSymptoms.length < 1"
-                class="w-full py-3 rounded-[2rem] font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                選擇
+        <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
+            <button @click="confirmSymptoms()" :disabled="step.selectedSymptoms.length < 1"
+                    class="
+                        text-blue-950 bg-blue-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
+                        active:scale-110 active:rounded-lg
+                        disabled:cursor-not-allowed"
+                    :class="[
+                        step.currentStatus === status.IDLE ? 'px-16' : 'px-4',
+                        step.selectedSymptoms.length < 1 ? 'opacity-25' : ''
+                    ]">
+
+                <span x-show="step.currentStatus === status.SUCCESS"
+                    class="flex items-center material-symbols-rounded">
+                    check_circle
+                </span>
+                <span x-show="step.currentStatus === status.IDLE">選擇</span>
             </button>
         </div>
 

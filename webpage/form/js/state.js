@@ -2,14 +2,19 @@ const initState = () => ([
     // completed: tracks progress
     // mode:      control current state of the card
     // value:     holds input data
-    // editType:  edit | logout | null
     {
         key: 'auth',
         completed: false,
-        mode: 'login',      // 'login' | 'authed'
         error: null,
+        status: Object.freeze({
+            IDLE: 'idel',
+            LOADING: 'loading',
+            SUCCESS: 'success',
+        }),
+        currentStatus: 'idel',
         btnType: 'logout',
 
+        authed: false,
         account: '', 
         password: '',
         doctorName: '',
@@ -18,10 +23,16 @@ const initState = () => ([
     {
         key: 'pair',
         completed: false,
-        mode: 'line',         // 'line' | 'patient'
         error: null,
+        status: Object.freeze({
+            IDLE: 'idel',
+            LOADING: 'loading',
+            SUCCESS: 'success',
+        }),
+        currentStatus: 'idel',
         btnType: 'edit',
-
+        
+        paired: false,
         paringCode: '',
         lineUuid: '',
         lineUname: '',
@@ -31,17 +42,20 @@ const initState = () => ([
             self: { type: 'self', relation: '帳號本人', mrc: '' },
             new: { type: 'new', relation: '', mrc: '' }
         },
-        pairLoading: false,
-        pairSuccess: false,
+
         pairSelectError: '',
         existingScrolled: false,
     },
     {
         key: 'symptoms',
         completed: false,
-        mode: null,
         error: null,
         btnType: 'edit',
+        status: Object.freeze({
+            IDLE: 'idel',
+            SUCCESS: 'success',
+        }),
+        currentStatus: 'idel',
 
         selectedSymptoms: [],
         sessionLoaded: false,
@@ -66,11 +80,13 @@ const initState = () => ([
     {
         key: 'review',
         completed: false,
-        mode: null,
         error: null,
         btnType: null,
-
-        submitLoading: false,
+        status: Object.freeze({
+            IDLE: 'idel',
+            LOADING: 'loading',
+        }),
+        currentStatus: 'idel',
     },
 ]);
 

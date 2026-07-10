@@ -15,11 +15,6 @@ document.addEventListener('alpine:init', () => {
             this.currentStep = i;
         },
 
-        // Transition of sub-steps / modes
-        setMode(i, newMode) {
-            this.steps[i].mode = newMode;
-        },
-
         // Transition between steps
         markCompleteAndAdvance(i) {
             this.steps[i].completed = true;
@@ -31,22 +26,28 @@ document.addEventListener('alpine:init', () => {
             const step = this.steps[i];
 
             if (i === this.currentStep) {
-                return 'w-full max-h-[72vh] rounded-[2rem] bg-blue-50 border border-blue-200 p-4';
+                return 'w-full max-h-[72vh] rounded-[2rem] bg-slate-900 p-4';
             }
 
             if (step.completed) {
-                return 'inline-flex flex-col rounded-md bg-blue-500 text-white px-3 py-2 max-w-full';
+                return 'inline-flex flex-col rounded-md bg-blue-700 text-white px-4 max-w-full';
             }
 
             // incomplet
-            return 'w-10 h-10 rounded-[2rem] bg-gray-300';
+            return 'w-10 h-10 rounded-[2rem] bg-gray-600';
+        },
+
+        async delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         },
 
 
         // ========== Auth Step ==========
-        async submitLogin() {
+        async confirmLogin() {
             const authStep = this.steps[0];
+            const status = authStep.status;
             authStep.error = null;
+            authStep.currentStatus = status.LOADING;
 
             try {
                 const resp = await fetch('/api/form_login', {
@@ -60,27 +61,38 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await resp.json();
 
+                await this.delay(1000);
                 if (!data.success) {
                     throw new Error(data.message);
                 }
+                authStep.currentStatus = status.SUCCESS;
 
+                await this.delay(300);
                 authStep.account = '';
                 authStep.password = '';
                 authStep.doctorName = data.doctor_name;
                 authStep.doctorDept = data.doctor_department;
                 authStep.completed = true;
                 this.nextStep();
-                authStep.mode = 'authed'
+                authStep.authed = true;
             } catch (err) {
                 authStep.error = err.message;
             }
+            authStep.currentStatus = status.IDLE;
         },
 
         async confirmLogout() {
+            const authStep = this.steps[0];
+            const status = authStep.status;
+            authStep.currentStatus = status.LOADING;
+
             try {
                 await fetch('api/form_logout', { method: 'POST' });
             } catch (e) { }
 
+            await this.delay(1000);
+            authStep.currentStatus = status.SUCCESS;
+            await this.delay(300);
             this.steps = initState();
         },
 
@@ -90,11 +102,12 @@ document.addEventListener('alpine:init', () => {
 
 
         // ========== Pair Step ==========
-        async pairLine() {
+        async confirmPair() {
             const step = this.steps[1];
+            const status = step.status;
             if (step.paringCode.length < 6) return;
 
-            step.pairLoading = true;
+            step.currentStatus = status.LOADING;
             step.error = '';
 
             try {
@@ -105,37 +118,38 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
 
-                if (data.success) {
-                    step.pairSuccess = true;
-                    step.lineUname = data.line_uname;
-                    step.lineUuid = data.line_uuid;
-                    step.relations = data.relations || [];
-                    setTimeout(() => {
-                        step.pairSuccess = false;
-                        step.mode = 'patient';
-
-                        const hasSelf = step.relations.some(r => r.relation === '帳號本人');
-                        if (!hasSelf) {
-                            step.selectedRelation = step.draftInputs.self;
-                        } else if (step.relations.length > 0) {
-                            const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                            step.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
-                        } else {
-                            step.selectedRelation = step.draftInputs.new;
-                        }
-                    }, 1000);
-                } else {
-                    step.error = data.message;
-                    step.paringCode = '';
+                await this.delay(1000);
+                if (!data.success) {
+                    throw new Error(data.message);
                 }
+
+                step.currentStatus = status.SUCCESS;
+                await this.delay(300);
+                step.lineUname = data.line_uname;
+                step.lineUuid = data.line_uuid;
+                step.relations = data.relations || [];
+                step.paired = true;
+
+                const hasSelf = step.relations.some(r => r.relation === '帳號本人');
+                if (!hasSelf) {
+                    step.selectedRelation = step.draftInputs.self;
+                } else if (step.relations.length > 0) {
+                    const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                    step.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
+                } else {
+                    step.selectedRelation = step.draftInputs.new;
+                }
+                
             } catch (e) {
-                step.error = '網路錯誤，請稍後再試';
+                step.error = data.message;
+                step.paringCode = '';
             }
-            step.pairLoading = false;
+            step.currentStatus = status.IDLE;
         },
 
-        async selectPatient() {
+        async confirmPatient() {
             const step = this.steps[1];
+            const status = step.status;
             if (!step.selectedRelation) return;
             step.pairSelectError = '';
 
@@ -186,9 +200,12 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
+            step.currentStatus = status.SUCCESS;
+            await this.delay(300);
             step.value = `${text} (${step.selectedRelation.mrc})`;
             step.completed = true;
             this.nextStep();
+            step.currentStatus = status.IDLE;
         },
 
 
@@ -250,15 +267,16 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        async doDischarge() {
+        async confirmSymptoms() {
             const step = this.steps[2];
+            const status = step.status;
             const pairStep = this.steps[1];
             if (step.selectedSymptoms.length < 1) return;
 
             const selectedRelation = pairStep.selectedRelation;
             const mrc = selectedRelation?.mrc?.trim() || '';
             const relation = selectedRelation?.type === 'self' ? '帳號本人' : (selectedRelation?.relation?.trim() || '');
-
+            
             try {
                 const res = await fetch('/api/form_discharge', {
                     method: 'POST',
@@ -271,9 +289,12 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
                 if (data.success) {
+                    step.currentStatus = status.SUCCESS
+                    await this.delay(300);
                     step.value = step.selectedSymptoms.join(', ');
                     step.completed = true;
                     this.nextStep();
+                    step.currentStatus = status.IDLE;
                 }
             } catch (e) {
                 console.error('Error saving symptoms:', e);
@@ -285,9 +306,10 @@ document.addEventListener('alpine:init', () => {
         // ========== Review Step ==========
         async submitForm() {
             const step = this.steps[3];
+            const status = step.status;
             const pairStep = this.steps[1];
 
-            step.submitLoading = true;
+            step.currentStatus = status.LOADING;
             step.error = '';
 
             const selectedRelation = pairStep.selectedRelation;
@@ -304,22 +326,21 @@ document.addEventListener('alpine:init', () => {
                     })
                 });
                 const data = await res.json();
-                if (data.success) {
-                    if (data.redirect) {
-                        window.location.href = data.redirect;
-                    } else {
-                        step.completed = true;
-                        step.value = '確認無誤';
-                        this.nextStep();
-                    }
-                } else {
-                    step.error = data.message || '資料傳送失敗，請再試一次';
+
+                await this.delay(1000);
+                if (!data.success) {
+                    throw new Error(data.message);
                 }
-            } catch (e) {
-                step.error = '資料傳送失敗，請再試一次';
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                    this.steps = initState();
+                    this.currentStep = 0;
+                }
+            } catch (err) {
+                step.error = err.message;
             }
 
-            step.submitLoading = false;
+            step.currentStatus = status.IDLE;
         },
 
         init() {

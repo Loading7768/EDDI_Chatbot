@@ -402,7 +402,17 @@ def get_current_prompt_info():
 
 @admin_bp.route('/admin')
 def index():
-    return send_from_directory(WEBPAGE_DIR, 'admin.html')
+    return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'html'), 'admin.html')
+
+
+@admin_bp.route('/admin/css/<path:filename>')
+def admin_css(filename):
+    return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'css'), filename)
+
+
+@admin_bp.route('/admin/js/<path:filename>')
+def admin_js(filename):
+    return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'js'), filename)
 
 
 @admin_bp.route('/api/me')

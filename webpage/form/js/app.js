@@ -341,7 +341,7 @@ document.addEventListener('alpine:init', () => {
                 authStep.doctorName = doctor.doctor_name;
                 authStep.doctorDept = doctor.department;
                 authStep.completed = true;
-                authStep.mode = 'authed';
+                authStep.authed = true;
                 if (this.currentStep === 0) this.currentStep = 1;
             }
 
@@ -351,7 +351,7 @@ document.addEventListener('alpine:init', () => {
                 pairStep.lineUname = pairing.line_uname;
                 pairStep.lineUuid = pairing.line_uuid;
                 pairStep.relations = pairing.relations || [];
-                pairStep.mode = 'patient';
+                pairStep.paired = true;
 
                 // Default selection (same logic as post-pair)
                 const hasSelf = pairStep.relations.some(r => r.relation === '帳號本人');
@@ -371,7 +371,6 @@ document.addEventListener('alpine:init', () => {
                         relation: pairing.selected_relation,
                         mrc: pairing.selected_mrc,
                     };
-                    pairStep.value = `${pairing.selected_relation} (${pairing.selected_mrc})`;
                     pairStep.completed = true;
                     if (this.currentStep <= 1) this.currentStep = 2;
 
@@ -379,7 +378,6 @@ document.addEventListener('alpine:init', () => {
                     if (pairing.symptoms && pairing.symptoms.length > 0) {
                         // Symptoms already saved — jump straight to review
                         symptomStep.selectedSymptoms = [...pairing.symptoms];
-                        symptomStep.value = pairing.symptoms.join(', ');
                         symptomStep.completed = true;
                         if (this.currentStep <= 2) this.currentStep = 3;
                     }

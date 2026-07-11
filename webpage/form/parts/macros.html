@@ -1,0 +1,32 @@
+{% macro card_header(titleText) %}
+<div class="shrink-0 px-4 pt-4 pb-2">
+     <div class="text-2xl font-medium text-slate-400 mb-6">{{ titleText }}</div>
+</div>
+{% endmacro %}
+
+{% macro footer_button(clickFunc, disableCond, disableStyleCond, textColor, bgColor, label) %}
+<div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
+    <button @click="{{ clickFunc }}"
+            :disabled="{{ disableCond }}"
+            class="
+                text-lg font-medium {{ textColor }} {{ bgColor }} h-12 transition-all duration-250 ease-spring
+                active:px-16 active:rounded-lg
+                disabled:pointer-events-none"
+            :class="[
+                step.currentStatus === status.IDLE ? 'px-14' : 'px-3',
+                step.currentStatus === status.SUCCESS ? 'rounded-lg scale-110' : 'rounded-[2rem]',
+                {{ disableStyleCond }} ? 'opacity-25' : '',
+            ]">
+
+        <span x-show="step.currentStatus === status.LOADING"
+            class="animate-spring flex items-center material-symbols-rounded">
+            data_usage
+        </span>
+        <span x-show="step.currentStatus === status.SUCCESS"
+            class="flex items-center material-symbols-rounded">
+            check_circle
+        </span>
+        <span x-show="step.currentStatus === status.IDLE">{{ label }}</span>
+    </button>
+</div>
+{% endmacro %}

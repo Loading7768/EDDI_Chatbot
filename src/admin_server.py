@@ -100,7 +100,7 @@ def check_needs_return_visit(mrn: str) -> bool:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for msg in data.get('messages', []):
-                if msg.get('role') == 'assistant' and '回診' in msg.get('content', ''):
+                if msg.get('role') == 'assistant' and '請立即前往急診回診' in msg.get('content', ''):
                     ts_str = msg.get('timestamp', '')
                     if ts_str:
                         try:

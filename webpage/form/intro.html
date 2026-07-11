@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>衛教表單系統</title>
+    <meta name="description" content="讓機器人了解病患，提供適當的衛教資料。">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .icon-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .btn-glow {
+            animation: pulse-glow 2.5s ease-in-out infinite;
+        }
+
+        .btn-glow:hover {
+            animation: none;
+            box-shadow: 0 0 50px rgba(16, 185, 129, 0.8);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-white font-sans min-h-screen flex items-center justify-center">
+
+    <div class="max-w-sm w-full mx-auto px-6 py-12 flex flex-col items-center text-center gap-8">
+
+        <!-- Icon -->
+        <div class="icon-float">
+            <div class="w-24 h-24 rounded-3xl bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center">
+                <span class="material-symbols-outlined text-emerald-400 text-[3.5rem]">health_and_safety</span>
+            </div>
+        </div>
+
+        <!-- Text -->
+        <div class="flex flex-col gap-3">
+            <h1 class="text-3xl font-bold text-slate-100 tracking-wide">
+                衛教表單系統
+            </h1>
+            <p class="text-slate-400 text-base leading-relaxed">
+                讓機器人了解病患。<br>提供適當的衛教資料。
+            </p>
+        </div>
+
+        <!-- Start Button -->
+        <a href="/form"
+            id="btn-start"
+            class="btn-glow mt-2 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-semibold text-lg py-4 rounded-2xl transition-all duration-200 select-none">
+            <span>開始</span>
+            <span class="material-symbols-outlined text-[1.25rem]">arrow_forward</span>
+        </a>
+
+    </div>
+
+</body>
+
+</html>

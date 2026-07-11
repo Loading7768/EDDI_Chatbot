@@ -11,7 +11,7 @@
                 <!-- Body -->
                 <div class="flex-1 overflow-y-auto px-4">
 
-                    <span class="block text-center material-symbols-rounded text-6xl text-indigo-400 mb-6">stethoscope</span>
+                    <span class="block text-center material-symbols-rounded text-6xl text-blue-400 mb-6">stethoscope</span>
 
                     <div class="relative mb-4">
                         <input type="text" id="account" x-model="step.account"
@@ -55,21 +55,21 @@
                 <!-- Header -->
                 <!-- {{ card_header('確認登出？') }} -->
                 <div class="shrink-0 px-4 pt-4 mb-6 flex justify-between">
+
                     <div class="text-2xl font-medium text-slate-400">確認登出？</div>
                     <button @click="cancelLogout()"
                             class="flex items-center text-slate-800 bg-slate-400 p-1 rounded-[2rem] transition-all duration-200 ease-spring
                             active:px-2 active:rounded-lg">
                         <span class="flex items-center material-symbols-rounded">cancel</span>
                     </button>
+
                 </div>
 
                 <!-- Body -->
-                <div class="flex-1 overflow-y-auto px-4">
+                <div class="flex-1 overflow-y-auto flex flex-col items-center px-4 py-12">
 
-                    <div class="flex flex-col items-center mb-6">
-                        <span class="material-symbols-rounded text-[6rem] text-red-500 mb-6">logout</span>
-                        <p class="text-gray-500 font-medium">未送出資料將不會保存</p>
-                    </div>
+                    <span class="material-symbols-rounded text-6xl text-red-400 mb-2">logout</span>
+                    <p class="text-slate-400 font-medium">未送出資料將不會保存</p>
 
                 </div>
 

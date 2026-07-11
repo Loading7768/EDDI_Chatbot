@@ -6,15 +6,12 @@
             <div class="login-wrapper">
 
                 <!-- Header -->
-                <div class="shrink-0 px-4 pt-4 pb-2">
-                    <div class="text-2xl font-medium text-gray-800 mb-6">請登入醫師帳號</div>
-                </div>
+                {{ card_header('請登入醫師帳號') }}
 
                 <!-- Body -->
                 <div class="flex-1 overflow-y-auto px-4">
 
-                    <span
-                        class="block text-center material-symbols-rounded text-[6rem] text-blue-500 mb-6">stethoscope</span>
+                    <span class="block text-center material-symbols-rounded text-6xl text-indigo-400 mb-6">stethoscope</span>
 
                     <div class="relative mb-4">
                         <input type="text" id="account" x-model="step.account"
@@ -35,35 +32,20 @@
                         </label>
                     </div>
 
-                    <div x-show="step.error" x-transition class="text-red-400 text-sm font-medium text-center"
-                        x-text="step.error"></div>
+                    <!-- <div x-show="step.error" x-transition class="text-red-400 text-sm font-medium text-center"
+                        x-text="step.error"></div> -->
 
                 </div>
 
                 <!-- Footer -->
-                <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
-                    <button @click="confirmLogin()"
-                            :disabled="step.currentStatus !== status.IDLE || !step.account || !step.password"
-                            class="
-                                text-blue-950 bg-blue-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
-                                active:scale-110 active:rounded-lg
-                                disabled:pointer-events-none"
-                            :class="[
-                                step.currentStatus === status.IDLE ? 'px-16' : 'px-4',
-                                !step.account || !step.password ? 'opacity-25' : '',
-                            ]">
-
-                        <span x-show="step.currentStatus === status.LOADING"
-                            class="animate-spin flex items-center material-symbols-rounded">
-                            progress_activity
-                        </span>
-                        <span x-show="step.currentStatus === status.SUCCESS"
-                            class="flex items-center material-symbols-rounded">
-                            check_circle
-                        </span>
-                        <span x-show="step.currentStatus === status.IDLE">登入</span>
-                    </button>
-                </div>
+                {{ footer_button(
+                    clickFunc='confirmLogin()',
+                    disableCond='step.currentStatus !== status.IDLE || !step.account || !step.password',
+                    disableStyleCond='!step.account || !step.password',
+                    textColor='text-blue-950',
+                    bgColor='bg-blue-400',
+                    label='登入'
+                ) }}
 
             </div>
         </template>
@@ -72,9 +54,7 @@
             <div class="logout-wrapper">
 
                 <!-- Header -->
-                <div class="shrink-0 px-4 pt-4 pb-2">
-                    <div class="text-2xl font-medium text-gray-800 mb-6">確認登出？</div>
-                </div>
+                {{ card_header('確認登出？') }}
 
                 <!-- Body -->
                 <div class="flex-1 overflow-y-auto px-4">
@@ -87,26 +67,14 @@
                 </div>
 
                 <!-- Footer -->
-                 <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
-                    <button @click="confirmLogout()"
-                            :disabled="step.currentStatus !== status.IDLE"
-                            class="
-                                text-red-950 bg-red-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
-                                active:scale-110 active:rounded-lg
-                                disabled:pointer-events-none"
-                            :class="step.currentStatus !== status.IDLE ? 'px-4' : 'px-16' ">
-
-                        <span x-show="step.currentStatus === status.LOADING"
-                            class="animate-spin flex items-center material-symbols-rounded">
-                            progress_activity
-                        </span>
-                        <span x-show="step.currentStatus === status.SUCCESS"
-                            class="flex items-center material-symbols-rounded">
-                            check_circle
-                        </span>
-                        <span x-show="step.currentStatus === status.IDLE">登出</span>
-                    </button>
-                </div>
+                {{ footer_button(
+                    clickFunc='confirmLogout()',
+                    disableCond='step.currentStatus !== status.IDLE',
+                    disableStyleCond='0',
+                    textColor='text-red-950',
+                    bgColor='bg-red-400',
+                    label='登出'
+                ) }}
 
             </div>
         </template>

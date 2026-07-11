@@ -3,9 +3,7 @@
     <div class="flex flex-col h-full">
 
         <!-- Header -->
-        <div class="px-4 pt-4 pb-2">
-            <div class="text-2xl font-medium text-gray-800 mb-2">請選擇要提供的衛教資料</div>
-        </div>
+        {{ card_header('請選擇要提供的衛教資料') }}
 
         <!-- Body: explicit max-height so overflow-y-auto actually triggers -->
         <div class="px-4 relative select-none pb-2 overflow-y-auto max-h-[50vh]"
@@ -117,24 +115,14 @@
         </div>
 
         <!-- Footer -->
-        <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
-            <button @click="confirmSymptoms()" :disabled="step.selectedSymptoms.length < 1"
-                    class="
-                        text-blue-950 bg-blue-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
-                        active:scale-110 active:rounded-lg
-                        disabled:cursor-not-allowed"
-                    :class="[
-                        step.currentStatus === status.IDLE ? 'px-16' : 'px-4',
-                        step.selectedSymptoms.length < 1 ? 'opacity-25' : ''
-                    ]">
-
-                <span x-show="step.currentStatus === status.SUCCESS"
-                    class="flex items-center material-symbols-rounded">
-                    check_circle
-                </span>
-                <span x-show="step.currentStatus === status.IDLE">選擇</span>
-            </button>
-        </div>
+        {{ footer_button(
+            clickFunc='confirmSymptoms()',
+            disableCond='step.currentStatus !== status.IDLE || step.selectedSymptoms.length < 1',
+            disableStyleCond='step.selectedSymptoms.length < 1',
+            textColor='text-blue-950',
+            bgColor='bg-blue-400',
+            label='選擇'
+        ) }}
 
     </div>
 </template>

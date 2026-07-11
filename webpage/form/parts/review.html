@@ -2,10 +2,7 @@
 <template x-if="i === currentStep">
     <div class="flex flex-col h-full">
 
-        <!-- Header -->
-        <div class="shrink-0 px-4 pt-4 pb-2">
-            <div class="text-2xl font-medium text-gray-800 mb-2">確認送出？</div>
-        </div>
+        <!-- NO Header -->
 
         <!-- Body -->
         <div class="px-4 pb-2">
@@ -34,20 +31,14 @@
         </div>
 
         <!-- Footer -->
-        <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
-            <button @click="submitForm()"
-                    class="
-                        text-amber-950 bg-amber-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
-                        active:scale-110 active:rounded-lg"
-                    :class="step.currentStatus === status.IDLE ? 'px-16' : 'px-4'">
-
-                <span x-show="step.currentStatus === status.LOADING"
-                      class="animate-spin flex items-center material-symbols-rounded">
-                    progress_activity
-                </span>
-                <span x-show="step.currentStatus === status.IDLE">確認送出</span>
-            </button>
-        </div>
+        {{ footer_button(
+            clickFunc='submitForm()',
+            disableCond='step.currentStatus !== status.IDLE',
+            disableStyleCond='0',
+            textColor='text-amber-950',
+            bgColor='bg-amber-400',
+            label='確認送出'
+        ) }}
 
     </div>
 </template>

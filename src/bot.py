@@ -501,28 +501,28 @@ def handle_message(event):
         user_name = user_profile.display_name
 
         # 1. 修改病患表單 (這是 app.py 原有的邏輯)
-        if user_message == '修改病患表單':
-            from form_handle import verification_codes, cleanup_expired_codes
+        if user_message == '綁定病患':
+            from form_handler import pairing_codes, cleanup_expired_codes
             import random
             import time
             
             cleanup_expired_codes()
-            for code, data in list(verification_codes.items()):
-                if data["user_id"] == user_id:
-                    del verification_codes[code]
+            for code, data in list(pairing_codes.items()):
+                if data["line_uuid"] == user_id:
+                    del pairing_codes[code]
                     break
             while True:
                 random_number = str(random.randint(100000, 999999))
-                if random_number not in verification_codes:
+                if random_number not in pairing_codes:
                     break
             expires_at = time.time() + 600
-            verification_codes[random_number] = {
-                "user_id": user_id,
-                "user_name": user_name,
+            pairing_codes[random_number] = {
+                "line_uuid": user_id,
+                "line_uname": user_name,
                 "expires_at": expires_at
             }
             formatted_expiry = datetime.fromtimestamp(expires_at, tz=tw_tz).strftime("%Y-%m-%d %H:%M:%S")
-            reply_text = f"您的驗證碼是：{random_number}\n此驗證碼將於 10 分鐘後失效（{formatted_expiry}）"
+            reply_text = f"您的配對碼是：{random_number}\n此配對碼將於 10 分鐘後失效（{formatted_expiry}）"
             
             line_bot_api.reply_message(
                 ReplyMessageRequest(

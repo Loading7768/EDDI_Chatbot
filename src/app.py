@@ -37,7 +37,7 @@ assets_dir = base_dir / "assets"
 app = Flask(__name__, template_folder=str(webpage_dir), static_folder=str(assets_dir), static_url_path='/assets')
 
 # 引入其他 .py 檔案的 Blueprint
-from form_handle import form_bp
+from form_handler import form_bp
 from admin_server import admin_bp
 
 # 註冊網頁路由 Blueprint

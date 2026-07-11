@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提交完成 — 衛教表單系統</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+
+    <style>
+        @keyframes pop-in {
+            0%   { transform: scale(0.4); opacity: 0; }
+            70%  { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1);   opacity: 1; }
+        }
+
+        @keyframes fade-up {
+            from { transform: translateY(12px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+
+        @keyframes ring-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50%       { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+        }
+
+        .icon-pop {
+            animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .ring-pulse {
+            animation: ring-pulse 2s ease-out infinite;
+        }
+
+        .text-fade {
+            opacity: 0;
+            animation: fade-up 0.4s ease-out 0.45s forwards;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-white font-sans min-h-screen flex items-center justify-center">
+
+    <div class="max-w-sm w-full mx-auto px-6 py-12 flex flex-col items-center text-center gap-8">
+
+        <!-- Animated checkmark -->
+        <div class="ring-pulse w-28 h-28 rounded-full bg-emerald-500/10 border-2 border-emerald-500/50 flex items-center justify-center">
+            <span class="material-symbols-outlined icon-pop text-emerald-400"
+                style="font-size: 4rem;">check_circle</span>
+        </div>
+
+        <!-- Message -->
+        <div class="text-fade flex flex-col gap-2">
+            <p class="text-slate-300 text-lg font-medium">
+                提交完成。您可以關閉此頁面
+            </p>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

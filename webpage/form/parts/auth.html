@@ -1,0 +1,125 @@
+<!--Current: expanded card-->
+<template x-if="i === currentStep">
+    <div class="flex flex-col h-full">
+
+        <template x-if="!step.authed">
+            <div class="login-wrapper">
+
+                <!-- Header -->
+                <div class="shrink-0 px-4 pt-4 pb-2">
+                    <div class="text-2xl font-medium text-gray-800 mb-6">請登入醫師帳號</div>
+                </div>
+
+                <!-- Body -->
+                <div class="flex-1 overflow-y-auto px-4">
+
+                    <span
+                        class="block text-center material-symbols-rounded text-[6rem] text-blue-500 mb-6">stethoscope</span>
+
+                    <div class="relative mb-4">
+                        <input type="text" id="account" x-model="step.account"
+                            class="block rounded-xl px-4 pt-6 pb-2 w-full text-white bg-slate-800 border border-slate-600 appearance-none focus:outline-none focus:ring-0 focus:border-indigo-500 peer"
+                            placeholder=" " />
+                        <label for="account"
+                            class="absolute text-slate-400 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] start-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 peer-focus:text-indigo-500">
+                            帳號
+                        </label>
+                    </div>
+                    <div class="relative mb-4">
+                        <input type="password" id="password" x-model="step.password"
+                            class="block rounded-xl px-4 pt-6 pb-2 w-full text-white bg-slate-800 border border-slate-600 appearance-none focus:outline-none focus:ring-0 focus:border-indigo-500 peer"
+                            placeholder=" " />
+                        <label for="password"
+                            class="absolute text-slate-400 duration-300 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] start-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 peer-focus:text-indigo-500">
+                            密碼
+                        </label>
+                    </div>
+
+                    <div x-show="step.error" x-transition class="text-red-400 text-sm font-medium text-center"
+                        x-text="step.error"></div>
+
+                </div>
+
+                <!-- Footer -->
+                <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
+                    <button @click="confirmLogin()"
+                            :disabled="step.currentStatus !== status.IDLE || !step.account || !step.password"
+                            class="
+                                text-blue-950 bg-blue-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
+                                active:scale-110 active:rounded-lg
+                                disabled:pointer-events-none"
+                            :class="[
+                                step.currentStatus === status.IDLE ? 'px-16' : 'px-4',
+                                !step.account || !step.password ? 'opacity-25' : '',
+                            ]">
+
+                        <span x-show="step.currentStatus === status.LOADING"
+                            class="animate-spin flex items-center material-symbols-rounded">
+                            progress_activity
+                        </span>
+                        <span x-show="step.currentStatus === status.SUCCESS"
+                            class="flex items-center material-symbols-rounded">
+                            check_circle
+                        </span>
+                        <span x-show="step.currentStatus === status.IDLE">登入</span>
+                    </button>
+                </div>
+
+            </div>
+        </template>
+
+        <template x-if="step.authed">
+            <div class="logout-wrapper">
+
+                <!-- Header -->
+                <div class="shrink-0 px-4 pt-4 pb-2">
+                    <div class="text-2xl font-medium text-gray-800 mb-6">確認登出？</div>
+                </div>
+
+                <!-- Body -->
+                <div class="flex-1 overflow-y-auto px-4">
+
+                    <div class="flex flex-col items-center mb-6">
+                        <span class="material-symbols-rounded text-[6rem] text-red-500 mb-6">logout</span>
+                        <p class="text-gray-500 font-medium">未送出資料將不會保存</p>
+                    </div>
+
+                </div>
+
+                <!-- Footer -->
+                 <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
+                    <button @click="confirmLogout()"
+                            :disabled="step.currentStatus !== status.IDLE"
+                            class="
+                                text-red-950 bg-red-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
+                                active:scale-110 active:rounded-lg
+                                disabled:pointer-events-none"
+                            :class="step.currentStatus !== status.IDLE ? 'px-4' : 'px-16' ">
+
+                        <span x-show="step.currentStatus === status.LOADING"
+                            class="animate-spin flex items-center material-symbols-rounded">
+                            progress_activity
+                        </span>
+                        <span x-show="step.currentStatus === status.SUCCESS"
+                            class="flex items-center material-symbols-rounded">
+                            check_circle
+                        </span>
+                        <span x-show="step.currentStatus === status.IDLE">登出</span>
+                    </button>
+                </div>
+
+            </div>
+        </template>
+
+    </div>
+</template>
+
+<!-- Completed: compact summary -->
+<template x-if="step.completed && i !== currentStep">
+    <div class="flex items-center gap-2">
+        <span class="material-symbols-rounded text-blue-200 text-[20px] shrink-0">stethoscope</span>
+        <div class="text-sm text-blue-50">
+            您好！<span class="font-bold" x-text="step.doctorName"></span> 醫師
+        </div>
+    </div>
+</template>

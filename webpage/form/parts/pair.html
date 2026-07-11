@@ -34,8 +34,7 @@
                 <!-- Footer -->
                 {{ footer_button(
                     clickFunc='confirmPair()',
-                    disableCond='step.currentStatus !== status.IDLE || step.paringCode.length < 6',
-                    disableStyleCond='step.paringCode.length < 6',
+                    disableCond='step.paringCode.length < 6',
                     textColor='text-blue-950',
                     bgColor='bg-blue-400',
                     label='配對'
@@ -182,13 +181,7 @@
                 <!-- Footer -->
                 {{ footer_button(
                     clickFunc='confirmPatient()',
-                    disableCond="step.currentStatus !== status.IDLE
-                        || !(step.selectedRelation
-                        && ((step.selectedRelation.type === 'self' && step.draftInputs.self.mrc.trim())
-                        || (step.selectedRelation.type === 'new' && step.draftInputs.new.relation.trim() && step.draftInputs.new.mrc.trim())
-                        || step.selectedRelation.type.startsWith('existing'))
-                    )",
-                    disableStyleCond="!(step.selectedRelation
+                    disableCond="!(step.selectedRelation
                         && ((step.selectedRelation.type === 'self' && step.draftInputs.self.mrc.trim())
                         || (step.selectedRelation.type === 'new' && step.draftInputs.new.relation.trim() && step.draftInputs.new.mrc.trim())
                         || step.selectedRelation.type.startsWith('existing'))

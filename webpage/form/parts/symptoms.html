@@ -117,8 +117,7 @@
         <!-- Footer -->
         {{ footer_button(
             clickFunc='confirmSymptoms()',
-            disableCond='step.currentStatus !== status.IDLE || step.selectedSymptoms.length < 1',
-            disableStyleCond='step.selectedSymptoms.length < 1',
+            disableCond='step.selectedSymptoms.length < 1',
             textColor='text-blue-950',
             bgColor='bg-blue-400',
             label='選擇'

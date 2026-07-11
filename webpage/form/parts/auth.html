@@ -40,8 +40,7 @@
                 <!-- Footer -->
                 {{ footer_button(
                     clickFunc='confirmLogin()',
-                    disableCond='step.currentStatus !== status.IDLE || !step.account || !step.password',
-                    disableStyleCond='!step.account || !step.password',
+                    disableCond='!step.account || !step.password',
                     textColor='text-blue-950',
                     bgColor='bg-blue-400',
                     label='登入'
@@ -69,8 +68,7 @@
                 <!-- Footer -->
                 {{ footer_button(
                     clickFunc='confirmLogout()',
-                    disableCond='step.currentStatus !== status.IDLE',
-                    disableStyleCond='0',
+                    disableCond='false',
                     textColor='text-red-950',
                     bgColor='bg-red-400',
                     label='登出'

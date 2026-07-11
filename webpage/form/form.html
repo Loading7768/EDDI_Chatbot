@@ -24,7 +24,7 @@
         {% set step_keys = ['auth', 'pair', 'symptoms', 'review'] %}
         {% for key in step_keys %}
         <div class="contents" 
-             x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] }, get status() { return this.steps[this.i].status } }">
+             x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] }}">
 
             <div class="flex items-start gap-3 shrink-0">
                 <!-- Node -->

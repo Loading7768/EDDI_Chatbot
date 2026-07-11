@@ -2,7 +2,10 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('formApp', () => ({
         currentStep: 0,
         prevStep: 0,
-        steps: initState(), // state.js
+
+        // state.js
+        steps: initSteps(),
+        STATUS,
 
         nextStep() {
             if (this.currentStep < this.steps.length) {
@@ -15,26 +18,19 @@ document.addEventListener('alpine:init', () => {
             this.currentStep = i;
         },
 
-        // Transition between steps
-        markCompleteAndAdvance(i) {
-            this.steps[i].completed = true;
-            this.steps[i].value = `(dummy ${this.steps[i].key} value)`;
-            this.nextStep();
-        },
-
         nodeClasses(i) {
             const step = this.steps[i];
 
             if (i === this.currentStep) {
-                return 'w-full max-h-[72vh] rounded-[2rem] bg-slate-900 p-4';
+                return 'w-full max-h-[72vh] p-4 rounded-[2rem] bg-slate-800';
             }
 
             if (step.completed) {
-                return 'inline-flex flex-col rounded-md bg-blue-700 text-white px-4 max-w-full';
+                return 'inline-flex flex-col rounded-md bg-blue-700 text-white p-4 max-w-full';
             }
 
             // incomplet
-            return 'w-10 h-10 rounded-[2rem] bg-gray-600';
+            return 'w-10 h-10 p-4 rounded-[2rem] bg-slate-900';
         },
 
         async delay(ms) {
@@ -45,9 +41,8 @@ document.addEventListener('alpine:init', () => {
         // ========== Auth Step ==========
         async confirmLogin() {
             const authStep = this.steps[0];
-            const status = authStep.status;
             authStep.error = null;
-            authStep.currentStatus = status.LOADING;
+            authStep.currentStatus = STATUS.LOADING;
 
             try {
                 const resp = await fetch('/api/form_login', {
@@ -65,7 +60,7 @@ document.addEventListener('alpine:init', () => {
                 if (!data.success) {
                     throw new Error(data.message);
                 }
-                authStep.currentStatus = status.SUCCESS;
+                authStep.currentStatus = STATUS.SUCCESS;
 
                 await this.delay(300);
                 authStep.account = '';
@@ -78,22 +73,21 @@ document.addEventListener('alpine:init', () => {
             } catch (err) {
                 authStep.error = err.message;
             }
-            authStep.currentStatus = status.IDLE;
+            authStep.currentStatus = STATUS.IDLE;
         },
 
         async confirmLogout() {
             const authStep = this.steps[0];
-            const status = authStep.status;
-            authStep.currentStatus = status.LOADING;
+            authStep.currentStatus = STATUS.LOADING;
 
             try {
                 await fetch('api/form_logout', { method: 'POST' });
             } catch (e) { }
 
             await this.delay(1000);
-            authStep.currentStatus = status.SUCCESS;
+            authStep.currentStatus = STATUS.SUCCESS;
             await this.delay(300);
-            this.steps = initState();
+            this.steps = initSteps();
         },
 
         cancelLogout() {
@@ -104,10 +98,9 @@ document.addEventListener('alpine:init', () => {
         // ========== Pair Step ==========
         async confirmPair() {
             const step = this.steps[1];
-            const status = step.status;
             if (step.paringCode.length < 6) return;
 
-            step.currentStatus = status.LOADING;
+            step.currentStatus = STATUS.LOADING;
             step.error = '';
 
             try {
@@ -123,7 +116,7 @@ document.addEventListener('alpine:init', () => {
                     throw new Error(data.message);
                 }
 
-                step.currentStatus = status.SUCCESS;
+                step.currentStatus = STATUS.SUCCESS;
                 await this.delay(300);
                 step.lineUname = data.line_uname;
                 step.lineUuid = data.line_uuid;
@@ -144,12 +137,11 @@ document.addEventListener('alpine:init', () => {
                 step.error = data.message;
                 step.paringCode = '';
             }
-            step.currentStatus = status.IDLE;
+            step.currentStatus = STATUS.IDLE;
         },
 
         async confirmPatient() {
             const step = this.steps[1];
-            const status = step.status;
             if (!step.selectedRelation) return;
             step.pairSelectError = '';
 
@@ -200,12 +192,12 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            step.currentStatus = status.SUCCESS;
+            step.currentStatus = STATUS.SUCCESS;
             await this.delay(300);
             step.value = `${text} (${step.selectedRelation.mrc})`;
             step.completed = true;
             this.nextStep();
-            step.currentStatus = status.IDLE;
+            step.currentStatus = STATUS.IDLE;
         },
 
 
@@ -269,7 +261,6 @@ document.addEventListener('alpine:init', () => {
 
         async confirmSymptoms() {
             const step = this.steps[2];
-            const status = step.status;
             const pairStep = this.steps[1];
             if (step.selectedSymptoms.length < 1) return;
 
@@ -289,12 +280,12 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    step.currentStatus = status.SUCCESS
+                    step.currentStatus = STATUS.SUCCESS
                     await this.delay(300);
                     step.value = step.selectedSymptoms.join(', ');
                     step.completed = true;
                     this.nextStep();
-                    step.currentStatus = status.IDLE;
+                    step.currentStatus = STATUS.IDLE;
                 }
             } catch (e) {
                 console.error('Error saving symptoms:', e);
@@ -306,10 +297,9 @@ document.addEventListener('alpine:init', () => {
         // ========== Review Step ==========
         async submitForm() {
             const step = this.steps[3];
-            const status = step.status;
             const pairStep = this.steps[1];
 
-            step.currentStatus = status.LOADING;
+            step.currentStatus = STATUS.LOADING;
             step.error = '';
 
             const selectedRelation = pairStep.selectedRelation;
@@ -333,14 +323,14 @@ document.addEventListener('alpine:init', () => {
                 }
                 if (data.redirect) {
                     window.location.href = data.redirect;
-                    this.steps = initState();
+                    this.steps = initSteps();
                     this.currentStep = 0;
                 }
             } catch (err) {
                 step.error = err.message;
             }
 
-            step.currentStatus = status.IDLE;
+            step.currentStatus = STATUS.IDLE;
         },
 
         init() {

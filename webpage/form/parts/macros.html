@@ -4,29 +4,29 @@
 </div>
 {% endmacro %}
 
-{% macro footer_button(clickFunc, disableCond, disableStyleCond, textColor, bgColor, label) %}
+{% macro footer_button(clickFunc, disableCond, textColor, bgColor, label) %}
 <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
     <button @click="{{ clickFunc }}"
-            :disabled="{{ disableCond }}"
+            :disabled="step.currentStatus !== STATUS.IDLE || {{ disableCond }}"
             class="
                 text-lg font-medium {{ textColor }} {{ bgColor }} h-12 transition-all duration-250 ease-spring
                 active:px-16 active:rounded-lg
                 disabled:pointer-events-none"
             :class="[
-                step.currentStatus === status.IDLE ? 'px-14' : 'px-3',
-                step.currentStatus === status.SUCCESS ? 'rounded-lg scale-110' : 'rounded-[2rem]',
-                {{ disableStyleCond }} ? 'opacity-25' : '',
+                step.currentStatus === STATUS.IDLE ? 'px-14' : 'px-3',
+                step.currentStatus === STATUS.SUCCESS ? 'rounded-lg scale-110' : 'rounded-[2rem]',
+                {{ disableCond }} ? 'opacity-25' : '',
             ]">
 
-        <span x-show="step.currentStatus === status.LOADING"
+        <span x-show="step.currentStatus === STATUS.LOADING"
             class="animate-spring flex items-center material-symbols-rounded">
             data_usage
         </span>
-        <span x-show="step.currentStatus === status.SUCCESS"
+        <span x-show="step.currentStatus === STATUS.SUCCESS"
             class="flex items-center material-symbols-rounded">
             check_circle
         </span>
-        <span x-show="step.currentStatus === status.IDLE">{{ label }}</span>
+        <span x-show="step.currentStatus === STATUS.IDLE">{{ label }}</span>
     </button>
 </div>
 {% endmacro %}

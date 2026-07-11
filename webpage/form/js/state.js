@@ -1,4 +1,4 @@
-const initState = () => ([
+const initSteps = () => ([
     // completed: tracks progress
     // mode:      control current state of the card
     // value:     holds input data
@@ -6,12 +6,7 @@ const initState = () => ([
         key: 'auth',
         completed: false,
         error: null,
-        status: Object.freeze({
-            IDLE: 'idel',
-            LOADING: 'loading',
-            SUCCESS: 'success',
-        }),
-        currentStatus: 'idel',
+        currentStatus: 'idle',
         btnType: 'logout',
 
         authed: false,
@@ -24,12 +19,7 @@ const initState = () => ([
         key: 'pair',
         completed: false,
         error: null,
-        status: Object.freeze({
-            IDLE: 'idel',
-            LOADING: 'loading',
-            SUCCESS: 'success',
-        }),
-        currentStatus: 'idel',
+        currentStatus: 'idle',
         btnType: 'edit',
         
         paired: false,
@@ -51,11 +41,7 @@ const initState = () => ([
         completed: false,
         error: null,
         btnType: 'edit',
-        status: Object.freeze({
-            IDLE: 'idel',
-            SUCCESS: 'success',
-        }),
-        currentStatus: 'idel',
+        currentStatus: 'idle',
 
         selectedSymptoms: [],
         sessionLoaded: false,
@@ -82,12 +68,14 @@ const initState = () => ([
         completed: false,
         error: null,
         btnType: null,
-        status: Object.freeze({
-            IDLE: 'idel',
-            LOADING: 'loading',
-        }),
-        currentStatus: 'idel',
+        currentStatus: 'idle',
     },
 ]);
+
+const STATUS = Object.freeze ({
+    IDLE: 'idle',
+    LOADING: 'loading',
+    SUCCESS: 'success',
+});
 
 console.log('steps.js loaded.');

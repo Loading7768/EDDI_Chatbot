@@ -62,6 +62,8 @@
   .btn:active  { transform: scale(.97); }
   .btn-primary { background: var(--primary); color: #fff; width: 100%; padding: 12px; }
   .btn-primary:hover { opacity: .9; }
+  .btn-blue    { background: var(--primary, #3b82f6); color: #fff; }
+  .btn-blue:hover { opacity: .9; }
   .btn-sm      { padding: 6px 14px; font-size: 13px; }
   .btn-xs      { padding: 4px 10px; font-size: 12px; }
   .btn-accent  { background: var(--accent); color: #fff; }
@@ -331,8 +333,15 @@
   .bubble-row { display: flex; margin-bottom: 10px; }
   .bubble-row.user      { justify-content: flex-end; }
   .bubble-row.assistant { justify-content: flex-start; }
+  .bubble-row > div {
+    max-width: 72%;
+    display: flex;
+    flex-direction: column;
+  }
+  .bubble-row.user > div      { align-items: flex-end; }
+  .bubble-row.assistant > div { align-items: flex-start; }
   .bubble {
-    max-width: 72%; padding: 10px 14px; border-radius: 16px;
+    padding: 10px 14px; border-radius: 16px;
     font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
   }
   .bubble-row.user .bubble {
@@ -408,7 +417,30 @@
   .save-status.fail { color: var(--danger); }
 
   /* ── DOCTORS ── */
+  #section-doctors {
+    max-width: 900px;
+    margin: 0 auto;
+  }
   .doctor-table-wrap { margin-top: 20px; overflow-x: auto; }
+  #doctor-table th {
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+  #doctor-table td {
+    font-size: 15px;
+    padding: 12px 16px;
+  }
+  #doctor-table code {
+    font-size: 14px;
+  }
+  #doctor-table .badge {
+    font-size: 12px;
+    padding: 3px 10px;
+  }
+  #doctor-table .btn-xs {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
   table { width: 100%; border-collapse: collapse; background: var(--card);
           border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
   th { background: var(--bg); font-size: 12px; font-weight: 700; color: var(--muted);
@@ -947,6 +979,7 @@
   .modal-backdrop-alert {
     backdrop-filter: blur(8px);
     background: rgba(15, 23, 42, 0.45) !important;
+    z-index: 600 !important;
   }
   .modal-alert {
     width: 440px;
@@ -978,6 +1011,10 @@
     background: #fef2f2;
     color: #ef4444;
   }
+  .modal-alert-icon-wrap.success {
+    background: #ecfdf5;
+    color: #10b981;
+  }
   .modal-alert-title {
     font-size: 18px;
     font-weight: 700;
@@ -1007,6 +1044,11 @@
     background-color: #fef2f2;
     border: 1px solid #fee2e2;
     color: #991b1b;
+  }
+  .modal-alert-banner.success {
+    background-color: #ecfdf5;
+    border: 1px solid #d1fae5;
+    color: #065f46;
   }
   .modal-alert-subtitle {
     color: #64748b;
@@ -1176,13 +1218,20 @@
           </div>
 
           <div class="chat-panel">
-            <div class="chat-panel-header">
+            <div class="chat-panel-header" style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <div class="chat-panel-title" id="chat-title">請選擇病患</div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <div class="chat-panel-title" id="chat-title">請選擇病患</div>
+                  <span id="chat-relation-badge" class="badge badge-relation" style="display: none; font-weight: 500;"></span>
+                  <span id="chat-return-badge" class="badge" style="display: none; background-color: #ef4444; color: white; font-weight: 500;">需回診</span>
+                </div>
                 <div class="chat-panel-sub"   id="chat-sub">點擊左側病患查看詳情</div>
               </div>
-              <div id="session-select-wrapper" style="display: none !important;">
-                <select id="session-select"></select>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <button id="btn-clear-return-visit" class="btn btn-danger btn-sm" onclick="confirmClearReturnVisit()" style="display: none; background-color: #ef4444; color: white; border: none; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;">已回診</button>
+                <div id="session-select-wrapper" style="display: none !important;">
+                  <select id="session-select"></select>
+                </div>
               </div>
             </div>
             <div class="chat-panel-body" id="chat-body">
@@ -1243,7 +1292,7 @@
                 <div class="chat-panel-sub"   id="form-edit-sub">點擊就診紀錄載入表單進行修改</div>
               </div>
               <div id="form-edit-save-btn-wrapper" style="display: none;">
-                <button class="btn btn-accent" onclick="saveFormEdit()">💾 儲存修改</button>
+                <button class="btn btn-accent" id="btn-save-form-edit" onclick="saveFormEdit()">💾 儲存修改</button>
               </div>
             </div>
             <div class="chat-panel-body" id="form-edit-body" style="position: relative;">
@@ -1269,7 +1318,10 @@
                             <div style="background-color: #e8f5e9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c8e6c9;">
                                 <span style="font-weight: bold; color: #666; font-size: 13px;">病患：</span>
                                 <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3;">
-                                    <span id="display-form-relation" style="font-weight: bold; font-size: 16px; color: #333;">-</span>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span id="display-form-relation" style="font-weight: bold; font-size: 16px; color: #333;">-</span>
+                                        <span id="display-form-return-badge" class="badge" style="display: none; background-color: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">需回診</span>
+                                    </div>
                                     <span id="display-form-mrn" style="font-size: 13px; color: #666;">-</span>
                                 </div>
                             </div>
@@ -1293,28 +1345,31 @@
 
                         <!-- Edit Mode Container (Vertical Form Layout, No LINE Account) -->
                         <div id="card-edit-mode" style="display: none; padding: 16px; flex-direction: column; gap: 12px;">
-                            <!-- Admin fields for Relation and MRN -->
+                            <!-- Relation field (Always visible to all doctors in edit mode) -->
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <label style="font-weight: bold; color: #666; font-size: 13px;">關係</label>
+                                <input type="text" id="edit-form-relation-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
+                            </div>
+                            
+                            <!-- Admin fields for MRN (Visible to admins only) -->
                             <div id="edit-form-admin-fields" style="display: none; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; flex-direction: column; gap: 4px;">
-                                    <label style="font-weight: bold; color: #666; font-size: 13px;">關係</label>
-                                    <input type="text" id="edit-form-relation-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
-                                </div>
                                 <div style="display: flex; flex-direction: column; gap: 4px;">
                                     <label style="font-weight: bold; color: #666; font-size: 13px;">病歷號</label>
                                     <input type="text" id="edit-form-mrn-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
+                                    <span id="edit-form-mrn-warning" style="color: var(--danger); font-size: 12px; font-weight: 500; display: none; margin-top: 4px; text-align: left;">⚠️ 此病歷號已存在於系統中，無法使用</span>
                                 </div>
                             </div>
                             
-                            <!-- 就診日期 (Full Width Datetime Picker) -->
+                            <!-- 就診日期 (Disabled / Read-only) -->
                             <div style="display: flex; flex-direction: column; gap: 4px;">
                                 <label style="font-weight: bold; color: #666; font-size: 13px;">就診日期</label>
-                                <input type="datetime-local" id="edit-form-date-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
+                                <input type="datetime-local" id="edit-form-date-input" disabled style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: #e2e8f0; color: #64748b; box-sizing: border-box; width: 100%;">
                             </div>
                             
-                            <!-- 醫師 (Full Width Select Dropdown) -->
+                            <!-- 醫師 (Disabled / Read-only) -->
                             <div id="edit-form-doctor-group" style="display: none; flex-direction: column; gap: 4px;">
                                 <label style="font-weight: bold; color: #666; font-size: 13px;">醫師</label>
-                                <select id="edit-form-doctor-select" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;"></select>
+                                <select id="edit-form-doctor-select" disabled style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: #e2e8f0; color: #64748b; box-sizing: border-box; width: 100%;"></select>
                             </div>
                         </div>
 
@@ -1392,7 +1447,10 @@
         <p style="font-size:13px;color:var(--muted);margin-top:6px;">
           可修改醫師姓名、啟用狀態，以及幫醫師重設密碼。
         </p>
-        <div style="margin-top: 14px; margin-bottom: 14px; display: flex; justify-content: flex-end;">
+        <div style="margin-top: 14px; margin-bottom: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="btn btn-blue btn-sm" onclick="openDepartmentModal()">
+            🏥 科別管理
+          </button>
           <button class="btn btn-accent btn-sm" onclick="openAddDoctorModal()">
             ➕ 新增醫師帳號
           </button>
@@ -1512,6 +1570,129 @@
   </div>
 </div>
 
+<!-- ── Modal：確認已回診 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-return-visit">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap success">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認已回診</div>
+    <div class="modal-alert-banner success">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">已回診後將清除該病患的「需回診」標記，按鈕與標籤亦會隨之隱藏。</div>
+    </div>
+    <div class="modal-alert-subtitle">確定要清除該病患的「需回診」狀態嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-return-visit')">取消</button>
+      <button class="btn btn-danger" onclick="executeClearReturnVisit()">確認已回診</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：修改科別名稱 ── -->
+<div class="modal-backdrop" id="modal-rename-department" style="z-index: 600;">
+  <div class="modal" style="max-width: 450px; width: 90%;">
+    <div class="modal-title">✏️ 修改科別名稱</div>
+    <input type="hidden" id="rename-dept-old-name">
+    <div class="form-group">
+      <label>原科別名稱</label>
+      <input type="text" id="rename-dept-old-name-show" disabled style="background:#f3f4f6;color:var(--muted)">
+    </div>
+    <div class="form-group">
+      <label>新科別名稱</label>
+      <input type="text" id="rename-dept-new-name" placeholder="輸入新名稱，如：小兒科">
+    </div>
+    <p class="error-msg" id="rename-dept-error" style="text-align:left"></p>
+    <div class="modal-actions">
+      <button class="btn btn-gray btn-sm" onclick="closeModal('modal-rename-department')">取消</button>
+      <button class="btn btn-accent btn-sm" onclick="executeRenameDepartment()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：確認停用或刪除科別 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-dept-action">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap warning" id="dept-action-icon-wrap">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title" id="dept-action-title">確認操作</div>
+    <div class="modal-alert-banner warning" id="dept-action-banner">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div id="dept-action-banner-text" style="font-weight: 600; font-size: 14px; line-height: 1.45;">-</div>
+    </div>
+    <div class="modal-alert-subtitle" id="dept-action-subtitle">確定要執行此操作嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-dept-action')">取消</button>
+      <button class="btn btn-danger" id="btn-dept-action-confirm" onclick="executeDeptAction()">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：錯誤提示 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-alert-error" style="z-index: 600;">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap danger">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">無法修改資料</div>
+    <div class="modal-alert-banner danger">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div id="error-alert-message" style="font-weight: 600; font-size: 14px; line-height: 1.45;">該病歷號已存在於系統中，無法修改為此號碼。</div>
+    </div>
+    <div class="modal-alert-subtitle">請確認輸入的資料正確且無重複後再重試。</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-alert-error')" style="flex: 1;">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：科別管理 ── -->
+<div class="modal-backdrop" id="modal-departments">
+  <div class="modal" style="max-width: 600px; width: 90%;">
+    <div class="modal-title">🏥 科別管理</div>
+    
+    <!-- 新增科別表單 -->
+    <div style="background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+      <input type="text" id="new-department-name" placeholder="輸入新科別名稱，如：急診科" style="padding: 8px 12px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; flex: 1; background: var(--bg, #fff); color: var(--text, #333);">
+      <button class="btn btn-accent btn-sm" onclick="addDepartment()" style="padding: 8px 16px; white-space: nowrap;">新增科別</button>
+    </div>
+    
+    <!-- 科別列表 -->
+    <div style="max-height: 300px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 8px;">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+        <thead>
+          <tr style="background: var(--bg); border-bottom: 1.5px solid var(--border); color: var(--text);">
+            <th style="padding: 10px 12px; font-weight: 600;">科別名稱</th>
+            <th style="padding: 10px 12px; font-weight: 600; width: 100px;">狀態</th>
+            <th style="padding: 10px 12px; font-weight: 600; width: 200px; text-align: right;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="department-tbody" style="color: var(--text);">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+    </div>
+    
+    <p class="error-msg" id="department-modal-error" style="text-align:left; margin-top: 10px;"></p>
+    <div class="modal-actions" style="margin-top: 16px;">
+      <button class="btn btn-gray btn-sm" onclick="closeDepartmentModal()">關閉</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal：確認套用 Prompt ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-apply-prompt">
   <div class="modal-alert">
@@ -1573,7 +1754,13 @@
     </div>
     <div class="form-group">
       <label>科別</label>
-      <input type="text" id="edit-doctor-specialty" placeholder="例如: 急診科">
+      <select id="edit-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'edit-doctor-specialty-custom-group', 'edit-doctor-specialty')">
+        <!-- Will be loaded dynamically -->
+      </select>
+    </div>
+    <div class="form-group" id="edit-doctor-specialty-custom-group" style="display: none;">
+      <label>自訂科別名稱</label>
+      <input type="text" id="edit-doctor-specialty" placeholder="例如: 骨科">
     </div>
     <div class="form-group">
       <label>新密碼（留空則不修改）</label>
@@ -1616,7 +1803,13 @@
       </div>
       <div class="form-group">
         <label>科別</label>
-        <input type="text" id="add-doctor-specialty" placeholder="例如: 急診科">
+        <select id="add-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'add-doctor-specialty-custom-group', 'add-doctor-specialty')">
+          <!-- Will be loaded dynamically -->
+        </select>
+      </div>
+      <div class="form-group" id="add-doctor-specialty-custom-group" style="display: none;">
+        <label>自訂科別名稱</label>
+        <input type="text" id="add-doctor-specialty" placeholder="例如: 骨科">
       </div>
       <div class="form-group">
         <label>狀態</label>
@@ -1670,6 +1863,12 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// Helper to parse date strings securely
+function parseDate(str) {
+  if (!str) return null;
+  return new Date(str.trim().replace(' ', 'T'));
+}
+
 // ── state ──
 const state = { isAdmin: false, currentMrn: null, formCurrentMrn: null, doctors: [], currentForms: [], currentSessions: [], allPatients: [], allFormPatients: [] };
 
@@ -1900,6 +2099,7 @@ function renderPatientList(patients) {
         <div class="patient-mrn">
           ${esc(p.medical_record_num)}
           ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
+          ${p.needs_return_visit ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
         </div>
         <div class="patient-meta">
           <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
@@ -1919,6 +2119,11 @@ async function loadDetail(mrn, el) {
   document.querySelectorAll('#patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
 
+  // Hide return visit and relation badges/buttons while loading
+  document.getElementById('chat-relation-badge').style.display = 'none';
+  document.getElementById('chat-return-badge').style.display = 'none';
+  document.getElementById('btn-clear-return-visit').style.display = 'none';
+
   document.getElementById('visit-list-body').innerHTML =
     '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
   document.getElementById('chat-body').innerHTML =
@@ -1937,6 +2142,26 @@ async function loadDetail(mrn, el) {
     
     state.currentSessions = d.sessions || [];
     state.currentForms = d.forms || [];
+    
+    // Update patient-level badges & buttons
+    const chatRelationBadge = document.getElementById('chat-relation-badge');
+    const chatReturnBadge = document.getElementById('chat-return-badge');
+    const btnClearReturnVisit = document.getElementById('btn-clear-return-visit');
+
+    if (d.patient.relation) {
+      chatRelationBadge.textContent = d.patient.relation;
+      chatRelationBadge.style.display = '';
+    } else {
+      chatRelationBadge.style.display = 'none';
+    }
+
+    if (d.patient.needs_return_visit) {
+      chatReturnBadge.style.display = '';
+      btnClearReturnVisit.style.display = '';
+    } else {
+      chatReturnBadge.style.display = 'none';
+      btnClearReturnVisit.style.display = 'none';
+    }
     
     renderVisits();
   } catch (err) {
@@ -1967,8 +2192,10 @@ function renderVisits() {
     const v_next = nextForm ? nextForm.checkout_date : null;
     
     const hasLogs = state.currentSessions.some(s => {
-      const sDate = s.start_time ? s.start_time.substring(0, 10) : '';
-      return sDate >= v_current && (!v_next || sDate < v_next);
+      const sTime = parseDate(s.start_time);
+      const vCurrent = parseDate(v_current);
+      const vNext = parseDate(v_next);
+      return sTime && vCurrent && sTime >= vCurrent && (!vNext || sTime < vNext);
     });
     
     return `
@@ -2003,8 +2230,10 @@ function selectVisit(checkoutDate, el) {
   const v_next = nextForm ? nextForm.checkout_date : null;
   
   const matchedSessions = state.currentSessions.filter(s => {
-    const sDate = s.start_time ? s.start_time.substring(0, 10) : '';
-    return sDate >= v_current && (!v_next || sDate < v_next);
+    const sTime = parseDate(s.start_time);
+    const vCurrent = parseDate(v_current);
+    const vNext = parseDate(v_next);
+    return sTime && vCurrent && sTime >= vCurrent && (!vNext || sTime < vNext);
   });
   
   matchedSessions.sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -2176,6 +2405,7 @@ function renderFormPatientList(patients) {
         <div class="patient-mrn">
           ${esc(p.medical_record_num)}
           ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
+          ${p.needs_return_visit ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
         </div>
         <div class="patient-meta">
           <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
@@ -2288,9 +2518,11 @@ function toggleCardEditMode() {
     if (cardViewMode) cardViewMode.style.display = 'none';
     if (cardEditMode) cardEditMode.style.display = 'flex';
     
+    // 任何醫師都可編輯關係
+    if (editRelationInput && displayRelation) editRelationInput.value = displayRelation.textContent.trim();
+    
     if (state.isAdmin) {
-      if (editAdminFields) editAdminFields.style.display = 'none';
-      if (editRelationInput && displayRelation) editRelationInput.value = displayRelation.textContent.trim();
+      if (editAdminFields) editAdminFields.style.display = 'flex';
       if (editMrnInput && displayMrn) editMrnInput.value = displayMrn.textContent.trim();
     } else {
       if (editAdminFields) editAdminFields.style.display = 'none';
@@ -2317,18 +2549,18 @@ function toggleCardEditMode() {
   } else {
     // Validate inputs
     let relationVal = displayRelation ? displayRelation.textContent.trim() : '本人';
-    let mrnVal = displayMrn ? displayMrn.textContent.trim() : '';
+    if (editRelationInput) relationVal = editRelationInput.value.trim();
+    if (!relationVal) {
+      alert('關係不能為空');
+      isEditingCard = true;
+      return;
+    }
     
+    let mrnVal = displayMrn ? displayMrn.textContent.trim() : '';
     if (state.isAdmin) {
-      if (editRelationInput) relationVal = editRelationInput.value.trim();
       if (editMrnInput) mrnVal = editMrnInput.value.trim();
       if (!mrnVal) {
         alert('病歷號不能為空');
-        isEditingCard = true;
-        return;
-      }
-      if (!relationVal) {
-        alert('關係不能為空');
         isEditingCard = true;
         return;
       }
@@ -2349,8 +2581,8 @@ function toggleCardEditMode() {
       dateVal = dateVal.substring(0, 16) + secondsPart + ".000";
     }
 
+    if (displayRelation) displayRelation.textContent = relationVal;
     if (state.isAdmin) {
-      if (displayRelation) displayRelation.textContent = relationVal;
       if (displayMrn) displayMrn.textContent = mrnVal;
     }
     
@@ -2378,6 +2610,9 @@ function toggleCardEditMode() {
       `;
     }
     if (btn) btn.style.backgroundColor = '#06C755';
+  }
+  if (typeof checkFormModified === 'function') {
+    checkFormModified();
   }
 }
 
@@ -2410,6 +2645,9 @@ async function selectFormVisit(idx, el) {
   // Reset edit button style and icon to pencil
   const btnEditCard = document.getElementById('btn-edit-card');
   if (btnEditCard) {
+    btnEditCard.disabled = false;
+    btnEditCard.style.opacity = '1';
+    btnEditCard.style.cursor = 'pointer';
     btnEditCard.style.backgroundColor = '#06C755';
     const icon = document.getElementById('edit-card-icon');
     if (icon) {
@@ -2420,6 +2658,9 @@ async function selectFormVisit(idx, el) {
     }
   }
   
+  const warningEl = document.getElementById('edit-form-mrn-warning');
+  if (warningEl) warningEl.style.display = 'none';
+  
   document.getElementById('form-edit-error').textContent = '';
 
   // Populate values
@@ -2429,10 +2670,19 @@ async function selectFormVisit(idx, el) {
   const displayRelation = document.getElementById('display-form-relation');
   const displayMrn = document.getElementById('display-form-mrn');
   const displayDate = document.getElementById('display-form-date');
+  const displayFormReturnBadge = document.getElementById('display-form-return-badge');
   
   if (displayRelation) displayRelation.textContent = relationText;
   if (displayMrn) displayMrn.textContent = mrn;
   if (displayDate) displayDate.textContent = f.checkout_date;
+
+  if (displayFormReturnBadge) {
+    if (patientObj && patientObj.needs_return_visit) {
+      displayFormReturnBadge.style.display = '';
+    } else {
+      displayFormReturnBadge.style.display = 'none';
+    }
+  }
   
   const editRelationInput = document.getElementById('edit-form-relation-input');
   const editMrnInput = document.getElementById('edit-form-mrn-input');
@@ -2504,8 +2754,8 @@ async function saveFormEdit() {
   const payload = { checkout_date: displayDate, symptoms };
   if (state.isAdmin) {
     payload.medical_record_num = displayMrn;
-    payload.relation = displayRelation;
   }
+  payload.relation = displayRelation;
   if (doctor) payload.doctor_account = doctor;
 
   const res = await api('PUT', `/api/forms/${encodeURIComponent(mrn)}/${encodeURIComponent(origDate)}`, payload);
@@ -2530,7 +2780,16 @@ async function saveFormEdit() {
       loadDetail(targetMrn, null);
     }
   } else {
+    document.getElementById('error-alert-message').textContent = res.error || '儲存失敗';
+    openModal('modal-alert-error');
     errEl.textContent = res.error || '儲存失敗';
+    
+    // Revert form content to original state
+    const idx = state.currentForms.findIndex(form => form.checkout_date === origDate);
+    if (idx !== -1) {
+      const activeEl = document.querySelector('#form-visit-list-body .visit-item.active');
+      selectFormVisit(idx, activeEl);
+    }
   }
 }
 
@@ -2582,11 +2841,16 @@ function openDoctorEditModal(account, name, isActive, isAdmin, specialty) {
   document.getElementById('edit-doctor-account').value       = account;
   document.getElementById('edit-doctor-account-show').value  = account;
   document.getElementById('edit-doctor-name').value          = name;
-  document.getElementById('edit-doctor-specialty').value     = specialty || '';
   document.getElementById('edit-doctor-pw').value            = '';
   document.getElementById('edit-doctor-active').value        = String(isActive);
   document.getElementById('edit-doctor-admin').value         = String(isAdmin);
   document.getElementById('doctor-modal-error').textContent  = '';
+  populateSpecialtySelect(
+    'edit-doctor-specialty-select',
+    'edit-doctor-specialty-custom-group',
+    'edit-doctor-specialty',
+    specialty || ''
+  );
   openModal('modal-doctor');
 }
 
@@ -2619,7 +2883,6 @@ async function saveDoctorEdit() {
 function openAddDoctorModal() {
   document.getElementById('add-doctor-account').value = '';
   document.getElementById('add-doctor-name').value = '';
-  document.getElementById('add-doctor-specialty').value = '';
   document.getElementById('add-doctor-active').value = '1';
   document.getElementById('add-doctor-admin').value = '0';
   document.getElementById('add-doctor-modal-error').textContent = '';
@@ -2627,6 +2890,12 @@ function openAddDoctorModal() {
   document.getElementById('add-doctor-form-container').style.display = 'block';
   document.getElementById('add-doctor-success-container').style.display = 'none';
   
+  populateSpecialtySelect(
+    'add-doctor-specialty-select',
+    'add-doctor-specialty-custom-group',
+    'add-doctor-specialty',
+    ''
+  );
   openModal('modal-add-doctor');
 }
 
@@ -3177,6 +3446,10 @@ function renderConfirmedChips(forceClean = false) {
   } else {
     emptyMsg.style.display = 'none';
   }
+  
+  if (typeof checkFormModified === 'function') {
+    checkFormModified();
+  }
 }
 
 function createChipElement(topic, isActive) {
@@ -3213,6 +3486,437 @@ function createChipElement(topic, isActive) {
   
   return div;
 }
+// ── 已回診與科別管理 ──
+let pendingDeptName = '';
+let pendingDeptAction = ''; // 'disable', 'enable', 'delete'
+
+function confirmClearReturnVisit() {
+  openModal('modal-confirm-return-visit');
+}
+
+async function executeClearReturnVisit() {
+  const mrn = state.currentMrn;
+  if (!mrn) return;
+  
+  try {
+    const res = await api('POST', `/api/patients/${encodeURIComponent(mrn)}/clear_return_visit`);
+    if (res.success) {
+      closeModal('modal-confirm-return-visit');
+      showToast('✅ 已清除回診狀態', 'ok');
+      
+      // Instantly clear patient badges in client side
+      document.getElementById('chat-return-badge').style.display = 'none';
+      document.getElementById('btn-clear-return-visit').style.display = 'none';
+      
+      if (state.allPatients) {
+        const p = state.allPatients.find(x => x.medical_record_num === mrn);
+        if (p) p.needs_return_visit = false;
+      }
+      if (state.allFormPatients) {
+        const p = state.allFormPatients.find(x => x.medical_record_num === mrn);
+        if (p) p.needs_return_visit = false;
+      }
+      
+      const displayFormReturnBadge = document.getElementById('display-form-return-badge');
+      if (displayFormReturnBadge && state.formCurrentMrn === mrn) {
+        displayFormReturnBadge.style.display = 'none';
+      }
+      
+      const sortCriteria = document.getElementById('patient-sort-select')?.value || 'checkout_desc';
+      sortAndRenderPatients(sortCriteria);
+      const formSortCriteria = document.getElementById('form-patient-sort-select')?.value || 'checkout_desc';
+      sortAndRenderFormPatients(formSortCriteria);
+    } else {
+      alert(res.error || '清除失敗');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('連線失敗: ' + err);
+  }
+}
+
+async function populateSpecialtySelect(selectId, customGroupId, inputId, selectedValue) {
+  const selectEl = document.getElementById(selectId);
+  const customGroup = document.getElementById(customGroupId);
+  const inputEl = document.getElementById(inputId);
+  
+  selectEl.innerHTML = '<option value="">載入中…</option>';
+  
+  try {
+    const deps = await api('GET', '/api/departments');
+    selectEl.innerHTML = '';
+    
+    // Filter active ones
+    const activeDeps = deps.filter(d => d.is_active);
+    
+    // If selectedValue is not in active list but was specified, append it to option list
+    const hasSelected = activeDeps.some(d => d.name === selectedValue);
+    
+    activeDeps.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.name;
+      opt.textContent = d.name;
+      selectEl.appendChild(opt);
+    });
+    
+    if (selectedValue && !hasSelected && selectedValue !== '__custom__') {
+      const opt = document.createElement('option');
+      opt.value = selectedValue;
+      opt.textContent = selectedValue;
+      selectEl.appendChild(opt);
+    }
+    
+    // Add custom option
+    const customOpt = document.createElement('option');
+    customOpt.value = '__custom__';
+    customOpt.textContent = '➕ 新增其他科別';
+    selectEl.appendChild(customOpt);
+    
+    if (selectedValue) {
+      const matched = deps.some(d => d.name === selectedValue);
+      if (matched) {
+        selectEl.value = selectedValue;
+        customGroup.style.display = 'none';
+        inputEl.value = selectedValue;
+      } else {
+        selectEl.value = '__custom__';
+        customGroup.style.display = 'block';
+        inputEl.value = selectedValue;
+      }
+    } else {
+      if (activeDeps.length > 0) {
+        selectEl.value = activeDeps[0].name;
+        customGroup.style.display = 'none';
+        inputEl.value = activeDeps[0].name;
+      } else {
+        selectEl.value = '__custom__';
+        customGroup.style.display = 'block';
+        inputEl.value = '';
+      }
+    }
+  } catch (err) {
+    console.error('Failed to populate departments', err);
+    selectEl.innerHTML = '<option value="__custom__">➕ 新增其他科別</option>';
+    selectEl.value = '__custom__';
+    customGroup.style.display = 'block';
+    inputEl.value = selectedValue || '';
+  }
+}
+
+function handleSpecialtySelectChange(selectEl, customGroupId, inputId) {
+  const customGroup = document.getElementById(customGroupId);
+  const inputEl = document.getElementById(inputId);
+  if (selectEl.value === '__custom__') {
+    customGroup.style.display = 'block';
+    inputEl.value = '';
+    inputEl.focus();
+  } else {
+    customGroup.style.display = 'none';
+    inputEl.value = selectEl.value;
+  }
+}
+
+function openDepartmentModal() {
+  document.getElementById('new-department-name').value = '';
+  document.getElementById('department-modal-error').textContent = '';
+  openModal('modal-departments');
+  loadDepartmentsList();
+}
+
+function closeDepartmentModal() {
+  closeModal('modal-departments');
+}
+
+async function loadDepartmentsList() {
+  const tbody = document.getElementById('department-tbody');
+  const errEl = document.getElementById('department-modal-error');
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;"><div class="spinner-dark"></div></td></tr>';
+  errEl.textContent = '';
+  
+  try {
+    const list = await api('GET', '/api/departments');
+    if (list.error) {
+      errEl.textContent = list.error;
+      tbody.innerHTML = '';
+      return;
+    }
+    
+    tbody.innerHTML = list.map(d => {
+      const activeBadge = d.is_active 
+        ? '<span class="badge badge-green">啟用中</span>' 
+        : '<span class="badge badge-gray">已停用</span>';
+      
+      let actionLabel = '';
+      let actionType = '';
+      let actionClass = '';
+      
+      if (d.is_used) {
+        if (d.is_active) {
+          actionLabel = '⏸️ 停用';
+          actionType = 'disable';
+          actionClass = 'btn-warn';
+        } else {
+          actionLabel = '▶️ 啟用';
+          actionType = 'enable';
+          actionClass = 'btn-accent';
+        }
+      } else {
+        actionLabel = '🗑️ 刪除';
+        actionType = 'delete';
+        actionClass = 'btn-danger';
+      }
+      
+      return `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 10px 12px; font-weight: 500;">${esc(d.name)}</td>
+          <td style="padding: 10px 12px;">${activeBadge}</td>
+          <td style="padding: 10px 12px; text-align: right; display: flex; gap: 6px; justify-content: flex-end;">
+            <button class="btn btn-gray btn-xs" onclick="openRenameDeptModal('${esc(d.name)}')" style="display: inline-flex; align-items: center; gap: 4px;">
+              ✏️ 修改
+            </button>
+            <button class="btn ${actionClass} btn-xs" onclick="confirmDeptAction('${esc(d.name)}', '${actionType}', ${d.is_used})" style="display: inline-flex; align-items: center; gap: 4px;">
+              ${actionLabel}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error(err);
+    errEl.textContent = '載入科別清單失敗';
+    tbody.innerHTML = '';
+  }
+}
+
+async function addDepartment() {
+  const inputEl = document.getElementById('new-department-name');
+  const name = inputEl.value.trim();
+  const errEl = document.getElementById('department-modal-error');
+  errEl.textContent = '';
+  
+  if (!name) {
+    errEl.textContent = '科別名稱不可為空';
+    return;
+  }
+  
+  try {
+    const res = await api('POST', '/api/departments', { name });
+    if (res.error) {
+      errEl.textContent = res.error;
+    } else {
+      inputEl.value = '';
+      showToast(res.message || '✅ 新增成功', 'ok');
+      loadDepartmentsList();
+    }
+  } catch (err) {
+    errEl.textContent = '連線失敗: ' + err;
+  }
+}
+
+function openRenameDeptModal(oldName) {
+  document.getElementById('rename-dept-old-name').value = oldName;
+  document.getElementById('rename-dept-old-name-show').value = oldName;
+  document.getElementById('rename-dept-new-name').value = oldName;
+  document.getElementById('rename-dept-error').textContent = '';
+  openModal('modal-rename-department');
+}
+
+async function executeRenameDepartment() {
+  const oldName = document.getElementById('rename-dept-old-name').value;
+  const newName = document.getElementById('rename-dept-new-name').value.trim();
+  const errEl = document.getElementById('rename-dept-error');
+  errEl.textContent = '';
+  
+  if (!newName) {
+    errEl.textContent = '科別名稱不可為空';
+    return;
+  }
+  if (newName === oldName) {
+    closeModal('modal-rename-department');
+    return;
+  }
+  
+  try {
+    const res = await api('PUT', `/api/departments/${encodeURIComponent(oldName)}`, { name: newName });
+    if (res.error) {
+      errEl.textContent = res.error;
+    } else {
+      closeModal('modal-rename-department');
+      showToast('✅ 科別已成功改名', 'ok');
+      loadDepartmentsList();
+      if (typeof loadDoctors === 'function') {
+        loadDoctors();
+      }
+    }
+  } catch (err) {
+    errEl.textContent = '連線失敗: ' + err;
+  }
+}
+
+function confirmDeptAction(name, action, isUsed) {
+  pendingDeptName = name;
+  pendingDeptAction = action;
+  
+  const titleEl = document.getElementById('dept-action-title');
+  const bannerTextEl = document.getElementById('dept-action-banner-text');
+  const subtitleEl = document.getElementById('dept-action-subtitle');
+  const confirmBtnEl = document.getElementById('btn-dept-action-confirm');
+  const iconWrapEl = document.getElementById('dept-action-icon-wrap');
+  const bannerEl = document.getElementById('dept-action-banner');
+  
+  // Clean up previous classes
+  iconWrapEl.className = 'modal-alert-icon-wrap';
+  bannerEl.className = 'modal-alert-banner';
+  
+  if (action === 'delete') {
+    titleEl.textContent = '確認刪除科別';
+    iconWrapEl.classList.add('danger');
+    bannerEl.classList.add('danger');
+    bannerTextEl.textContent = `科別「${name}」將會被完全從系統中刪除。`;
+    subtitleEl.textContent = `確定要刪除「${name}」科別嗎？此操作不可逆！`;
+    confirmBtnEl.textContent = '確認刪除';
+    confirmBtnEl.className = 'btn btn-danger';
+  } else if (action === 'disable') {
+    titleEl.textContent = '確認停用科別';
+    iconWrapEl.classList.add('warning');
+    bannerEl.classList.add('warning');
+    bannerTextEl.textContent = `科別「${name}」目前已有關聯醫師，系統無法刪除，將變更為「已停用」狀態。`;
+    subtitleEl.textContent = `確定要停用「${name}」科別嗎？`;
+    confirmBtnEl.textContent = '確認停用';
+    confirmBtnEl.className = 'btn btn-warn';
+  } else if (action === 'enable') {
+    titleEl.textContent = '確認啟用科別';
+    iconWrapEl.classList.add('success');
+    bannerEl.classList.add('success');
+    bannerTextEl.textContent = `科別「${name}」將會重新啟用，並可供新增或修改醫師時選擇。`;
+    subtitleEl.textContent = `確定要啟用「${name}」科別嗎？`;
+    confirmBtnEl.textContent = '確認啟用';
+    confirmBtnEl.className = 'btn btn-accent';
+  }
+  
+  openModal('modal-confirm-dept-action');
+}
+
+async function executeDeptAction() {
+  const name = pendingDeptName;
+  const action = pendingDeptAction;
+  if (!name || !action) return;
+  
+  closeModal('modal-confirm-dept-action');
+  
+  const errEl = document.getElementById('department-modal-error');
+  errEl.textContent = '';
+  
+  try {
+    let res;
+    if (action === 'delete') {
+      res = await api('DELETE', `/api/departments/${encodeURIComponent(name)}`);
+    } else if (action === 'disable') {
+      res = await api('PUT', `/api/departments/${encodeURIComponent(name)}`, { is_active: false });
+    } else if (action === 'enable') {
+      res = await api('PUT', `/api/departments/${encodeURIComponent(name)}`, { is_active: true });
+    }
+    
+    if (res.error) {
+      alert(res.error);
+    } else {
+      if (action === 'delete') {
+        showToast(res.message || '✅ 刪除成功', 'ok');
+      } else {
+        showToast(`✅ 已${action === 'enable' ? '啟用' : '停用'}科別`, 'ok');
+      }
+      loadDepartmentsList();
+    }
+  } catch (err) {
+    alert('連線失敗: ' + err);
+  }
+}
+
+// ── 修改表單儲存按鈕狀態檢查 ──
+function checkFormModified() {
+  const saveBtn = document.getElementById('btn-save-form-edit');
+  if (!saveBtn) return;
+  
+  const mrn = document.getElementById('edit-form-mrn').value;
+  const origDate = document.getElementById('edit-form-orig-date').value;
+  if (!mrn || !origDate) {
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = '0.5';
+    saveBtn.style.cursor = 'not-allowed';
+    return;
+  }
+  
+  const f = state.currentForms.find(form => form.checkout_date === origDate);
+  if (!f) return;
+  
+  const origMrn = mrn;
+  const patientObj = state.allFormPatients.find(p => p.medical_record_num === origMrn);
+  const origRelation = patientObj ? (patientObj.relation || '本人') : '本人';
+  const origSymptoms = f.symptoms || [];
+  
+  const editRelationInput = document.getElementById('edit-form-relation-input');
+  const editMrnInput = document.getElementById('edit-form-mrn-input');
+  
+  let currentRelation = origRelation;
+  let currentMrn = origMrn;
+  
+  if (isEditingCard) {
+    if (editRelationInput) currentRelation = editRelationInput.value.trim();
+    if (state.isAdmin && editMrnInput) currentMrn = editMrnInput.value.trim();
+  } else {
+    const displayRelation = document.getElementById('display-form-relation');
+    const displayMrn = document.getElementById('display-form-mrn');
+    if (displayRelation) currentRelation = displayRelation.textContent.trim();
+    if (displayMrn) currentMrn = displayMrn.textContent.trim();
+  }
+  
+  const currentSymptoms = Array.from(selectedTopics);
+  
+  let symptomsModified = false;
+  if (currentSymptoms.length !== origSymptoms.length) {
+    symptomsModified = true;
+  } else {
+    symptomsModified = currentSymptoms.some(s => !origSymptoms.includes(s));
+  }
+  
+  const mrnModified = (currentMrn !== origMrn);
+  const relationModified = (currentRelation !== origRelation);
+  
+  const isModified = mrnModified || relationModified || symptomsModified;
+  
+  if (isModified) {
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = '1';
+    saveBtn.style.cursor = 'pointer';
+  } else {
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = '0.5';
+    saveBtn.style.cursor = 'not-allowed';
+  }
+}
+
+// Register listeners during page script loading
+document.getElementById('edit-form-relation-input').addEventListener('input', checkFormModified);
+document.getElementById('edit-form-mrn-input').addEventListener('input', function() {
+  const enteredMrn = this.value.trim();
+  const originalMrn = document.getElementById('edit-form-mrn').value;
+  const warningEl = document.getElementById('edit-form-mrn-warning');
+  const btnEditCard = document.getElementById('btn-edit-card');
+  
+  if (enteredMrn !== originalMrn && state.allFormPatients && state.allFormPatients.some(p => p.medical_record_num === enteredMrn)) {
+    warningEl.style.display = 'block';
+    btnEditCard.disabled = true;
+    btnEditCard.style.opacity = '0.5';
+    btnEditCard.style.cursor = 'not-allowed';
+  } else {
+    warningEl.style.display = 'none';
+    btnEditCard.disabled = false;
+    btnEditCard.style.opacity = '1';
+    btnEditCard.style.cursor = 'pointer';
+  }
+  checkFormModified();
+});
+
 
 // ── utils ──
 function esc(s) {

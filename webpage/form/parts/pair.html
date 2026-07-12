@@ -9,10 +9,10 @@
                 {{ card_header('請配對LINE帳號') }}
 
                 <!-- Body -->
-                <div class="flex-1 overflow-y-auto px-4 flex flex-col justify-center items-center w-full mb-6">
+                <div class="flex-1 overflow-y-auto px-4 flex flex-col justify-center items-center w-full my-12">
                     <div class="space-y-6 w-full">
                         <p class="text-slate-400 text-center font-medium">請輸入6位配對碼</p>
-                        <div class="relative flex justify-between w-full px-2 mb-6" dir="ltr"
+                        <div class="relative flex justify-between w-full px-2" dir="ltr"
                             @click="$refs.pairInput.focus()">
                             <input x-ref="pairInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
                                 x-model="step.paringCode"
@@ -73,22 +73,22 @@
                             <div class="flex flex-col text-right">
                                 <template
                                     x-if="step.selectedRelation && (step.selectedRelation.relation || step.selectedRelation.type === 'self')">
-                                    <span class="font-bold text-gray-800 text-sm"
+                                    <span class="font-bold text-amber-400 text-sm"
                                         x-text="step.selectedRelation.type === 'self' ? '帳號本人' : step.selectedRelation.relation || '新增'"></span>
                                 </template>
                                 <template
                                     x-if="!(step.selectedRelation && (step.selectedRelation.relation || step.selectedRelation.type === 'self'))">
-                                    <span class="font-bold text-gray-400 text-sm">???</span>
+                                    <span class="font-bold text-amber-400 text-sm">???</span>
                                 </template>
                                 <template x-if="step.selectedRelation && step.selectedRelation.mrc">
-                                    <span class="text-xs text-gray-500" x-text="step.selectedRelation.mrc"></span>
+                                    <span class="text-xs text-amber-400" x-text="step.selectedRelation.mrc"></span>
                                 </template>
                                 <template x-if="!(step.selectedRelation && step.selectedRelation.mrc)">
-                                    <span class="text-xs text-gray-400">???</span>
+                                    <span class="text-xs text-slate-400">???</span>
                                 </template>
                             </div>
                             <span
-                                class="material-symbols-rounded text-[24px] text-slate-400 shrink-0">account_circle</span>
+                                class="material-symbols-rounded text-[24px] text-amber-400 shrink-0">account_circle</span>
                         </div>
                     </div>
 
@@ -199,12 +199,11 @@
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-center gap-2">
-        <span class="material-symbols-rounded text-blue-400 text-[20px] shrink-0">account_circle</span>
-        <div class="text-sm text-blue-50">
-            <span class="font-bold"
-                x-text="step.selectedRelation?.type === 'self' ? '帳號本人' : step.selectedRelation?.relation"></span>
-            <span x-text="` ${step.selectedRelation?.mrc}`" class="text-blue-200"></span>
+    <div class="flex items-center gap-4">
+        <span class="material-symbols-rounded text-blue-400">account_circle</span>
+        <div class="font-medium text-blue-400 gap-2">
+            <span class="text-amber-400" x-text="step.selectedRelation?.type === 'self' ? '帳號本人' : step.selectedRelation?.relation"></span>
+            <span x-text="` ${step.selectedRelation?.mrc}`"></span>
         </div>
     </div>
 </template>

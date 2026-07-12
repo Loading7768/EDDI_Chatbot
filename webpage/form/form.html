@@ -19,16 +19,16 @@
 
 <body class="bg-slate-950 min-h-screen">
 
-    <div x-data="formApp()" class="max-w-sm mx-auto py-10 px-4 min-h-screen flex flex-col justify-center">
+    <div x-data="formApp()" class="max-w-sm mx-auto p-4 min-h-screen flex flex-col justify-center">
         {% from 'form/parts/macros.html' import card_header, footer_button %}
         {% set step_keys = ['auth', 'pair', 'symptoms', 'review'] %}
         {% for key in step_keys %}
         <div class="contents" 
              x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] }}">
 
-            <div class="flex items-start gap-3 shrink-0">
+            <div class="flex items-stretch gap-1 shrink-0">
                 <!-- Node -->
-                <div class="transition-all duration-300 ease-spring overflow-hidden" :class="nodeClasses(i)">
+                <div class="transition-all duration-700 ease-spring overflow-hidden" :class="nodeClasses(i)">
 
                     <!-- Incomplete: gery circle, empty -->
                     <template x-if="i !== currentStep && !step.completed">
@@ -43,20 +43,31 @@
                 </div>
 
                 <!-- Sibling button: for some completed nodes -->
-                <button x-show="step.completed && i !== currentStep && step.btnType" @click="jumpTo(i)"
-                    class="p-1.5 rounded-full my-auto text-white flex items-center justify-center"
-                    :class="step.btnType === 'logout' ? 'bg-red-500' : 'bg-blue-500'">
-                    <span class="material-symbols-rounded text-[18px]"
-                        x-text="step.btnType === 'logout' ? 'logout' : 'edit'"></span>
+                <button x-show="step.completed && i !== currentStep"
+                        x-data="{ edit: false }"
+                        @click="edit = true; jumpTo(i);"
+                        class="px-4 rounded-s-lg rounded-e-[2rem] transition-all duration-200 ease-spring
+                            active:rounded-s-[2rem] active:px-6"
+                        :class="{
+                            'text-red-400 bg-red-950': step.key === 'auth',
+                            'text-blue-400 bg-blue-950': step.key !== 'auth',
+                            'rounded-s-[2rem]': edit
+                            }">
+
+                    <span class="flex items-center material-symbols-rounded"
+                          x-text="step.key === 'auth' ? 'logout' : 'edit'"></span>
                 </button>
             </div>
 
             <!-- Node links -->
-            <div x-show="i < steps.length - 1" class="w-px ml-5 transition-colors duration-300" :class="{
-                        'h-[8px]': currentStep === 3,
-                        'max-h-[32px] flex-1': currentStep !== 3,
-                        'bg-indigo-400': step.completed,
-                        'bg-slate-900': !step.completed}"></div>
+            <div x-show="i < steps.length - 1" class="w-1 ml-[38px] transition-all delay-200 duration-200 ease-in-out"
+                 :class="{
+                    'h-[4px]': currentStep === 3,
+                    'max-h-[12px] flex-1': currentStep !== 3,
+                    'bg-blue-900': step.completed,
+                    'bg-slate-900': !step.completed
+                }">
+            </div>
 
         </div>
         {% endfor %}

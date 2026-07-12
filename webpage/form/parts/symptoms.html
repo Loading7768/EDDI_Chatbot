@@ -128,13 +128,13 @@
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-start gap-2">
-        <span class="material-symbols-rounded text-blue-400 text-[20px] shrink-0 mt-0.5">sick</span>
+    <div class="flex items-center gap-4">
+        <span class="material-symbols-rounded text-blue-400">sick</span>
         <div class="flex flex-wrap gap-1">
             <template x-for="topic in step.selectedSymptoms" :key="topic">
-                <span
-                    class="text-xs font-medium bg-blue-400/20 text-blue-100 border border-blue-300/30 rounded-full px-2 py-0.5"
-                    x-text="topic"></span>
+                <span class="text-sm font-medium bg-amber-400 text-amber-950 rounded-lg px-2 py-0.5"
+                      x-text="topic">
+                </span>
             </template>
         </div>
     </div>

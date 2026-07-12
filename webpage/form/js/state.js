@@ -7,7 +7,6 @@ const initSteps = () => ([
         completed: false,
         error: null,
         currentStatus: 'idle',
-        btnType: 'logout',
 
         authed: false,
         account: '', 
@@ -20,7 +19,6 @@ const initSteps = () => ([
         completed: false,
         error: null,
         currentStatus: 'idle',
-        btnType: 'edit',
         
         paired: false,
         paringCode: '',
@@ -40,7 +38,6 @@ const initSteps = () => ([
         key: 'symptoms',
         completed: false,
         error: null,
-        btnType: 'edit',
         currentStatus: 'idle',
 
         selectedSymptoms: [],
@@ -67,7 +64,6 @@ const initSteps = () => ([
         key: 'review',
         completed: false,
         error: null,
-        btnType: null,
         currentStatus: 'idle',
     },
 ]);

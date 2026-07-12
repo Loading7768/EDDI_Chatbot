@@ -90,10 +90,10 @@
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-center gap-2">
-        <span class="material-symbols-rounded text-blue-200 text-[20px] shrink-0">stethoscope</span>
-        <div class="text-sm text-blue-50">
-            您好！<span class="font-bold" x-text="step.doctorName"></span> 醫師
+    <div class="flex items-center gap-4">
+        <span class="material-symbols-rounded text-blue-400">stethoscope</span>
+        <div class="font-medium text-blue-400">
+            您好！    <span class="text-amber-400" x-text="step.doctorName"></span> 醫師
         </div>
     </div>
 </template>

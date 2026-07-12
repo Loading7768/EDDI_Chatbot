@@ -7,15 +7,21 @@ document.addEventListener('alpine:init', () => {
         steps: initSteps(),
         STATUS,
 
-        nextStep() {
+        async nextStep() {
             if (this.currentStep < this.steps.length) {
-                this.currentStep++;
+                next = this.currentStep + 1;
+                this.currentStep = -2;
+                await this.delay(200);
+                this.currentStep = next;
             }
         },
 
-        jumpTo(i) {
+        async jumpTo(i) {
             this.prevStep = this.currentStep;
+            this.currentStep = -2;
+            await this.delay(200);
             this.currentStep = i;
+            this.edit = false;
         },
 
         nodeClasses(i) {
@@ -26,11 +32,11 @@ document.addEventListener('alpine:init', () => {
             }
 
             if (step.completed) {
-                return 'inline-flex flex-col rounded-md bg-blue-700 text-white p-4 max-w-full';
+                return 'flex justify-center px-6 py-4 rounded-lg bg-blue-950';
             }
 
             // incomplet
-            return 'w-10 h-10 p-4 rounded-[2rem] bg-slate-900';
+            return 'w-10 h-10 p-4 ml-5 rounded-[2rem] bg-slate-900';
         },
 
         async delay(ms) {
@@ -90,7 +96,9 @@ document.addEventListener('alpine:init', () => {
             this.steps = initSteps();
         },
 
-        cancelLogout() {
+        async cancelLogout() {
+            this.currentStep = -2;
+            await this.delay(200);
             this.currentStep = this.prevStep;
         },
 

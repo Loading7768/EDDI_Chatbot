@@ -1,4 +1,4 @@
-const initState = () => ([
+const initSteps = () => ([
     // completed: tracks progress
     // mode:      control current state of the card
     // value:     holds input data
@@ -6,17 +6,13 @@ const initState = () => ([
         key: 'auth',
         completed: false,
         error: null,
-        status: Object.freeze({
-            IDLE: 'idel',
-            LOADING: 'loading',
-            SUCCESS: 'success',
-        }),
-        currentStatus: 'idel',
-        btnType: 'logout',
+        currentStatus: 'idle',
 
         authed: false,
-        account: '', 
-        password: '',
+        draft: {
+            account:'',
+            password: '',
+        },
         doctorName: '',
         doctorDept: '',
     },
@@ -24,13 +20,7 @@ const initState = () => ([
         key: 'pair',
         completed: false,
         error: null,
-        status: Object.freeze({
-            IDLE: 'idel',
-            LOADING: 'loading',
-            SUCCESS: 'success',
-        }),
-        currentStatus: 'idel',
-        btnType: 'edit',
+        currentStatus: 'idle',
         
         paired: false,
         paringCode: '',
@@ -38,7 +28,7 @@ const initState = () => ([
         lineUname: '',
         relations: [],
         selectedRelation: null,
-        draftInputs: {
+        draft: {
             self: { type: 'self', relation: '帳號本人', mrc: '' },
             new: { type: 'new', relation: '', mrc: '' }
         },
@@ -50,12 +40,7 @@ const initState = () => ([
         key: 'symptoms',
         completed: false,
         error: null,
-        btnType: 'edit',
-        status: Object.freeze({
-            IDLE: 'idel',
-            SUCCESS: 'success',
-        }),
-        currentStatus: 'idel',
+        currentStatus: 'idle',
 
         selectedSymptoms: [],
         sessionLoaded: false,
@@ -81,13 +66,14 @@ const initState = () => ([
         key: 'review',
         completed: false,
         error: null,
-        btnType: null,
-        status: Object.freeze({
-            IDLE: 'idel',
-            LOADING: 'loading',
-        }),
-        currentStatus: 'idel',
+        currentStatus: 'idle',
     },
 ]);
+
+const STATUS = Object.freeze ({
+    IDLE: 'idle',
+    LOADING: 'loading',
+    SUCCESS: 'success',
+});
 
 console.log('steps.js loaded.');

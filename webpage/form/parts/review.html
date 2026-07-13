@@ -3,51 +3,40 @@
     <div class="flex flex-col h-full">
 
         <!-- Header -->
-        <div class="shrink-0 px-4 pt-4 pb-2">
-            <div class="text-2xl font-medium text-gray-800 mb-2">確認送出？</div>
-        </div>
+        {{ card_header('請確認資料無誤') }}
 
         <!-- Body -->
         <div class="px-4 pb-2">
 
-            <!-- Date row -->
-            <div class="flex items-center gap-2 text-gray-700 font-medium mb-4">
-                <span class="material-symbols-outlined text-[20px] text-blue-500">calendar_today</span>
-                <span
-                    x-text="new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')"></span>
+            <!-- Disclaimer -->
+            <div class="flex flex-col items-center my-12 text-red-400">
+                <span class="animate-pulse material-symbols-rounded text-6xl mb-2">info</span>
+                <p class="font-medium">提交後必須至後台修改</p>
             </div>
 
-            <!-- Disclaimer -->
-            <div
-                class="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 text-sm text-amber-700">
-                <span class="material-symbols-outlined text-[18px] shrink-0 mt-0.5">info</span>
-                <span>確認資料無誤，提交後必須至後台修改</span>
-            </div>
+            <!-- Date row -->
+            <!-- <div class="flex justify-center items-center gap-3 text-xl text-slate-400 font-medium my-4">
+                <span class="material-symbols-rounded text-blue-400">calendar_today</span>
+                <p x-text="new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')"></p>
+            </div> -->
 
             <!-- Error msg -->
             <div x-show="step.error" x-transition
                 class="mt-3 flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-600">
-                <span class="material-symbols-outlined text-[18px] shrink-0">error</span>
+                <span class="material-symbols-rounded text-[18px] shrink-0">error</span>
                 <span x-text="step.error"></span>
             </div>
 
         </div>
 
         <!-- Footer -->
-        <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
-            <button @click="submitForm()"
-                    class="
-                        text-amber-950 bg-amber-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
-                        active:scale-110 active:rounded-lg"
-                    :class="step.currentStatus === status.IDLE ? 'px-16' : 'px-4'">
-
-                <span x-show="step.currentStatus === status.LOADING"
-                      class="animate-spin flex items-center material-symbols-rounded">
-                    progress_activity
-                </span>
-                <span x-show="step.currentStatus === status.IDLE">確認送出</span>
-            </button>
-        </div>
+        {{ footer_button(
+            clickFunc='submitForm()',
+            disableCond='false',
+            textColor='text-amber-950',
+            bgColor='bg-amber-400',
+            label='確認送出'
+        ) }}
 
     </div>
 </template>

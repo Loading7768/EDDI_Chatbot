@@ -1,3 +1,4 @@
+from math import degrees
 from linebot.v3 import (
     WebhookHandler
 )
@@ -88,4 +89,4 @@ import bot
 bot.register_line_handlers(line_handler, configuration)
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

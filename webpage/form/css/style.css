@@ -1,3 +1,28 @@
+/* ========== Button Animation ========== */
+.ease-spring {
+    transition-timing-function: cubic-bezier(0.34,1.56,0.64,1) !important;
+}
+
+@keyframes spin-quarter-bounce {
+    /* --- STEP 1 (0° to 120°) --- */
+    0% { transform: rotate(0deg); }
+    8% { transform: rotate(135deg); }   /* Overshoot by 15° */
+    15%, 33.33% { transform: rotate(120deg); } /* Settle & Pause */
+
+    /* --- STEP 2 (120° to 240°) --- */
+    41.33% { transform: rotate(255deg); } /* Overshoot by 15° */
+    48.33%, 66.66% { transform: rotate(240deg); } /* Settle & Pause */
+
+    /* --- STEP 3 (240° to 360°) --- */
+    74.66% { transform: rotate(375deg); } /* Overshoot by 15° */
+    81.66%, 100% { transform: rotate(360deg); } /* Settle, Pause & Loop cleanly back to 0° */
+}
+.animate-spring {
+    animation: spin-quarter-bounce 0.8s infinite !important;
+}
+
+
+
 /* Card 3 human body / organ interface styles */
 .image-section {
     margin-top: 15px;

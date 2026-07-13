@@ -3,9 +3,7 @@
     <div class="flex flex-col h-full">
 
         <!-- Header -->
-        <div class="px-4 pt-4 pb-2">
-            <div class="text-2xl font-medium text-gray-800 mb-2">請選擇要提供的衛教資料</div>
-        </div>
+        {{ card_header('請選擇要提供的衛教資料') }}
 
         <!-- Body: explicit max-height so overflow-y-auto actually triggers -->
         <div class="px-4 relative select-none pb-2 overflow-y-auto max-h-[50vh]"
@@ -75,7 +73,7 @@
                             <span class="font-bold text-slate-100" x-text="step.activeRegion"></span>
                             <button @click.stop="step.activeRegion = null"
                                 class="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition-colors focus:outline-none">
-                                <span class="material-symbols-outlined text-[18px]">close</span>
+                                <span class="material-symbols-rounded text-[18px]">close</span>
                             </button>
                         </div>
                         <div class="pop-checkbox-list">
@@ -85,7 +83,7 @@
                                     @click.stop="toggleSymptom(topic)">
                                     <template x-if="step.selectedSymptoms.includes(topic)">
                                         <span
-                                            class="material-symbols-outlined text-emerald-400 mr-2 text-[18px]">check</span>
+                                            class="material-symbols-rounded text-emerald-400 mr-2 text-[18px]">check</span>
                                     </template>
                                     <span x-text="topic"></span>
                                 </div>
@@ -117,37 +115,26 @@
         </div>
 
         <!-- Footer -->
-        <div class="shrink-0 px-4 pt-4 pb-4 flex justify-center">
-            <button @click="confirmSymptoms()" :disabled="step.selectedSymptoms.length < 1"
-                    class="
-                        text-blue-950 bg-blue-400 py-4 rounded-[2rem] transition-all duration-150 ease-in-out
-                        active:scale-110 active:rounded-lg
-                        disabled:cursor-not-allowed"
-                    :class="[
-                        step.currentStatus === status.IDLE ? 'px-16' : 'px-4',
-                        step.selectedSymptoms.length < 1 ? 'opacity-25' : ''
-                    ]">
-
-                <span x-show="step.currentStatus === status.SUCCESS"
-                    class="flex items-center material-symbols-rounded">
-                    check_circle
-                </span>
-                <span x-show="step.currentStatus === status.IDLE">選擇</span>
-            </button>
-        </div>
+        {{ footer_button(
+            clickFunc='confirmSymptoms()',
+            disableCond='step.selectedSymptoms.length < 1',
+            textColor='text-blue-950',
+            bgColor='bg-blue-400',
+            label='選擇'
+        ) }}
 
     </div>
 </template>
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-start gap-2">
-        <span class="material-symbols-outlined text-blue-200 text-[20px] shrink-0 mt-0.5">sick</span>
+    <div class="flex items-center gap-4">
+        <span class="material-symbols-rounded text-blue-400">sick</span>
         <div class="flex flex-wrap gap-1">
             <template x-for="topic in step.selectedSymptoms" :key="topic">
-                <span
-                    class="text-xs font-medium bg-blue-400/20 text-blue-100 border border-blue-300/30 rounded-full px-2 py-0.5"
-                    x-text="topic"></span>
+                <span class="text-sm font-medium bg-amber-400 text-amber-950 rounded-lg px-2 py-0.5"
+                      x-text="topic">
+                </span>
             </template>
         </div>
     </div>

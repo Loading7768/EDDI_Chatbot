@@ -2,39 +2,54 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('formApp', () => ({
         currentStep: 0,
         prevStep: 0,
-        steps: initState(), // state.js
 
-        nextStep() {
+        // state.js
+        steps: initSteps(),
+        STATUS,
+
+        runWithNodeFlip(mutateFn) {
+            const elements = [...document.querySelectorAll('[data-flip]')];
+            window.flipAnimate(elements, mutateFn);
+        },
+
+        async nextStep() {
             if (this.currentStep < this.steps.length) {
-                this.currentStep++;
+                // next = this.currentStep + 1;
+                // this.currentStep = -2;
+                // await this.delay(200);
+                // this.currentStep = next;
+                this.runWithNodeFlip(() => {
+                    this.currentStep++;
+                });
             }
         },
 
-        jumpTo(i) {
-            this.prevStep = this.currentStep;
-            this.currentStep = i;
-        },
-
-        // Transition between steps
-        markCompleteAndAdvance(i) {
-            this.steps[i].completed = true;
-            this.steps[i].value = `(dummy ${this.steps[i].key} value)`;
-            this.nextStep();
+        async jumpTo(i) {
+            // this.prevStep = this.currentStep;
+            // this.currentStep = -2;
+            // await this.delay(200);
+            // this.currentStep = i;
+            // this.edit = false;
+            this.runWithNodeFlip(() => {
+                this.prevStep = this.currentStep;
+                this.currentStep = i;
+                this.edit = false;
+            });
         },
 
         nodeClasses(i) {
             const step = this.steps[i];
 
             if (i === this.currentStep) {
-                return 'w-full max-h-[72vh] rounded-[2rem] bg-slate-900 p-4';
+                return 'w-full max-h-[72vh] p-4 rounded-[2rem] bg-slate-800';
             }
 
             if (step.completed) {
-                return 'inline-flex flex-col rounded-md bg-blue-700 text-white px-4 max-w-full';
+                return 'flex justify-center px-6 py-4 rounded-lg bg-blue-950';
             }
 
             // incomplet
-            return 'w-10 h-10 rounded-[2rem] bg-gray-600';
+            return 'w-10 h-10 p-4 ml-5 rounded-[2rem] bg-slate-900';
         },
 
         async delay(ms) {
@@ -45,9 +60,8 @@ document.addEventListener('alpine:init', () => {
         // ========== Auth Step ==========
         async confirmLogin() {
             const authStep = this.steps[0];
-            const status = authStep.status;
             authStep.error = null;
-            authStep.currentStatus = status.LOADING;
+            authStep.currentStatus = STATUS.LOADING;
 
             try {
                 const resp = await fetch('/api/form_login', {
@@ -55,8 +69,8 @@ document.addEventListener('alpine:init', () => {
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
-                        account: authStep.account,
-                        password: authStep.password,
+                        account: authStep.draft.account,
+                        password: authStep.draft.password,
                     }),
                 });
                 const data = await resp.json();
@@ -65,11 +79,10 @@ document.addEventListener('alpine:init', () => {
                 if (!data.success) {
                     throw new Error(data.message);
                 }
-                authStep.currentStatus = status.SUCCESS;
+                authStep.currentStatus = STATUS.SUCCESS;
 
                 await this.delay(300);
-                authStep.account = '';
-                authStep.password = '';
+                authStep.draft = { account: '', password: '' };
                 authStep.doctorName = data.doctor_name;
                 authStep.doctorDept = data.doctor_department;
                 authStep.completed = true;
@@ -78,36 +91,39 @@ document.addEventListener('alpine:init', () => {
             } catch (err) {
                 authStep.error = err.message;
             }
-            authStep.currentStatus = status.IDLE;
+            authStep.currentStatus = STATUS.IDLE;
         },
 
         async confirmLogout() {
             const authStep = this.steps[0];
-            const status = authStep.status;
-            authStep.currentStatus = status.LOADING;
+            authStep.currentStatus = STATUS.LOADING;
 
             try {
                 await fetch('api/form_logout', { method: 'POST' });
             } catch (e) { }
 
             await this.delay(1000);
-            authStep.currentStatus = status.SUCCESS;
+            authStep.currentStatus = STATUS.SUCCESS;
             await this.delay(300);
-            this.steps = initState();
+            this.steps = initSteps();
         },
 
-        cancelLogout() {
-            this.currentStep = this.prevStep;
+        async cancelLogout() {
+            this.runWithNodeFlip(() => {
+                this.currentStep = this.prevStep;
+            });
+            // this.currentStep = -2;
+            // await this.delay(200);
+            // this.currentStep = this.prevStep;
         },
 
 
         // ========== Pair Step ==========
         async confirmPair() {
             const step = this.steps[1];
-            const status = step.status;
             if (step.paringCode.length < 6) return;
 
-            step.currentStatus = status.LOADING;
+            step.currentStatus = STATUS.LOADING;
             step.error = '';
 
             try {
@@ -123,7 +139,7 @@ document.addEventListener('alpine:init', () => {
                     throw new Error(data.message);
                 }
 
-                step.currentStatus = status.SUCCESS;
+                step.currentStatus = STATUS.SUCCESS;
                 await this.delay(300);
                 step.lineUname = data.line_uname;
                 step.lineUuid = data.line_uuid;
@@ -132,41 +148,46 @@ document.addEventListener('alpine:init', () => {
 
                 const hasSelf = step.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
-                    step.selectedRelation = step.draftInputs.self;
-                } else if (step.relations.length > 0) {
-                    const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                    step.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
-                } else {
-                    step.selectedRelation = step.draftInputs.new;
+                    step.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
                 }
+                step.relations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                step.selectedRelation = { type: 'existing_0', relation: step.relations[0].relation, mrc: step.relations[0].medical_record_num };
                 
-            } catch (e) {
-                step.error = data.message;
+            } catch (err) {
+                step.error = err.message;
                 step.paringCode = '';
             }
-            step.currentStatus = status.IDLE;
+            step.currentStatus = STATUS.IDLE;
         },
 
         async confirmPatient() {
             const step = this.steps[1];
-            const status = step.status;
             if (!step.selectedRelation) return;
             step.pairSelectError = '';
 
-            // If new, validate inputs
-            if (step.selectedRelation.type === 'self' && !step.selectedRelation.mrc) return;
+            // Resolve effective mrc: for 帳號本人 with blank mrc, use draft input
+            let effectiveMrc = step.selectedRelation.mrc;
+            const isSelfInput = step.selectedRelation.type.startsWith('existing')
+                && step.selectedRelation.relation === '帳號本人'
+                && !step.selectedRelation.mrc;
+            if (isSelfInput) {
+                effectiveMrc = step.draft.self.mrc.trim();
+            }
+
+            // Validate
+            if (isSelfInput && !effectiveMrc) return;
             if (step.selectedRelation.type === 'new' && (!step.selectedRelation.mrc || !step.selectedRelation.relation)) return;
 
-            if (step.selectedRelation.type === 'self' || step.selectedRelation.type === 'new') {
-                const rel = step.selectedRelation.type === 'self' ? '帳號本人' : step.selectedRelation.relation.trim();
-                const mrc = step.selectedRelation.mrc.trim();
+            if (isSelfInput || step.selectedRelation.type === 'new') {
+                const rel = isSelfInput ? '帳號本人' : step.selectedRelation.relation.trim();
+                const mrc = isSelfInput ? effectiveMrc : step.selectedRelation.mrc.trim();
 
                 if (step.selectedRelation.type === 'new' && (rel === '新增' || rel === '帳號本人')) {
                     step.pairSelectError = '稱呼和病歷號不可重複';
                     return;
                 }
 
-                const isDup = step.relations.some(r => r.relation === rel || r.medical_record_num === mrc);
+                const isDup = step.relations.some(r => r.relation !== '帳號本人' && (r.relation === rel || r.medical_record_num === mrc));
                 if (isDup) {
                     step.pairSelectError = '稱呼和病歷號不可重複';
                     return;
@@ -177,14 +198,13 @@ document.addEventListener('alpine:init', () => {
             let matchedRelationObj = null;
             if (step.selectedRelation.type.startsWith('existing')) {
                 const idx = parseInt(step.selectedRelation.type.split('_')[1]);
-                const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                matchedRelationObj = sorted[idx];
+                matchedRelationObj = step.relations[idx];
                 text = step.selectedRelation.relation;
-            } else if (step.selectedRelation.type === 'self') {
-                text = '帳號本人';
             } else {
                 text = step.selectedRelation.relation || '？？？';
             }
+
+            const finalMrc = effectiveMrc || step.selectedRelation.mrc;
 
             // Prefill selection based on patient
             const symptomStep = this.steps[2];
@@ -200,12 +220,13 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            step.currentStatus = status.SUCCESS;
+            step.currentStatus = STATUS.SUCCESS;
             await this.delay(300);
-            step.value = `${text} (${step.selectedRelation.mrc})`;
+            step.selectedRelation.mrc = finalMrc;
+            step.value = `${text} (${finalMrc})`;
             step.completed = true;
             this.nextStep();
-            step.currentStatus = status.IDLE;
+            step.currentStatus = STATUS.IDLE;
         },
 
 
@@ -269,7 +290,6 @@ document.addEventListener('alpine:init', () => {
 
         async confirmSymptoms() {
             const step = this.steps[2];
-            const status = step.status;
             const pairStep = this.steps[1];
             if (step.selectedSymptoms.length < 1) return;
 
@@ -289,12 +309,12 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    step.currentStatus = status.SUCCESS
+                    step.currentStatus = STATUS.SUCCESS
                     await this.delay(300);
                     step.value = step.selectedSymptoms.join(', ');
                     step.completed = true;
                     this.nextStep();
-                    step.currentStatus = status.IDLE;
+                    step.currentStatus = STATUS.IDLE;
                 }
             } catch (e) {
                 console.error('Error saving symptoms:', e);
@@ -306,10 +326,9 @@ document.addEventListener('alpine:init', () => {
         // ========== Review Step ==========
         async submitForm() {
             const step = this.steps[3];
-            const status = step.status;
             const pairStep = this.steps[1];
 
-            step.currentStatus = status.LOADING;
+            step.currentStatus = STATUS.LOADING;
             step.error = '';
 
             const selectedRelation = pairStep.selectedRelation;
@@ -333,14 +352,14 @@ document.addEventListener('alpine:init', () => {
                 }
                 if (data.redirect) {
                     window.location.href = data.redirect;
-                    this.steps = initState();
+                    this.steps = initSteps();
                     this.currentStep = 0;
                 }
             } catch (err) {
                 step.error = err.message;
             }
 
-            step.currentStatus = status.IDLE;
+            step.currentStatus = STATUS.IDLE;
         },
 
         init() {
@@ -351,7 +370,7 @@ document.addEventListener('alpine:init', () => {
                 authStep.doctorName = doctor.doctor_name;
                 authStep.doctorDept = doctor.department;
                 authStep.completed = true;
-                authStep.mode = 'authed';
+                authStep.authed = true;
                 if (this.currentStep === 0) this.currentStep = 1;
             }
 
@@ -361,27 +380,24 @@ document.addEventListener('alpine:init', () => {
                 pairStep.lineUname = pairing.line_uname;
                 pairStep.lineUuid = pairing.line_uuid;
                 pairStep.relations = pairing.relations || [];
-                pairStep.mode = 'patient';
+                pairStep.paired = true;
 
                 // Default selection (same logic as post-pair)
                 const hasSelf = pairStep.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
-                    pairStep.selectedRelation = pairStep.draftInputs.self;
-                } else if (pairStep.relations.length > 0) {
-                    const sorted = [...pairStep.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                    pairStep.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
-                } else {
-                    pairStep.selectedRelation = pairStep.draftInputs.new;
+                    pairStep.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
                 }
+                pairStep.relations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                pairStep.selectedRelation = { type: 'existing_0', relation: pairStep.relations[0].relation, mrc: pairStep.relations[0].medical_record_num };
 
                 // If patient was previously confirmed, restore full progress
                 if (pairing.selected_mrc && pairing.selected_relation) {
+                    const restoredIdx = pairStep.relations.findIndex(r => r.relation === pairing.selected_relation);
                     pairStep.selectedRelation = {
-                        type: pairing.selected_relation === '帳號本人' ? 'self' : 'existing_0',
+                        type: 'existing_' + (restoredIdx >= 0 ? restoredIdx : 0),
                         relation: pairing.selected_relation,
                         mrc: pairing.selected_mrc,
                     };
-                    pairStep.value = `${pairing.selected_relation} (${pairing.selected_mrc})`;
                     pairStep.completed = true;
                     if (this.currentStep <= 1) this.currentStep = 2;
 
@@ -389,7 +405,6 @@ document.addEventListener('alpine:init', () => {
                     if (pairing.symptoms && pairing.symptoms.length > 0) {
                         // Symptoms already saved — jump straight to review
                         symptomStep.selectedSymptoms = [...pairing.symptoms];
-                        symptomStep.value = pairing.symptoms.join(', ');
                         symptomStep.completed = true;
                         if (this.currentStep <= 2) this.currentStep = 3;
                     }

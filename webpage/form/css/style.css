@@ -1,0 +1,344 @@
+/* ========== Button Animation ========== */
+.ease-spring {
+    transition-timing-function: cubic-bezier(0.34,1.56,0.64,1) !important;
+}
+
+@keyframes spin-quarter-bounce {
+    /* --- STEP 1 (0° to 120°) --- */
+    0% { transform: rotate(0deg); }
+    8% { transform: rotate(135deg); }   /* Overshoot by 15° */
+    15%, 33.33% { transform: rotate(120deg); } /* Settle & Pause */
+
+    /* --- STEP 2 (120° to 240°) --- */
+    41.33% { transform: rotate(255deg); } /* Overshoot by 15° */
+    48.33%, 66.66% { transform: rotate(240deg); } /* Settle & Pause */
+
+    /* --- STEP 3 (240° to 360°) --- */
+    74.66% { transform: rotate(375deg); } /* Overshoot by 15° */
+    81.66%, 100% { transform: rotate(360deg); } /* Settle, Pause & Loop cleanly back to 0° */
+}
+.animate-spring {
+    animation: spin-quarter-bounce 0.8s infinite !important;
+}
+
+
+
+/* Card 3 human body / organ interface styles */
+.image-section {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.image-wrapper {
+    position: relative;
+    display: block;
+    width: 100%;
+    max-width: 495px;
+    margin: 0 auto;
+}
+
+.image-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.image-container img {
+    width: 100%;
+    display: block;
+    border-radius: 8px;
+}
+
+.interactive-layout {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    margin: 15px auto 0 auto;
+    gap: 10px;
+    width: 100%;
+    max-width: 450px;
+    position: relative;
+    padding: 0 5px;
+    box-sizing: border-box;
+}
+
+.body-column {
+    flex: 0 0 126px;
+    position: relative;
+}
+
+.popover-column {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 220px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    pointer-events: none;
+    z-index: 100;
+    transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.buttons-column {
+    flex: 0 0 68px;
+    position: relative;
+}
+
+.hotspot {
+    position: absolute;
+    border: 2px solid #10b981;
+    /* emerald-500 */
+    background-color: rgba(16, 185, 129, 0.1);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s, border-width 0.2s;
+    box-sizing: border-box;
+    z-index: 5;
+}
+
+.hotspot:hover,
+.hotspot.active {
+    background-color: rgba(16, 185, 129, 0.4);
+    border-width: 3px;
+    transform: scale(1.05);
+    z-index: 10;
+}
+
+.hotspot.disabled {
+    border-color: #475569 !important;
+    /* slate-600 */
+    background-color: rgba(71, 85, 105, 0.1) !important;
+    color: #64748b !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+.hotspot.disabled:hover {
+    transform: none !important;
+    background-color: rgba(71, 85, 105, 0.1) !important;
+}
+
+.bottom-btn {
+    position: absolute !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 6px 8px;
+    border-radius: 21px;
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    /* emerald-500 */
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, transform 0.2s;
+}
+
+.bottom-btn.disabled:hover {
+    transform: translateY(-50%) !important;
+    background-color: rgba(71, 85, 105, 0.1) !important;
+    color: #64748b !important;
+    border-color: #475569 !important;
+}
+
+.btn-skin {
+    top: 25% !important;
+    left: 0 !important;
+    transform: translateY(-50%) !important;
+}
+
+.btn-mental {
+    top: 50% !important;
+    left: 0 !important;
+    transform: translateY(-50%) !important;
+}
+
+.btn-other {
+    top: 75% !important;
+    left: 0 !important;
+    transform: translateY(-50%) !important;
+}
+
+.btn-skin:hover,
+.btn-skin.active,
+.btn-mental:hover,
+.btn-mental.active,
+.btn-other:hover,
+.btn-other.active {
+    background-color: #10b981;
+    /* emerald-500 */
+    color: white;
+    border-width: 2px;
+    transform: translateY(-50%) scale(1.05) !important;
+}
+
+#popover {
+    position: absolute;
+    left: 0;
+    width: 220px;
+    z-index: 100;
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+
+.popover-content {
+    background: #0f172a;
+    /* slate-900 */
+    border: 1.5px solid #10b981;
+    /* emerald-500 */
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    overflow: hidden;
+}
+
+#popover h4 {
+    margin: 0;
+    padding: 14px 16px 10px 16px;
+    background-color: #0f172a;
+    color: #10b981;
+    font-size: 14px;
+    border-bottom: 1px solid #1e293b;
+    /* slate-800 */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#popover h4 .close-btn {
+    cursor: pointer;
+    font-size: 18px;
+    color: #64748b;
+    /* slate-500 */
+    line-height: 1;
+    padding: 0 2px;
+    user-select: none;
+}
+
+#popover h4 .close-btn:hover {
+    color: #cbd5e1;
+}
+
+.pop-checkbox-list {
+    padding: 10px 16px 14px 16px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#popover::before {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #0f172a;
+    z-index: 2;
+    border-left: 1.5px solid #10b981;
+    border-top: 1.5px solid #10b981;
+}
+
+#popover.arrow-left::before {
+    left: -7px;
+    top: calc(var(--arrow-top, 18px) - 8.5px);
+    transform: rotate(-45deg);
+}
+
+#popover.arrow-right::before {
+    right: -7px;
+    top: calc(var(--arrow-top, 18px) - 8.5px);
+    transform: rotate(135deg);
+}
+
+@keyframes custom-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);
+        background-color: rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.6);
+    }
+
+    50% {
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.8);
+        background-color: rgba(16, 185, 129, 0.3);
+        border-color: rgba(16, 185, 129, 1);
+    }
+}
+
+.pulse-glow {
+    animation: custom-glow 2s infinite ease-in-out;
+}
+
+.pop-checkbox-item {
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s;
+    color: #94a3b8;
+    /* slate-400 */
+    border: 1px solid transparent;
+}
+
+.pop-checkbox-item:hover {
+    background: #1e293b;
+    color: #f1f5f9;
+}
+
+.pop-checkbox-item.selected {
+    background: rgba(16, 185, 129, 0.15);
+    /* emerald-500/15 */
+    color: #34d399;
+    /* emerald-400 */
+    border-color: rgba(16, 185, 129, 0.3);
+    font-weight: 500;
+    padding-left: 8px;
+}
+
+/* Chips styling for selected symptoms list at the bottom */
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+}
+
+.chip .icon {
+    margin-right: 6px;
+    font-weight: bold;
+}
+
+.chip.active {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    /* emerald-400 */
+    border: 1px solid #10b981;
+}
+
+.chip.active:hover {
+    background-color: rgba(16, 185, 129, 0.3);
+}

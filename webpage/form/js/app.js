@@ -7,21 +7,34 @@ document.addEventListener('alpine:init', () => {
         steps: initSteps(),
         STATUS,
 
+        runWithNodeFlip(mutateFn) {
+            const elements = [...document.querySelectorAll('[data-flip]')];
+            window.flipAnimate(elements, mutateFn);
+        },
+
         async nextStep() {
             if (this.currentStep < this.steps.length) {
-                next = this.currentStep + 1;
-                this.currentStep = -2;
-                await this.delay(200);
-                this.currentStep = next;
+                // next = this.currentStep + 1;
+                // this.currentStep = -2;
+                // await this.delay(200);
+                // this.currentStep = next;
+                this.runWithNodeFlip(() => {
+                    this.currentStep++;
+                });
             }
         },
 
         async jumpTo(i) {
-            this.prevStep = this.currentStep;
-            this.currentStep = -2;
-            await this.delay(200);
-            this.currentStep = i;
-            this.edit = false;
+            // this.prevStep = this.currentStep;
+            // this.currentStep = -2;
+            // await this.delay(200);
+            // this.currentStep = i;
+            // this.edit = false;
+            this.runWithNodeFlip(() => {
+                this.prevStep = this.currentStep;
+                this.currentStep = i;
+                this.edit = false;
+            });
         },
 
         nodeClasses(i) {
@@ -96,9 +109,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         async cancelLogout() {
-            this.currentStep = -2;
-            await this.delay(200);
-            this.currentStep = this.prevStep;
+            this.runWithNodeFlip(() => {
+                this.currentStep = this.prevStep;
+            });
+            // this.currentStep = -2;
+            // await this.delay(200);
+            // this.currentStep = this.prevStep;
         },
 
 
@@ -132,16 +148,13 @@ document.addEventListener('alpine:init', () => {
 
                 const hasSelf = step.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
-                    step.selectedRelation = step.draft.self;
-                } else if (step.relations.length > 0) {
-                    const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                    step.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
-                } else {
-                    step.selectedRelation = step.draft.new;
+                    step.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
                 }
+                step.relations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                step.selectedRelation = { type: 'existing_0', relation: step.relations[0].relation, mrc: step.relations[0].medical_record_num };
                 
-            } catch (e) {
-                step.error = data.message;
+            } catch (err) {
+                step.error = err.message;
                 step.paringCode = '';
             }
             step.currentStatus = STATUS.IDLE;
@@ -152,20 +165,29 @@ document.addEventListener('alpine:init', () => {
             if (!step.selectedRelation) return;
             step.pairSelectError = '';
 
-            // If new, validate inputs
-            if (step.selectedRelation.type === 'self' && !step.selectedRelation.mrc) return;
+            // Resolve effective mrc: for 帳號本人 with blank mrc, use draft input
+            let effectiveMrc = step.selectedRelation.mrc;
+            const isSelfInput = step.selectedRelation.type.startsWith('existing')
+                && step.selectedRelation.relation === '帳號本人'
+                && !step.selectedRelation.mrc;
+            if (isSelfInput) {
+                effectiveMrc = step.draft.self.mrc.trim();
+            }
+
+            // Validate
+            if (isSelfInput && !effectiveMrc) return;
             if (step.selectedRelation.type === 'new' && (!step.selectedRelation.mrc || !step.selectedRelation.relation)) return;
 
-            if (step.selectedRelation.type === 'self' || step.selectedRelation.type === 'new') {
-                const rel = step.selectedRelation.type === 'self' ? '帳號本人' : step.selectedRelation.relation.trim();
-                const mrc = step.selectedRelation.mrc.trim();
+            if (isSelfInput || step.selectedRelation.type === 'new') {
+                const rel = isSelfInput ? '帳號本人' : step.selectedRelation.relation.trim();
+                const mrc = isSelfInput ? effectiveMrc : step.selectedRelation.mrc.trim();
 
                 if (step.selectedRelation.type === 'new' && (rel === '新增' || rel === '帳號本人')) {
                     step.pairSelectError = '稱呼和病歷號不可重複';
                     return;
                 }
 
-                const isDup = step.relations.some(r => r.relation === rel || r.medical_record_num === mrc);
+                const isDup = step.relations.some(r => r.relation !== '帳號本人' && (r.relation === rel || r.medical_record_num === mrc));
                 if (isDup) {
                     step.pairSelectError = '稱呼和病歷號不可重複';
                     return;
@@ -176,14 +198,13 @@ document.addEventListener('alpine:init', () => {
             let matchedRelationObj = null;
             if (step.selectedRelation.type.startsWith('existing')) {
                 const idx = parseInt(step.selectedRelation.type.split('_')[1]);
-                const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                matchedRelationObj = sorted[idx];
+                matchedRelationObj = step.relations[idx];
                 text = step.selectedRelation.relation;
-            } else if (step.selectedRelation.type === 'self') {
-                text = '帳號本人';
             } else {
                 text = step.selectedRelation.relation || '？？？';
             }
+
+            const finalMrc = effectiveMrc || step.selectedRelation.mrc;
 
             // Prefill selection based on patient
             const symptomStep = this.steps[2];
@@ -201,7 +222,8 @@ document.addEventListener('alpine:init', () => {
 
             step.currentStatus = STATUS.SUCCESS;
             await this.delay(300);
-            step.value = `${text} (${step.selectedRelation.mrc})`;
+            step.selectedRelation.mrc = finalMrc;
+            step.value = `${text} (${finalMrc})`;
             step.completed = true;
             this.nextStep();
             step.currentStatus = STATUS.IDLE;
@@ -363,18 +385,16 @@ document.addEventListener('alpine:init', () => {
                 // Default selection (same logic as post-pair)
                 const hasSelf = pairStep.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
-                    pairStep.selectedRelation = pairStep.draft.self;
-                } else if (pairStep.relations.length > 0) {
-                    const sorted = [...pairStep.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                    pairStep.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
-                } else {
-                    pairStep.selectedRelation = pairStep.draft.new;
+                    pairStep.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
                 }
+                pairStep.relations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                pairStep.selectedRelation = { type: 'existing_0', relation: pairStep.relations[0].relation, mrc: pairStep.relations[0].medical_record_num };
 
                 // If patient was previously confirmed, restore full progress
                 if (pairing.selected_mrc && pairing.selected_relation) {
+                    const restoredIdx = pairStep.relations.findIndex(r => r.relation === pairing.selected_relation);
                     pairStep.selectedRelation = {
-                        type: pairing.selected_relation === '帳號本人' ? 'self' : 'existing_0',
+                        type: 'existing_' + (restoredIdx >= 0 ? restoredIdx : 0),
                         relation: pairing.selected_relation,
                         mrc: pairing.selected_mrc,
                     };

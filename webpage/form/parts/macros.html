@@ -33,16 +33,15 @@
 {% endmacro %}
 
 {% macro text_input(inputId, inputType, label) %}
-<div class="relative mb-5" x-data="{ focused: false }">
+<div class="relative" x-data="{ focused: false }">
     <input type="{{ inputType }}"
             id="{{ inputId }}"
             x-model="step.draft.{{ inputId }}"
             @focus="focused = true; step.error = null"
             @blur="focused = false"
-            class="w-full font-medium text-slate-200 bg-blue-900/50 border-2 border-transparent px-6 py-4 focus:outline-none peer"
-            :class="focused ? 'border-blue-400 rounded-lg' :
-                    step.error ? 'border-red-400 rounded-lg' :
-                    step.draft.{{ inputId }} ? 'rounded-lg' : 'rounded-[1.5rem]'"
+            class="w-full font-medium text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] px-6 py-3 focus:outline-none peer"
+            :class="focused ? 'border-blue-400' :
+                    step.error ? 'border-red-400' : ''"
             placeholder=" " />
     <label for="{{ inputId }}"
             class="absolute font-medium start-4 top-4 rounded-lg z-10

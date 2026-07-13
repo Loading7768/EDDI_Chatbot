@@ -13,17 +13,19 @@
 
                     <span class="block text-center material-symbols-rounded text-6xl text-blue-400 my-6">stethoscope</span>
 
-                    {{ text_input(
-                        inputId='account',
-                        inputType='text',
-                        label='帳號'
-                    ) }}
-
-                    {{ text_input(
-                        inputId='password',
-                        inputType='password',
-                        label='密碼'
-                    ) }}
+                    <div class="space-y-5">
+                        {{ text_input(
+                            inputId='account',
+                            inputType='text',
+                            label='帳號'
+                        ) }}
+    
+                        {{ text_input(
+                            inputId='password',
+                            inputType='password',
+                            label='密碼'
+                        ) }}
+                    </div>
 
                     <div x-show="step.error" x-transition class="text-red-400 font-medium text-center" x-text="step.error"></div>
 

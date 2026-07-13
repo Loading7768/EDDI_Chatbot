@@ -56,8 +56,8 @@ document.addEventListener('alpine:init', () => {
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
-                        account: authStep.account,
-                        password: authStep.password,
+                        account: authStep.draft.account,
+                        password: authStep.draft.password,
                     }),
                 });
                 const data = await resp.json();
@@ -69,8 +69,7 @@ document.addEventListener('alpine:init', () => {
                 authStep.currentStatus = STATUS.SUCCESS;
 
                 await this.delay(300);
-                authStep.account = '';
-                authStep.password = '';
+                authStep.draft = { account: '', password: '' };
                 authStep.doctorName = data.doctor_name;
                 authStep.doctorDept = data.doctor_department;
                 authStep.completed = true;
@@ -133,12 +132,12 @@ document.addEventListener('alpine:init', () => {
 
                 const hasSelf = step.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
-                    step.selectedRelation = step.draftInputs.self;
+                    step.selectedRelation = step.draft.self;
                 } else if (step.relations.length > 0) {
                     const sorted = [...step.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
                     step.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
                 } else {
-                    step.selectedRelation = step.draftInputs.new;
+                    step.selectedRelation = step.draft.new;
                 }
                 
             } catch (e) {
@@ -364,12 +363,12 @@ document.addEventListener('alpine:init', () => {
                 // Default selection (same logic as post-pair)
                 const hasSelf = pairStep.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
-                    pairStep.selectedRelation = pairStep.draftInputs.self;
+                    pairStep.selectedRelation = pairStep.draft.self;
                 } else if (pairStep.relations.length > 0) {
                     const sorted = [...pairStep.relations].sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
                     pairStep.selectedRelation = { type: 'existing_0', relation: sorted[0].relation, mrc: sorted[0].medical_record_num };
                 } else {
-                    pairStep.selectedRelation = pairStep.draftInputs.new;
+                    pairStep.selectedRelation = pairStep.draft.new;
                 }
 
                 // If patient was previously confirmed, restore full progress

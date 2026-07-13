@@ -98,7 +98,7 @@
                         <div x-show="!step.relations.some(r => r.relation === '帳號本人')"
                             class="transition-colors cursor-pointer p-4 shrink-0 border border-gray-200 rounded-xl"
                             :class="step.selectedRelation?.type === 'self' ? 'bg-emerald-500/10 border-emerald-500' : 'bg-gray-100 hover:bg-gray-200'"
-                            @click="if(!step.selectedRelation || step.selectedRelation.type !== 'self') step.selectedRelation = step.draftInputs.self;">
+                            @click="if(!step.selectedRelation || step.selectedRelation.type !== 'self') step.selectedRelation = step.draft.self;">
                             <div class="flex items-center">
                                 <!-- Icon -->
                                 <div x-show="step.selectedRelation?.type === 'self'"
@@ -109,8 +109,13 @@
                                 <div class="flex-grow min-w-0">
                                     <div class="font-bold text-gray-800">帳號本人</div>
                                     <div x-show="step.selectedRelation?.type === 'self'" class="mt-2" @click.stop>
-                                        <input type="text" x-model="step.draftInputs.self.mrc" placeholder="病歷號"
-                                            class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-500">
+                                        <!-- <input type="text" x-model="step.draft.self.mrc" placeholder="病歷號"
+                                            class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-500"> -->
+                                        {{ text_input(
+                                            inputId='self.mrc',
+                                            inputType='text',
+                                            label='病歷號'
+                                        ) }}
                                     </div>
                                 </div>
                             </div>
@@ -148,7 +153,7 @@
                         <!-- NEW -->
                         <div class="transition-colors cursor-pointer p-4 shrink-0 border border-gray-200 rounded-xl"
                             :class="step.selectedRelation?.type === 'new' ? 'bg-emerald-500/10 border-emerald-500' : 'bg-gray-100 hover:bg-gray-200'"
-                            @click="if(!step.selectedRelation || step.selectedRelation.type !== 'new') step.selectedRelation = step.draftInputs.new;">
+                            @click="if(!step.selectedRelation || step.selectedRelation.type !== 'new') step.selectedRelation = step.draft.new;">
 
                             <!-- When NOT selected -->
                             <div x-show="step.selectedRelation?.type !== 'new'" class="flex items-center">
@@ -163,10 +168,22 @@
                                 </div>
                                 <!-- Two input fields -->
                                 <div class="flex-grow flex flex-col space-y-2 min-w-0">
-                                    <input type="text" x-model="step.draftInputs.new.relation" placeholder="稱呼"
-                                        class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-500">
-                                    <input type="text" x-model="step.draftInputs.new.mrc" placeholder="病歷號"
-                                        class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-500">
+                                    <!-- <input type="text" x-model="step.draft.new.relation" placeholder="稱呼"
+                                        class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-500"> -->
+                                    <!-- <input type="text" x-model="step.draft.new.mrc" placeholder="病歷號"
+                                        class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-500"> -->
+                                    {{ text_input(
+                                        inputId='new.relation',
+                                        inputType='text',
+                                        label='稱呼'
+                                    ) }}
+                                    
+                                    {{ text_input(
+                                        inputId='new.mrc',
+                                        inputType='text',
+                                        label='病歷號'
+                                    ) }}
+
                                 </div>
                             </div>
                         </div>
@@ -182,8 +199,8 @@
                 {{ footer_button(
                     clickFunc='confirmPatient()',
                     disableCond="!(step.selectedRelation
-                        && ((step.selectedRelation.type === 'self' && step.draftInputs.self.mrc.trim())
-                        || (step.selectedRelation.type === 'new' && step.draftInputs.new.relation.trim() && step.draftInputs.new.mrc.trim())
+                        && ((step.selectedRelation.type === 'self' && step.draft.self.mrc.trim())
+                        || (step.selectedRelation.type === 'new' && step.draft.new.relation.trim() && step.draft.new.mrc.trim())
                         || step.selectedRelation.type.startsWith('existing'))
                     )",
                     textColor='text-blue-950',

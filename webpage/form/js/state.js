@@ -9,8 +9,10 @@ const initSteps = () => ([
         currentStatus: 'idle',
 
         authed: false,
-        account: '', 
-        password: '',
+        draft: {
+            account:'',
+            password: '',
+        },
         doctorName: '',
         doctorDept: '',
     },
@@ -26,7 +28,7 @@ const initSteps = () => ([
         lineUname: '',
         relations: [],
         selectedRelation: null,
-        draftInputs: {
+        draft: {
             self: { type: 'self', relation: '帳號本人', mrc: '' },
             new: { type: 'new', relation: '', mrc: '' }
         },

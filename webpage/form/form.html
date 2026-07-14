@@ -43,7 +43,8 @@
                 </div>
 
                 <!-- Sibling button: for some completed nodes -->
-                <button x-show="step.completed && i !== currentStep"
+                <button data-flip
+                        x-show="step.completed && i !== currentStep"
                         x-data="{ edit: false }"
                         @click="edit = true; jumpTo(i);"
                         class="px-4 rounded-s-lg rounded-e-[2rem] transition-all duration-200 ease-spring

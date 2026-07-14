@@ -460,6 +460,51 @@
   </div>
 </div>
 
+<!-- ── Modal：重複登入衝突 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-session-conflict">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap warning">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">帳號重複登入提示</div>
+    <div class="modal-alert-banner warning">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">此帳號已在其他地方登入。<br>為維護帳號安全，系統禁止多處同時登入。</div>
+    </div>
+    <div class="modal-alert-subtitle">您要保留哪一邊的登入狀態？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-session-conflict')">保留原本登入<br>(不在此登入)</button>
+      <button class="btn btn-danger" onclick="doLogin(true)">在此處登入<br>(強制登出另一邊)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：重複登入被迫登出 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-kicked-out">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap danger">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">系統登出通知</div>
+    <div class="modal-alert-banner danger">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">您的帳號已在其他地方登入，此連線已被登出。</div>
+    </div>
+    <div class="modal-alert-subtitle">若非您本人操作，請儘速修改密碼。</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-danger" onclick="closeModal('modal-kicked-out')">確定</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal：確認登出 ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-logout">
   <div class="modal-alert">

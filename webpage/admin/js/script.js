@@ -15,6 +15,16 @@ async function api(method, path, body) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(path, opts);
+  if (res.status === 401) {
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error === '您的帳號已在其他地方登入，此連線已被登出。') {
+      openModal('modal-kicked-out');
+    } else {
+      showToast(errData.error || '請先登入', 'fail');
+    }
+    showLogin();
+    return errData;
+  }
   return res.json();
 }
 
@@ -56,7 +66,14 @@ function closeSidebar() {
 // ── auth ──
 async function checkAuth() {
   const me = await api('GET', '/api/me');
-  me.logged_in ? initApp(me) : showLogin();
+  if (me.logged_in) {
+    initApp(me);
+  } else {
+    if (me.kicked_out) {
+      openModal('modal-kicked-out');
+    }
+    showLogin();
+  }
 }
 
 function showLogin() {
@@ -78,10 +95,12 @@ function initApp(me) {
     el.style.display = me.is_admin ? '' : 'none';
   });
 
-  loadStats();
+  const savedSection = localStorage.getItem('admin_active_section') || 'stats';
+  const targetSection = (savedSection === 'prompt' || savedSection === 'doctors') && !me.is_admin ? 'stats' : savedSection;
+  showSection(targetSection);
 }
 
-async function doLogin() {
+async function doLogin(force = false) {
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
   const errEl    = document.getElementById('login-error');
@@ -94,9 +113,12 @@ async function doLogin() {
   btn.disabled  = true;
 
   try {
-    const res = await api('POST', '/api/login', { username, password });
+    const res = await api('POST', '/api/login', { username, password, force });
     if (res.success) {
+      closeModal('modal-session-conflict');
       initApp({ doctor_name: res.doctor_name, is_admin: res.is_admin });
+    } else if (res.conflict) {
+      openModal('modal-session-conflict');
     } else {
       errEl.textContent = res.error || '登入失敗';
     }
@@ -106,6 +128,7 @@ async function doLogin() {
 
 async function executeLogout() {
   closeModal('modal-confirm-logout');
+  localStorage.removeItem('admin_active_section');
   await api('POST', '/api/logout');
   state.currentMrn = null;
   document.getElementById('login-user').value = '';
@@ -117,6 +140,7 @@ async function doLogout() {
   if (!confirm('確定要登出系統嗎？')) {
     return;
   }
+  localStorage.removeItem('admin_active_section');
   await api('POST', '/api/logout');
   state.currentMrn = null;
   document.getElementById('login-user').value = '';
@@ -130,6 +154,7 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
 
 // ── navigation ──
 function showSection(name) {
+  localStorage.setItem('admin_active_section', name);
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
@@ -152,5 +177,7 @@ function esc(s) {
 }
 
 // ── init ──
-initBodyDiagramEvents();
-checkAuth();
+document.addEventListener('DOMContentLoaded', () => {
+  initBodyDiagramEvents();
+  checkAuth();
+});

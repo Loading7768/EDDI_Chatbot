@@ -95,12 +95,14 @@ def check_needs_return_visit(mrn: str) -> bool:
         except Exception:
             pass
             
+    returnVisitTerms = ['請立即前往急診回診', '情況緊急，請立即撥打 119 或前往最近的急診室']
+
     for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for msg in data.get('messages', []):
-                if msg.get('role') == 'assistant' and '請立即前往急診回診' in msg.get('content', ''):
+                if msg.get('role') == 'assistant' and any(term in msg.get('content', '') for term in returnVisitTerms):
                     ts_str = msg.get('timestamp', '')
                     if ts_str:
                         try:

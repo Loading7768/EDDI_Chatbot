@@ -1,6 +1,6 @@
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full animate-fade-in">
 
         <template x-if="!step.authed">
             <div class="login-wrapper">
@@ -84,10 +84,13 @@
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-4 animate-fade-in">
+
         <span class="material-symbols-rounded text-blue-400">stethoscope</span>
-        <div class="font-medium text-blue-400">
-            您好！    <span class="text-amber-400" x-text="step.doctorName"></span> 醫師
+
+        <div class="text-blue-400">
+            您好！<span class="ml-2 text-amber-400" x-text="step.doctorName"></span>醫師
         </div>
+
     </div>
 </template>

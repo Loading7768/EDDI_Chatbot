@@ -1,3 +1,16 @@
+/* ========== Fade-in Animation ========== */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 300ms ease-out 300ms both;
+  /* ↑ delay=300ms, fill-mode=both starts it at opacity:0 immediately (no flash) */
+}
+
+
+
 /* ========== Button Animation ========== */
 .ease-spring {
     transition-timing-function: cubic-bezier(0.34,1.56,0.64,1) !important;
@@ -21,6 +34,8 @@
     animation: spin-quarter-bounce 0.8s infinite !important;
 }
 
+
+/* ========== Icon Animation ========== */
 @keyframes jolt-frames {
     0% { transform: rotate(0deg); }
     10% { transform: rotate(20deg); }
@@ -31,7 +46,8 @@
     animation: jolt-frames 2.0s infinite !important;
 }
 
-/* Card 3 human body / organ interface styles */
+
+/* ========== Card 3 Layout Styles ========== */
 .image-section {
     margin-top: 15px;
     text-align: center;

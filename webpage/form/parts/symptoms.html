@@ -1,6 +1,6 @@
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full animate-fade-in">
 
         <!-- Header -->
         {{ card_header('請選擇要提供的衛教資料') }}
@@ -128,14 +128,15 @@
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-4 animate-fade-in">
+        
         <span class="material-symbols-rounded text-blue-400">sick</span>
+
         <div class="flex flex-wrap gap-1">
             <template x-for="topic in step.selectedSymptoms" :key="topic">
-                <span class="text-sm font-medium bg-amber-400 text-amber-950 rounded-lg px-2 py-0.5"
-                      x-text="topic">
-                </span>
+                <span class="text-sm font-medium bg-amber-400 text-amber-950 rounded-lg px-2 py-0.5" x-text="topic"></span>
             </template>
         </div>
+
     </div>
 </template>

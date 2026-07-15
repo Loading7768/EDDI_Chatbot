@@ -1,6 +1,6 @@
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full animate-fade-in">
 
         <template x-if="!step.paired">
             <div class="line-wrapper">
@@ -40,7 +40,7 @@
                     </div>
 
                     <div x-show="step.error" class="text-red-500 font-medium text-center my-6" x-text="step.error"></div>
-                    
+
                 </div>
 
                 <!-- Footer -->
@@ -56,7 +56,7 @@
         </template>
 
         <template x-if="step.paired">
-            <div class="patient-wrapper">
+            <div class="patient-wrapper animate-fade-in">
 
                 <!-- Header -->
                 {{ card_header('請選擇本次聊天病患') }}
@@ -120,7 +120,7 @@
                                             </span>
                                             
                                             <div class="flex-grow">
-                                                <div class="font-medium mr-auto" x-text="r.relation"></div>
+                                                <span class="font-medium mr-auto" x-text="r.relation"></span>
                                                 <template x-if="r.relation === '帳號本人' && !r.medical_record_num && step.selectedRelation?.type === 'existing_' + idx">
                                                     <div class="mt-5" @click.stop>
                                                       {{ text_input(
@@ -204,11 +204,14 @@
 
 <!-- Completed: compact summary -->
 <template x-if="step.completed && i !== currentStep">
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-4 animate-fade-in">
+
         <span class="material-symbols-rounded text-blue-400">account_circle</span>
-        <div class="font-medium text-blue-400 gap-2">
-            <span class="text-amber-400" x-text="step.selectedRelation?.relation"></span>
-            <span x-text="` ${step.selectedRelation?.mrc}`"></span>
+
+        <div class="flex text-blue-400">
+            <span class="mr-2 text-amber-400" x-text="step.selectedRelation?.relation"></span>
+            <span x-text="step.selectedRelation?.mrc"></span>
         </div>
+
     </div>
 </template>

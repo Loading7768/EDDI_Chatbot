@@ -21,28 +21,28 @@ pairing_codes = {
     "000000": {
         "line_uuid": "U0000000", # new account
         "line_uname": "新人",
-        "expires_at": time.time() + 3600
+        "expires_at": None
     },
     "111111": {
         "line_uuid": "U1a2b3c4d5", # self only
         "line_uname": "孤兒",
-        "expires_at": time.time() + 3600
+        "expires_at": None
     },
     "222222": {
         "line_uuid": "U2e3f4g5h6", # self + many relations
         "line_uname": "關係複雜",
-        "expires_at": time.time() + 3600
+        "expires_at": None
     },
     "333333": {
         "line_uuid": "U3i4j5k6l7", # one relation, no self
         "line_uname": "小幫手",
-        "expires_at": time.time() + 3600
+        "expires_at": None
     }
 }
 
 def cleanup_expired_codes():
     current_time = time.time()
-    expired_keys = [code for code, data in pairing_codes.items() if current_time > data["expires_at"]]
+    expired_keys = [code for code, data in pairing_codes.items() if data["expires_at"] is not None and current_time > data["expires_at"]]
     for k in expired_keys:
         del pairing_codes[k]
 

@@ -121,7 +121,7 @@ document.addEventListener('alpine:init', () => {
         // ========== Pair Step ==========
         async confirmPair() {
             const step = this.steps[1];
-            if (step.paringCode.length < 6) return;
+            if (step.pairingCode.length < 6) return;
 
             step.currentStatus = STATUS.LOADING;
             step.error = '';
@@ -130,7 +130,7 @@ document.addEventListener('alpine:init', () => {
                 const res = await fetch('/api/form_pair', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: step.paringCode })
+                    body: JSON.stringify({ code: step.pairingCode })
                 });
                 const data = await res.json();
 
@@ -146,6 +146,7 @@ document.addEventListener('alpine:init', () => {
                 step.relations = data.relations || [];
                 step.paired = true;
 
+                // Pre-processing for select patient
                 const hasSelf = step.relations.some(r => r.relation === '帳號本人');
                 if (!hasSelf) {
                     step.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
@@ -155,7 +156,7 @@ document.addEventListener('alpine:init', () => {
                 
             } catch (err) {
                 step.error = err.message;
-                step.paringCode = '';
+                step.pairingCode = '';
             }
             step.currentStatus = STATUS.IDLE;
         },

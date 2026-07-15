@@ -6,35 +6,47 @@
             <div class="line-wrapper">
 
                 <!-- Header -->
-                {{ card_header('請配對LINE帳號') }}
+                {{ card_header('請輸入配對碼') }}
 
                 <!-- Body -->
-                <div class="flex-1 overflow-y-auto px-4 flex flex-col justify-center items-center w-full my-12">
-                    <div class="space-y-6 w-full">
-                        <p class="text-slate-400 text-center font-medium">請輸入6位配對碼</p>
-                        <div class="relative flex justify-between w-full px-2" dir="ltr"
-                            @click="$refs.pairInput.focus()">
-                            <input x-ref="pairInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
-                                x-model="step.paringCode"
-                                @input="step.paringCode = step.paringCode.replace(/[^0-9]/g, '')"
-                                class="absolute inset-0 w-full h-full opacity-0 cursor-text z-10" />
+                <div class="flex-1 overflow-y-auto items-center px-4 mt-16 mb-10">
 
-                            <template x-for="idx in [0,1,2,3,4,5]" :key="idx">
-                                <div class="w-10 h-14 sm:w-12 sm:h-16 flex items-center justify-center text-2xl font-bold text-amber-400 bg-transparent border-b-2 transition-colors"
-                                    :class="step.paringCode.length === idx ? 'border-indigo-500' : 'border-slate-400'">
-                                    <span x-text="step.paringCode[idx] || ''"></span>
-                                </div>
-                            </template>
-                        </div>
-                        <div x-show="step.error" x-transition class="text-red-500 text-sm font-medium text-center"
-                            x-text="step.error"></div>
+                    <!-- Input Wrapper  -->
+                    <div class="relative flex items-center justify-center px-4" dir="ltr"
+                            x-data="{ focused: false }">
+
+                        <!-- The Real Input (Hidden) -->
+                        <input x-ref="pairInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                            x-model="step.pairingCode"
+                            @input="step.pairingCode = step.pairingCode.replace(/[^0-9]/g, '')"
+                            @mousedown.prevent="$el.focus()"
+                            @keyup="$el.setSelectionRange($el.value.length, $el.value.length)"
+                            @focus="focused = true; $nextTick(() => $el.setSelectionRange($el.value.length, $el.value.length))"
+                            @blur="focused = false"
+                            class="absolute w-full h-full opacity-0 select-none caret-transparent z-10"/>
+
+                        <!-- Input Display -->
+                        <template x-for="idx in [0,1,2,3,4,5]" :key="idx">
+                            <div class="h-12 rounded-[2rem] flex justify-center items-center
+                                    text-2xl font-extrabold text-slate-200
+                                    transition-all duration-200 ease-spring"
+                                :class="
+                                    step.pairingCode.length === 6 ?
+                                    'w-8 mx-0 rounded-none ' + (focused ? 'bg-amber-900' : 'bg-slate-700') + (idx === 0 ? ' rounded-s-2xl pl-2' : idx === 5 ? ' rounded-e-2xl pr-2' : ' w-6')
+                                    : 'mx-auto ' + ((step.pairingCode.length === idx && focused) ? 'w-16 bg-amber-900 rounded-lg' : 'w-8 bg-slate-700')">
+                                <span x-text="step.pairingCode[idx] || ''"></span>
+                            </div>
+                        </template>
                     </div>
+
+                    <div x-show="step.error" class="text-red-500 font-medium text-center my-6" x-text="step.error"></div>
+                    
                 </div>
 
                 <!-- Footer -->
                 {{ footer_button(
                     clickFunc='confirmPair()',
-                    disableCond='step.paringCode.length < 6',
+                    disableCond='step.pairingCode.length < 6',
                     textColor='text-blue-950',
                     bgColor='bg-blue-400',
                     label='配對'

@@ -23,7 +23,7 @@ const initSteps = () => ([
         currentStatus: 'idle',
         
         paired: false,
-        paringCode: '',
+        pairingCode: '',
         lineUuid: '',
         lineUname: '',
         relations: [],

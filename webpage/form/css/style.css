@@ -17,11 +17,19 @@
     74.66% { transform: rotate(375deg); } /* Overshoot by 15° */
     81.66%, 100% { transform: rotate(360deg); } /* Settle, Pause & Loop cleanly back to 0° */
 }
-.animate-spring {
+.animate-spin-spring {
     animation: spin-quarter-bounce 0.8s infinite !important;
 }
 
-
+@keyframes jolt-frames {
+    0% { transform: rotate(0deg); }
+    10% { transform: rotate(20deg); }
+    12% { transform: rotate(-30deg); }
+    20% { transform: rotate(0deg); }
+}
+.animate-jolt {
+    animation: jolt-frames 2.0s infinite !important;
+}
 
 /* Card 3 human body / organ interface styles */
 .image-section {

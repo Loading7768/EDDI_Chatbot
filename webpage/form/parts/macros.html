@@ -20,11 +20,11 @@
             ]">
 
         <span x-show="step.currentStatus === STATUS.LOADING"
-            class="animate-spin-spring flex items-center material-symbols-rounded">
+            class="animate-spin-spring flex items-center material-symbols-rounded select-none">
             data_usage
         </span>
         <span x-show="step.currentStatus === STATUS.SUCCESS"
-            class="flex items-center material-symbols-rounded">
+            class="flex items-center material-symbols-rounded select-none">
             check_circle
         </span>
         <span x-show="step.currentStatus === STATUS.IDLE">{{ label }}</span>

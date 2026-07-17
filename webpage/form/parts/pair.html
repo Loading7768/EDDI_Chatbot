@@ -75,7 +75,7 @@
 
                         <!-- Icon -->
                         <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-                            <span class="material-symbols-rounded text-slate-400">sync_alt</span>
+                            <span class="material-symbols-rounded text-slate-400 select-none">sync_alt</span>
                         </div>
 
                         <!-- Patient side -->
@@ -95,7 +95,7 @@
                                 </span>
                             </div>
                             
-                            <span class="material-symbols-rounded">account_circle</span>
+                            <span class="material-symbols-rounded select-none">account_circle</span>
                         </div>
                     </div>
 
@@ -109,8 +109,8 @@
                                     : 'text-amber-400 bg-amber-950 rounded-[2rem] ' + ((idx === 0 && !step.hasSelf) ? 'h-24' : 'h-14')"
                                  @click="step.selectedIdx = idx;">
                                 
-                                <span class="material-symbols-rounded transition-all duration-200 ease-spring"
-                                        :class="step.selectedIdx === idx ? 'w-6 mr-2' : 'w-0 -translate-x-12'">
+                                <span class="material-symbols-rounded transition-all duration-200 ease-spring select-none"
+                                      :class="step.selectedIdx === idx ? 'w-6 mr-2' : 'w-0 -translate-x-12'">
                                         check_circle
                                 </span>
                                 
@@ -141,7 +141,7 @@
                             : 'h-14 text-blue-400 bg-blue-950 rounded-lg'"
                          @click="if(step.selectedIdx !== -1) step.selectedIdx = -1;">
 
-                        <span class="material-symbols-rounded transition-all duration-200 ease-spring"
+                        <span class="material-symbols-rounded transition-all duration-200 ease-spring select-none"
                                 :class="step.selectedIdx === -1 ? 'w-6 mr-2' : 'w-0 -translate-x-12'">
                                 add_circle
                         </span>
@@ -192,7 +192,7 @@
 <template x-if="step.completed && i !== currentStep">
     <div class="flex items-center gap-4 animate-fade-in">
 
-        <span class="material-symbols-rounded text-blue-400">account_circle</span>
+        <span class="material-symbols-rounded text-blue-400 select-none">account_circle</span>
 
         <div class="flex text-blue-400">
             <span class="mr-2 text-amber-400" x-text="step.selectedRelation?.relation"></span>

@@ -58,7 +58,7 @@
                             'rounded-s-[2rem]': edit
                             }">
 
-                    <span class="flex items-center material-symbols-rounded"
+                    <span class="flex items-center material-symbols-rounded select-none"
                           x-text="step.key === 'auth' ? 'logout' : 'edit'"></span>
                 </button>
             </div>
@@ -66,10 +66,10 @@
             <!-- Node links -->
             <div data-flip
                  x-show="i < steps.length - 1"
-                 class="flex-1 w-1 ml-[38px] transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+                 class="w-1 ml-[38px] transition-colors duration-200"
                  :class="{
                     'h-[4px]': currentStep === 3,
-                    'max-h-[36px]': currentStep !== 3,
+                    'max-h-[12px] flex-1': currentStep !== 3,
                     'bg-blue-900': step.completed,
                     'bg-slate-900': !step.completed
                 }">

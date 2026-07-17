@@ -73,7 +73,7 @@
                             <span class="font-bold text-slate-100" x-text="step.activeRegion"></span>
                             <button @click.stop="step.activeRegion = null"
                                 class="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition-colors focus:outline-none">
-                                <span class="material-symbols-rounded text-[18px]">close</span>
+                                <span class="material-symbols-rounded text-[18px] select-none">close</span>
                             </button>
                         </div>
                         <div class="pop-checkbox-list">
@@ -83,7 +83,7 @@
                                     @click.stop="toggleSymptom(topic)">
                                     <template x-if="step.selectedSymptoms.includes(topic)">
                                         <span
-                                            class="material-symbols-rounded text-emerald-400 mr-2 text-[18px]">check</span>
+                                            class="material-symbols-rounded text-emerald-400 mr-2 text-[18px] select-none">check</span>
                                     </template>
                                     <span x-text="topic"></span>
                                 </div>
@@ -130,7 +130,7 @@
 <template x-if="step.completed && i !== currentStep">
     <div class="flex items-center gap-4 animate-fade-in">
         
-        <span class="material-symbols-rounded text-blue-400">sick</span>
+        <span class="material-symbols-rounded text-blue-400 select-none">sick</span>
 
         <div class="flex flex-wrap gap-1">
             <template x-for="topic in step.selectedSymptoms" :key="topic">

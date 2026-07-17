@@ -33,26 +33,36 @@
 {% endmacro %}
 
 {% macro text_input(inputId, inputType, label) %}
-<div class="relative" x-data="{ focused: false }">
-    <input type="{{ inputType }}"
+<div class="relative" x-data="{ focused: false{% if inputType == 'password' %}, showPassword: false{% endif %} }">
+    <input {% if inputType == 'password' %}:type="showPassword ? 'text' : 'password'"{% else %}type="{{ inputType }}"{% endif %}
             id="{{ inputId }}"
             x-model="step.draft.{{ inputId }}"
             @focus="focused = true; step.error = null"
             @blur="focused = false"
-            class="w-full font-medium text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] px-6 py-3 focus:outline-none peer"
+            class="w-full font-medium text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] px-6 py-3 focus:outline-none peer{% if inputType == 'password' %} pr-12{% endif %}"
             :class="focused ? 'border-blue-400' :
                     step.error ? 'border-red-400' : ''"
-            placeholder=" " />
+            placeholder=" "/>
     <label for="{{ inputId }}"
             class="absolute font-medium start-4 top-4 rounded-lg z-10
                     transition-all duration-200 ease-spring"
             :class="[
-                focused ? '-translate-y-7 text-blue-950 bg-blue-400 px-4' :
-                step.error ? '-translate-y-7 text-red-950 bg-red-400 px-4' :
-                step.draft.{{ inputId }} ? '-translate-y-7 text-slate-400 bg-transparent px-2' : 'text-slate-400 px-2'
+                focused ? '-translate-y-7 text-blue-950 bg-blue-400 px-5' :
+                step.error ? '-translate-y-7 text-red-950 bg-red-400 px-5' :
+                step.draft.{{ inputId }} ? '-translate-y-7 text-slate-950 bg-slate-400 px-2.5' : 'text-slate-400 px-2.5'
             ]">
         {{ label }}
     </label>
+    {% if inputType == 'password' %}
+    <button type="button"
+            @click="showPassword = !showPassword"
+            tabindex="-1"
+            class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 transition-all duration-200 ease-spring focus:outline-none"
+            :class="showPassword ? 'bg-slate-400 text-slate-950 rounded-lg' : 'bg-transparent text-slate-400 rounded-[2rem]'"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'">
+        <span class="flex items-center material-symbols-rounded text-xl select-none" x-text="showPassword ? 'visibility' : 'visibility_off'"></span>
+    </button>
+    {% endif %}
 </div>
 {% endmacro %}
 

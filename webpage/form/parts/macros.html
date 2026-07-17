@@ -63,12 +63,12 @@
             x-model="step.draft.{{ inputId }}"
             @focus="focused = true; step.error = null"
             @blur="focused = false"
-            class="w-full font-medium text-xs text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] pl-[4.5rem] pr-4 py-3 focus:outline-none peer"
+            class="w-full font-medium text-sm text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] pl-[4.5rem] pr-4 py-2 focus:outline-none peer"
             :class="focused ? 'border-blue-400' :
                     step.error ? 'border-red-400' : ''"
             placeholder=" " />
     <label for="{{ inputId }}"
-            class="absolute w-14 text-sm font-medium flex start-2 top-2 py-1 rounded-lg z-10
+            class="absolute w-14 text-sm font-medium flex start-1.5 top-1.5 py-1 rounded-s-xl rounded-e-md z-10
                     transition-all duration-200 ease-spring"
             :class="[
                 focused ? 'justify-center text-blue-950 bg-blue-400' :

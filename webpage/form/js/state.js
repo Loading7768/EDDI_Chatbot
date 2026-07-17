@@ -13,6 +13,7 @@ const initSteps = () => ([
             account:'',
             password: '',
         },
+
         doctorName: '',
         doctorDept: '',
     },
@@ -24,17 +25,18 @@ const initSteps = () => ([
         
         paired: false,
         pairingCode: '',
-        lineUuid: '',
-        lineUname: '',
-        relations: [],
-        selectedRelation: null,
-        draft: {
-            self: { type: 'self', relation: '帳號本人', mrc: '' },
-            new: { type: 'new', relation: '', mrc: '' }
-        },
 
-        pairSelectError: '',
-        existingScrolled: false,
+        lineUname: '',
+        savedRelations: [],
+        hasSelf: false,
+        selectedIdx: 0,
+        draft: {
+            self: { mrc: '' },
+            new: { relation: '', mrc: '' }
+        },
+        selectedRelation: { relation: '', mrc: '' },
+
+        lineUuid: '',
     },
     {
         key: 'symptoms',

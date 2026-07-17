@@ -225,12 +225,9 @@ def form_pair():
     else:
         return jsonify({"success": False, "message": "配對碼錯誤或不存在"})
 
-@form_bp.route('/api/form_discharge', methods=['POST'])
-def form_discharge():
+@form_bp.route('/api/form_patient', methods=['POST'])
+def form_patient():
     data = request.json
-    symptoms = data.get('symptoms', [])
-    session['symptoms'] = symptoms
-    # Persist selected patient so page reload can resume at review
     mrc = data.get('medical_record_num', '')
     relation = data.get('relation', '')
     if mrc:
@@ -239,11 +236,17 @@ def form_discharge():
         session['selected_relation'] = relation
     return jsonify({"success": True})
 
+@form_bp.route('/api/form_symptoms', methods=['POST'])
+def form_symptoms():
+    data = request.json
+    symptoms = data.get('symptoms', [])
+    session['symptoms'] = symptoms
+    return jsonify({"success": True})
+
 @form_bp.route('/api/form_submit', methods=['POST'])
 def form_submit():
-    data = request.json
-    medical_record_num = data.get("medical_record_num")
-    relation = data.get("relation")
+    medical_record_num = session.get('selected_mrc')
+    relation = session.get('selected_relation')
     
     doctor_id = session.get('doctor_id')
     line_id = session.get('line_uuid')

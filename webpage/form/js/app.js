@@ -143,16 +143,15 @@ document.addEventListener('alpine:init', () => {
                 await this.delay(300);
                 step.lineUname = data.line_uname;
                 step.lineUuid = data.line_uuid;
-                step.relations = data.relations || [];
+                step.savedRelations = data.relations || [];
                 step.paired = true;
 
                 // Pre-processing for select patient
-                const hasSelf = step.relations.some(r => r.relation === '帳號本人');
-                if (!hasSelf) {
-                    step.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
+                step.hasSelf = step.savedRelations.some(r => r.relation === '帳號本人');
+                if (!step.hasSelf) {
+                    step.savedRelations.unshift({ relation: '帳號本人', medical_record_num: '' });
                 }
-                step.relations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                step.selectedRelation = { type: 'existing_0', relation: step.relations[0].relation, mrc: step.relations[0].medical_record_num };
+                step.savedRelations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
                 
             } catch (err) {
                 step.error = err.message;
@@ -163,68 +162,75 @@ document.addEventListener('alpine:init', () => {
 
         async confirmPatient() {
             const step = this.steps[1];
-            if (!step.selectedRelation) return;
-            step.pairSelectError = '';
+            step.error = '';
 
-            // Resolve effective mrc: for 帳號本人 with blank mrc, use draft input
-            let effectiveMrc = step.selectedRelation.mrc;
-            const isSelfInput = step.selectedRelation.type.startsWith('existing')
-                && step.selectedRelation.relation === '帳號本人'
-                && !step.selectedRelation.mrc;
-            if (isSelfInput) {
-                effectiveMrc = step.draft.self.mrc.trim();
-            }
+            // Resolve relation input & validate
+            if (step.selectedIdx == -1) { // new
+                step.selectedRelation.relation = step.draft.new.relation;
+                step.selectedRelation.mrc = step.draft.new.mrc;
 
-            // Validate
-            if (isSelfInput && !effectiveMrc) return;
-            if (step.selectedRelation.type === 'new' && (!step.selectedRelation.mrc || !step.selectedRelation.relation)) return;
-
-            if (isSelfInput || step.selectedRelation.type === 'new') {
-                const rel = isSelfInput ? '帳號本人' : step.selectedRelation.relation.trim();
-                const mrc = isSelfInput ? effectiveMrc : step.selectedRelation.mrc.trim();
-
-                if (step.selectedRelation.type === 'new' && (rel === '新增' || rel === '帳號本人')) {
-                    step.pairSelectError = '稱呼和病歷號不可重複';
-                    return;
-                }
-
-                const isDup = step.relations.some(r => r.relation !== '帳號本人' && (r.relation === rel || r.medical_record_num === mrc));
+                // Validate
+                const isDup = step.savedRelations.some(
+                    r => r.relation === step.selectedRelation.relation || r.medical_record_num === step.selectedRelation.mrc);
                 if (isDup) {
-                    step.pairSelectError = '稱呼和病歷號不可重複';
+                    step.error = '稱呼和病歷號不可重複';
                     return;
                 }
-            }
+            }else if(step.selectedIdx == 0 && !step.hasSelf) { // self input
+                step.selectedRelation.relation = '帳號本人';
+                step.selectedRelation.mrc = step.draft.self.mrc;
 
-            let text = '';
-            let matchedRelationObj = null;
-            if (step.selectedRelation.type.startsWith('existing')) {
-                const idx = parseInt(step.selectedRelation.type.split('_')[1]);
-                matchedRelationObj = step.relations[idx];
-                text = step.selectedRelation.relation;
-            } else {
-                text = step.selectedRelation.relation || '？？？';
-            }
-
-            const finalMrc = effectiveMrc || step.selectedRelation.mrc;
-
-            // Prefill selection based on patient
-            const symptomStep = this.steps[2];
-            if (symptomStep.sessionLoaded) {
-                symptomStep.sessionLoaded = false;
-            } else {
-                if (matchedRelationObj && matchedRelationObj.prefilled_symptoms && matchedRelationObj.prefilled_symptoms.length > 0) {
-                    symptomStep.selectedSymptoms = [...matchedRelationObj.prefilled_symptoms];
-                    symptomStep.showPrefillMsg = true;
-                } else {
-                    symptomStep.selectedSymptoms = [];
-                    symptomStep.showPrefillMsg = false;
+                // Validate
+                const isDup = step.savedRelations.some(r => r.medical_record_num === step.selectedRelation.mrc);
+                if (isDup) {
+                    step.error = '稱呼和病歷號不可重複';
+                    return;
                 }
+            }else { // select existing
+                step.selectedRelation.relation = step.savedRelations[step.selectedIdx].relation;
+                step.selectedRelation.mrc = step.savedRelations[step.selectedIdx].medical_record_num;
+
+                // Get records
+                let pastSymptoms = null;
+                pastSymptoms = step.savedRelations[step.selectedIdx].prefilled_symptoms;
+                // Prefill selection based on patient
+                const symptomStep = this.steps[2];
+                if (symptomStep.sessionLoaded) {
+                    symptomStep.sessionLoaded = false;
+                } else {
+                    if (pastSymptoms) {
+                        symptomStep.selectedSymptoms = [...pastSymptoms];
+                        symptomStep.showPrefillMsg = true;
+                    } else {
+                        symptomStep.selectedSymptoms = [];
+                        symptomStep.showPrefillMsg = false;
+                    }
+                }
+            }
+
+            // Save selected relation to session
+            try {
+                const res = await fetch('/api/form_patient', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        medical_record_num: step.selectedRelation.mrc,
+                        relation: step.selectedRelation.relation,
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    step.error = data.message || '儲存失敗';
+                    return;
+                }
+            } catch (e) {
+                console.error('Error saving patient:', e);
+                step.error = '網路錯誤，請再試一次';
+                return;
             }
 
             step.currentStatus = STATUS.SUCCESS;
             await this.delay(300);
-            step.selectedRelation.mrc = finalMrc;
-            step.value = `${text} (${finalMrc})`;
             step.completed = true;
             this.nextStep();
             step.currentStatus = STATUS.IDLE;
@@ -291,21 +297,14 @@ document.addEventListener('alpine:init', () => {
 
         async confirmSymptoms() {
             const step = this.steps[2];
-            const pairStep = this.steps[1];
             if (step.selectedSymptoms.length < 1) return;
-
-            const selectedRelation = pairStep.selectedRelation;
-            const mrc = selectedRelation?.mrc?.trim() || '';
-            const relation = selectedRelation?.type === 'self' ? '帳號本人' : (selectedRelation?.relation?.trim() || '');
             
             try {
-                const res = await fetch('/api/form_discharge', {
+                const res = await fetch('/api/form_symptoms', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         symptoms: step.selectedSymptoms,
-                        medical_record_num: mrc,
-                        relation: relation,
                     })
                 });
                 const data = await res.json();
@@ -327,23 +326,15 @@ document.addEventListener('alpine:init', () => {
         // ========== Review Step ==========
         async submitForm() {
             const step = this.steps[3];
-            const pairStep = this.steps[1];
 
             step.currentStatus = STATUS.LOADING;
             step.error = '';
-
-            const selectedRelation = pairStep.selectedRelation;
-            const mrc = selectedRelation?.mrc?.trim();
-            const relation = selectedRelation?.type === 'self' ? '帳號本人' : selectedRelation?.relation?.trim();
 
             try {
                 const res = await fetch('/api/form_submit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        medical_record_num: mrc,
-                        relation: relation,
-                    })
+                    body: JSON.stringify({})
                 });
                 const data = await res.json();
 
@@ -380,20 +371,20 @@ document.addEventListener('alpine:init', () => {
                 const pairStep = this.steps[1];
                 pairStep.lineUname = pairing.line_uname;
                 pairStep.lineUuid = pairing.line_uuid;
-                pairStep.relations = pairing.relations || [];
+                pairStep.savedRelations = pairing.relations || [];
                 pairStep.paired = true;
 
                 // Default selection (same logic as post-pair)
-                const hasSelf = pairStep.relations.some(r => r.relation === '帳號本人');
-                if (!hasSelf) {
-                    pairStep.relations.unshift({ relation: '帳號本人', medical_record_num: '' });
+                pairStep.hasSelf = pairStep.savedRelations.some(r => r.relation === '帳號本人');
+                if (!pairStep.hasSelf) {
+                    pairStep.savedRelations.unshift({ relation: '帳號本人', medical_record_num: '' });
                 }
-                pairStep.relations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
-                pairStep.selectedRelation = { type: 'existing_0', relation: pairStep.relations[0].relation, mrc: pairStep.relations[0].medical_record_num };
+                pairStep.savedRelations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
+                pairStep.selectedIdx = 0;
 
                 // If patient was previously confirmed, restore full progress
                 if (pairing.selected_mrc && pairing.selected_relation) {
-                    const restoredIdx = pairStep.relations.findIndex(r => r.relation === pairing.selected_relation);
+                    const restoredIdx = pairStep.savedRelations.findIndex(r => r.relation === pairing.selected_relation);
                     pairStep.selectedRelation = {
                         type: 'existing_' + (restoredIdx >= 0 ? restoredIdx : 0),
                         relation: pairing.selected_relation,

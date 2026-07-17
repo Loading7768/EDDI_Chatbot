@@ -1,12 +1,12 @@
 /* ========== Fade-in Animation ========== */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 .animate-fade-in {
-  animation: fade-in 300ms ease-out 300ms both;
-  /* ↑ delay=300ms, fill-mode=both starts it at opacity:0 immediately (no flash) */
+    animation: fade-in 300ms ease-out 300ms both;
+    /* ↑ delay=300ms, fill-mode=both starts it at opacity:0 immediately (no flash) */
 }
 
 

@@ -12,24 +12,15 @@ document.addEventListener('alpine:init', () => {
             window.flipAnimate(elements, mutateFn);
         },
 
-        async nextStep() {
+        nextStep() {
             if (this.currentStep < this.steps.length) {
-                // next = this.currentStep + 1;
-                // this.currentStep = -2;
-                // await this.delay(200);
-                // this.currentStep = next;
                 this.runWithNodeFlip(() => {
                     this.currentStep++;
                 });
             }
         },
 
-        async jumpTo(i) {
-            // this.prevStep = this.currentStep;
-            // this.currentStep = -2;
-            // await this.delay(200);
-            // this.currentStep = i;
-            // this.edit = false;
+        jumpTo(i) {
             this.runWithNodeFlip(() => {
                 this.prevStep = this.currentStep;
                 this.currentStep = i;
@@ -112,9 +103,6 @@ document.addEventListener('alpine:init', () => {
             this.runWithNodeFlip(() => {
                 this.currentStep = this.prevStep;
             });
-            // this.currentStep = -2;
-            // await this.delay(200);
-            // this.currentStep = this.prevStep;
         },
 
 
@@ -144,7 +132,9 @@ document.addEventListener('alpine:init', () => {
                 step.lineUname = data.line_uname;
                 step.lineUuid = data.line_uuid;
                 step.savedRelations = data.relations || [];
-                step.paired = true;
+                this.runWithNodeFlip(() => {
+                    step.paired = true;
+                });
 
                 // Pre-processing for select patient
                 step.hasSelf = step.savedRelations.some(r => r.relation === '帳號本人');

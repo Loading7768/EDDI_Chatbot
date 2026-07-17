@@ -27,8 +27,7 @@
         {% from 'form/parts/macros.html' import card_header, footer_button, text_input, small_text_input %}
         {% set step_keys = ['auth', 'pair', 'symptoms', 'review'] %}
         {% for key in step_keys %}
-        <div class="contents" 
-             x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] }}">
+        <div class="contents" x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] }}">
 
             <div class="flex items-stretch gap-1 shrink-0">
                 <!-- Node -->
@@ -66,10 +65,11 @@
 
             <!-- Node links -->
             <div data-flip
-                 x-show="i < steps.length - 1" class="w-1 ml-[38px]"
+                 x-show="i < steps.length - 1"
+                 class="flex-1 w-1 ml-[38px] transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
                  :class="{
                     'h-[4px]': currentStep === 3,
-                    'max-h-[12px] flex-1': currentStep !== 3,
+                    'max-h-[36px]': currentStep !== 3,
                     'bg-blue-900': step.completed,
                     'bg-slate-900': !step.completed
                 }">

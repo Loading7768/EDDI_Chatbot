@@ -21,9 +21,33 @@ function getBrandEasing() {
   return value || 'ease-out'; // fallback if the variable is ever missing
 }
 
+// Tracks any element currently mid-animation from a PRIOR flipAnimate()
+// call, so a rapid second action (click again before the first transition
+// settles) doesn't measure a mid-transition size as its "first" rect. If a
+// new cycle starts while an element is still animating, its old animation
+// is snapped to its resting state immediately (cut short, not dropped —
+// the state change it represented already happened) before the new
+// cycle's measurement begins.
+const activeCleanups = new WeakMap();
+
+function cancelIfAnimating(el) {
+  const cleanup = activeCleanups.get(el);
+  if (cleanup) {
+    cleanup();
+    activeCleanups.delete(el);
+  }
+}
+
 function flipAnimate(elements, mutate, options = {}) {
   const duration = options.duration ?? 500;
   const easing = 'cubic-bezier(0.25,1,0.5,1)';
+
+
+  // Settle any element still mid-animation from a previous cycle BEFORE
+  // measuring "first" rects — otherwise a rapid second action could
+  // capture an in-between (still-transitioning) size/position as if it
+  // were the real starting point, producing a wrong/jumpy animation.
+  elements.forEach((el) => cancelIfAnimating(el));
 
   // FIRST: record starting rects before anything changes. Elements hidden
   // via x-show (display:none) get a rect of all zeros from the browser —
@@ -36,64 +60,127 @@ function flipAnimate(elements, mutate, options = {}) {
     firstRects.set(el, wasHidden ? null : el.getBoundingClientRect());
   });
 
-  // Apply the actual state mutation (e.g. this.currentStep++)
+  // Apply the actual state mutation (e.g. this.currentStep++). This always
+  // runs, regardless of any prior animation state — a state change (like
+  // a real login response coming back) must never be dropped just because
+  // something was still animating.
   mutate();
 
   // Wait for Alpine to finish patching the DOM from that mutation before
   // measuring the "last" rects — measuring too early would just capture
-  // stale (pre-update) layout.
+  // stale (pre-update) layout. The extra rAF after that gives Alpine's own
+  // transition setup (e.g. a newly-mounted child's opacity:0 starting
+  // state) a chance to actually paint first — our own forced reflow below
+  // was previously happening in the same tick as Alpine's setup, which
+  // could collapse its opacity:0 -> opacity:100 into a single frame with
+  // no paint in between, making the child's fade-in invisible.
   Alpine.nextTick(() => {
-    elements.forEach((el) => {
-      if (!document.body.contains(el)) return; // element was removed entirely
-      const first = firstRects.get(el);
-      if (!first) return; // was hidden before (or newly hidden now) — nothing valid to animate from
+    requestAnimationFrame(() => {
+      // PASS 1: measure every element's "last" rect BEFORE touching any
+      // inline styles. Doing measure-then-invert per element in a single
+      // loop (the previous approach) meant an earlier element's invert
+      // step — which forces it back to a smaller/different size — was a
+      // real layout change that could shift where a LATER element (e.g. a
+      // connector sitting right below a node) actually renders. That
+      // later element would then measure a transient, corrupted position
+      // instead of the true settled one, breaking the assumption that its
+      // start/end rects genuinely line up with its neighbor's.
+      const lastRects = new Map();
+      elements.forEach((el) => {
+        if (!document.body.contains(el)) return; // element was removed entirely
+        const isHiddenNow = getComputedStyle(el).display === 'none';
+        if (isHiddenNow) return; // hidden after the change — nothing to show
+        lastRects.set(el, el.getBoundingClientRect());
+      });
 
-      const isHiddenNow = getComputedStyle(el).display === 'none';
-      if (isHiddenNow) return; // hidden after the change too — nothing to show
+      // PASS 2: now that every real final rect is known, invert each
+      // element (pin to its old position/size) without any risk of one
+      // element's change corrupting another's already-captured data.
+      const toPlay = [];
+      elements.forEach((el) => {
+        const first = firstRects.get(el);
+        const last = lastRects.get(el);
+        if (!first || !last) return; // was hidden before/after — skip
 
-      const last = el.getBoundingClientRect();
+        const positionOnly = el.hasAttribute('data-flip-move');
+        const dx = first.left - last.left;
+        const dy = first.top - last.top;
+        const samePosition = Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5;
 
-      const dx = first.left - last.left;
-      const dy = first.top - last.top;
-      const sameSize =
-        Math.abs(first.width - last.width) < 0.5 &&
-        Math.abs(first.height - last.height) < 0.5;
-      const samePosition = Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5;
+        if (positionOnly) {
+          if (samePosition) return; // nothing to animate
+          el.style.transition = 'none';
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          toPlay.push({ el, positionOnly: true, last });
+          return;
+        }
 
-      if (samePosition && sameSize) return; // nothing to animate
+        const sameSize =
+          Math.abs(first.width - last.width) < 0.5 &&
+          Math.abs(first.height - last.height) < 0.5;
+        if (samePosition && sameSize) return; // nothing to animate
 
-      // INVERT: pin the element to its old position and old size,
-      // with transitions disabled so this jump is instant
-      el.style.transition = 'none';
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-      el.style.width = `${first.width}px`;
-      el.style.height = `${first.height}px`;
+        el.style.transition = 'none';
+        el.style.transform = `translate(${dx}px, ${dy}px)`;
+        el.style.width = `${first.width}px`;
+        el.style.height = `${first.height}px`;
+        toPlay.push({ el, positionOnly: false, last });
+      });
 
-      void el.offsetHeight; // force reflow so the browser registers the above
+      // One shared forced reflow covers every inverted element above —
+      // reading a layout property forces the browser to flush ALL
+      // pending style changes at once, not just the one we read from.
+      void document.body.offsetHeight;
 
-      // PLAY: animate to the real new position/size. Target explicit
-      // pixel values (from the already-measured "last" rect), not ''/auto
-      // — CSS transitions can't smoothly interpolate toward auto, so
-      // clearing straight to '' here would make the resize snap instantly
-      // even though transform still animates. Release back to '' only
-      // after the transition finishes, as pure cleanup.
+      // PASS 3: release into the real animation. Targets explicit pixel
+      // values (from the already-measured "last" rect), not ''/auto — CSS
+      // transitions can't smoothly interpolate toward auto, so clearing
+      // straight to '' here would make the resize snap instantly even
+      // though transform still animates. Release back to '' only after
+      // the transition finishes, as pure cleanup.
       requestAnimationFrame(() => {
-        el.style.transition = [
-          `transform ${duration}ms ${easing}`,
-          `width ${duration}ms ${easing}`,
-          `height ${duration}ms ${easing}`,
-        ].join(', ');
-        el.style.transform = 'none';
-        el.style.width = `${last.width}px`;
-        el.style.height = `${last.height}px`;
+        toPlay.forEach(({ el, positionOnly, last }) => {
+          if (positionOnly) {
+            el.style.transition = `transform ${duration}ms ${easing}`;
+            el.style.transform = 'none';
 
-        const cleanup = () => {
-          el.style.transition = '';
-          el.style.width = '';
-          el.style.height = '';
-          el.removeEventListener('transitionend', cleanup);
-        };
-        el.addEventListener('transitionend', cleanup);
+            const cleanup = () => {
+              el.style.transition = '';
+              el.style.transform = '';
+              el.removeEventListener('transitionend', cleanupListener);
+              activeCleanups.delete(el);
+            };
+            const cleanupListener = () => cleanup();
+            el.addEventListener('transitionend', cleanupListener);
+            activeCleanups.set(el, cleanup);
+            return;
+          }
+
+          el.style.transition = [
+            `transform ${duration}ms ${easing}`,
+            `width ${duration}ms ${easing}`,
+            `height ${duration}ms ${easing}`,
+          ].join(', ');
+          el.style.transform = 'none';
+          el.style.width = `${last.width}px`;
+          el.style.height = `${last.height}px`;
+
+          // This same function is also what cancelIfAnimating() calls
+          // early if a new cycle interrupts this one before it finishes
+          // naturally — either way, it lands the element on its real
+          // final values and releases the inline overrides.
+          const cleanup = () => {
+            el.style.transition = '';
+            el.style.transform = '';
+            el.style.width = '';
+            el.style.height = '';
+            el.removeEventListener('transitionend', cleanupListener);
+            activeCleanups.delete(el);
+          };
+          const cleanupListener = () => cleanup();
+          el.addEventListener('transitionend', cleanupListener);
+          activeCleanups.set(el, cleanup);
+        });
       });
     });
   });
@@ -101,4 +188,4 @@ function flipAnimate(elements, mutate, options = {}) {
 
 window.flipAnimate = flipAnimate;
 
-console.log('flip.js loaded.')
+console.log('flip is loaded.')

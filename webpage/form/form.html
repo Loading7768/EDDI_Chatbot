@@ -24,7 +24,7 @@
 <body class="bg-slate-950 min-h-screen">
 
     <div x-data="formApp()" class="max-w-sm mx-auto p-4 min-h-screen flex flex-col justify-center">
-        {% from 'form/parts/macros.html' import card_header, footer_button, text_input %}
+        {% from 'form/parts/macros.html' import card_header, footer_button, text_input, small_text_input %}
         {% set step_keys = ['auth', 'pair', 'symptoms', 'review'] %}
         {% for key in step_keys %}
         <div class="contents" 

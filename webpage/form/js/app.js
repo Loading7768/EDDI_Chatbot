@@ -104,7 +104,9 @@ document.addEventListener('alpine:init', () => {
                 await this.delay(1000);
                 authStep.currentStatus = STATUS.SUCCESS;
                 await this.delay(300);
-                this.steps = initSteps();
+                this.runWithNodeFlip(() => {
+                    this.steps = initSteps();
+                });
                 
             } catch (err) {
                 authStep.error = err instanceof TypeError ? networkError : err.message;

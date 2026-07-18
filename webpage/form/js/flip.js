@@ -93,23 +93,46 @@ function flipAnimate(elements, mutate, options = {}) {
         lastRects.set(el, el.getBoundingClientRect());
       });
 
-      // PASS 2: now that every real final rect is known, invert each
-      // element (pin to its old position/size) without any risk of one
-      // element's change corrupting another's already-captured data.
-      const toPlay = [];
+      // PASS 2: invert each element to its old position/size. Split into
+      // sub-passes because setting explicit width/height on an earlier
+      // element changes the flow position of every later sibling — if we
+      // computed translate offsets from the pre-inversion "last" rects,
+      // those offsets would be wrong for any element whose flow position
+      // shifted due to a *different* element's size inversion.
+
+      // 2a — collect eligible elements and apply SIZE inversions only
+      // (no transform yet). This changes document flow to approximate
+      // the old layout's sizing.
+      const candidates = [];
       elements.forEach((el) => {
         const first = firstRects.get(el);
         const last = lastRects.get(el);
-        if (!first || !last) return; // was hidden before/after — skip
+        if (!first || !last) return;
 
         const positionOnly = el.hasAttribute('data-flip-move');
-        const dx = first.left - last.left;
-        const dy = first.top - last.top;
+        el.style.transition = 'none';
+        if (!positionOnly) {
+          el.style.width = `${first.width}px`;
+          el.style.height = `${first.height}px`;
+        }
+        candidates.push({ el, first, last, positionOnly });
+      });
+
+      // 2b — one forced reflow so the size inversions take effect, then
+      // re-measure every element's actual flow position. Because
+      // transform hasn't been set yet, getBoundingClientRect() returns
+      // pure flow coordinates — unaffected by any visual offset.
+      void document.body.offsetHeight;
+
+      const toPlay = [];
+      candidates.forEach(({ el, first, last, positionOnly }) => {
+        const corrected = el.getBoundingClientRect();
+        const dx = first.left - corrected.left;
+        const dy = first.top - corrected.top;
         const samePosition = Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5;
 
         if (positionOnly) {
-          if (samePosition) return; // nothing to animate
-          el.style.transition = 'none';
+          if (samePosition) return;
           el.style.transform = `translate(${dx}px, ${dy}px)`;
           toPlay.push({ el, positionOnly: true, last });
           return;
@@ -118,18 +141,19 @@ function flipAnimate(elements, mutate, options = {}) {
         const sameSize =
           Math.abs(first.width - last.width) < 0.5 &&
           Math.abs(first.height - last.height) < 0.5;
-        if (samePosition && sameSize) return; // nothing to animate
+        if (samePosition && sameSize) {
+          // Nothing to animate — undo the size override.
+          el.style.width = '';
+          el.style.height = '';
+          return;
+        }
 
-        el.style.transition = 'none';
         el.style.transform = `translate(${dx}px, ${dy}px)`;
-        el.style.width = `${first.width}px`;
-        el.style.height = `${first.height}px`;
         toPlay.push({ el, positionOnly: false, last });
       });
 
-      // One shared forced reflow covers every inverted element above —
-      // reading a layout property forces the browser to flush ALL
-      // pending style changes at once, not just the one we read from.
+      // 2c — one more forced reflow so all transforms are committed
+      // before Pass 3 starts the animation.
       void document.body.offsetHeight;
 
       // PASS 3: release into the real animation. Targets explicit pixel
@@ -150,7 +174,7 @@ function flipAnimate(elements, mutate, options = {}) {
               el.removeEventListener('transitionend', cleanupListener);
               activeCleanups.delete(el);
             };
-            const cleanupListener = () => cleanup();
+            const cleanupListener = (e) => { if (e.target === el) cleanup(); };
             el.addEventListener('transitionend', cleanupListener);
             activeCleanups.set(el, cleanup);
             return;
@@ -177,7 +201,7 @@ function flipAnimate(elements, mutate, options = {}) {
             el.removeEventListener('transitionend', cleanupListener);
             activeCleanups.delete(el);
           };
-          const cleanupListener = () => cleanup();
+          const cleanupListener = (e) => { if (e.target === el && e.propertyName === 'transform') cleanup(); };
           el.addEventListener('transitionend', cleanupListener);
           activeCleanups.set(el, cleanup);
         });

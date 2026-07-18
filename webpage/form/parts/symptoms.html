@@ -6,7 +6,7 @@
         {{ card_header('請選擇要提供的衛教資料') }}
 
         <!-- Body: explicit max-height so overflow-y-auto actually triggers -->
-        <div class="px-4 relative select-none pb-2 overflow-y-auto max-h-[50vh]"
+        <div class="mb-2 px-4 relative select-none overflow-y-auto max-h-[50vh]"
             @click.away="step.activeRegion = null">
 
             <!-- Image Wrapper -->
@@ -112,7 +112,11 @@
                 </div>
             </div>
 
+            <!-- Error Display -->
+            {{ error_display() }}
+
         </div>
+
 
         <!-- Footer -->
         {{ footer_button(

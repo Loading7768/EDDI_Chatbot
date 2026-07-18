@@ -9,7 +9,7 @@
                 {{ card_header('請輸入配對碼') }}
 
                 <!-- Body -->
-                <div class="flex-1 overflow-y-auto items-center px-4 mt-16 mb-10">
+                <div class="flex-1 overflow-y-auto items-center px-4 mt-16 mb-0">
 
                     <!-- Input Wrapper  -->
                     <div class="relative flex items-center justify-center px-4" dir="ltr"
@@ -21,7 +21,7 @@
                             @input="step.pairingCode = step.pairingCode.replace(/[^0-9]/g, '')"
                             @mousedown.prevent="$el.focus()"
                             @keyup="$el.setSelectionRange($el.value.length, $el.value.length)"
-                            @focus="focused = true; $nextTick(() => $el.setSelectionRange($el.value.length, $el.value.length))"
+                            @focus="focused = true; step.error = ''; $nextTick(() => $el.setSelectionRange($el.value.length, $el.value.length))"
                             @blur="focused = false"
                             class="absolute w-full h-full opacity-0 select-none caret-transparent z-10"/>
 
@@ -39,7 +39,8 @@
                         </template>
                     </div>
 
-                    <div x-show="step.error" class="text-red-500 font-medium text-center my-6" x-text="step.error"></div>
+                    <!-- Error Display -->
+                    {{ error_display() }}
 
                 </div>
 
@@ -62,10 +63,10 @@
                 {{ card_header('請選擇本次聊天病患') }}
 
                 <!-- Body -->
-                <div class="flex-1 overflow-y-auto p-4 flex-col">
+                <div class="flex-1 overflow-y-auto px-4 flex-col">
 
                     <!-- LINE and Patient Status display -->
-                    <div class="flex relative items-center justify-between mb-10 px-5 py-4 bg-slate-700/50 rounded-2xl">
+                    <div class="flex relative items-center justify-between my-6 px-5 py-4 bg-slate-700/50 rounded-2xl">
                         <!-- LINE side -->
                         <div class="flex items-center space-x-2 w-1/2 min-w-0 mr-4">
                             <div class="w-6 h-6 bg-slate-400 [mask-image:url('/assets/svg/line_icon.svg')]
@@ -100,14 +101,14 @@
                     </div>
 
                     <!-- SELF & EXISTING (Scrollable)-->
-                    <div class="h-[150px] overflow-y-auto flex flex-col gap-1">
+                    <div class="max-h-[150px] overflow-y-auto flex flex-col gap-1">
 
                         <!-- List Item -->
                         <template x-for="(r, idx) in step.savedRelations" :key="idx">
                             <div class="flex p-4 h-14 items-center justify-center transition-all duration-200 ease-spring"
                                  :class="step.selectedIdx !== idx ? 'text-blue-400 bg-blue-950 rounded-lg'
                                     : 'text-amber-400 bg-amber-950 rounded-[2rem] ' + ((idx === 0 && !step.hasSelf) ? 'h-24' : 'h-14')"
-                                 @click="step.selectedIdx = idx;">
+                                 @click="step.selectedIdx = idx; step.error = '';">
                                 
                                 <span class="material-symbols-rounded transition-all duration-200 ease-spring select-none"
                                       :class="step.selectedIdx === idx ? 'w-6 mr-2' : 'w-0 -translate-x-12'">
@@ -139,7 +140,7 @@
                     <div class="w-full flex items-center px-4 mt-3 overflow-hidden transition-all duration-200 ease-spring"
                          :class="step.selectedIdx === -1 ? 'h-28 text-amber-400 bg-amber-950 rounded-[2rem]'
                             : 'h-14 text-blue-400 bg-blue-950 rounded-lg'"
-                         @click="if(step.selectedIdx !== -1) step.selectedIdx = -1;">
+                         @click="if(step.selectedIdx !== -1) step.selectedIdx = -1; step.error = '';">
 
                         <span class="material-symbols-rounded transition-all duration-200 ease-spring select-none"
                                 :class="step.selectedIdx === -1 ? 'w-6 mr-2' : 'w-0 -translate-x-12'">
@@ -163,12 +164,10 @@
 
 
                     </div>
-
-                <!-- Error msg display -->
-                <div x-show="step.error" x-transition
-                    class="text-red-500 text-sm font-medium text-center mt-2 shrink-0"
-                    x-text="step.error"></div>
                 </div>
+
+                <!-- Error Display -->
+                {{ error_display() }}
 
                 <!-- Footer -->
                 {{ footer_button(

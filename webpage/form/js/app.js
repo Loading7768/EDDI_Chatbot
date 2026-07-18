@@ -1,3 +1,5 @@
+const networkError = '伺服器連線失敗';
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('formApp', () => ({
         currentStep: 0,
@@ -79,24 +81,36 @@ document.addEventListener('alpine:init', () => {
                 authStep.completed = true;
                 this.nextStep();
                 authStep.authed = true;
+
             } catch (err) {
-                authStep.error = err.message;
+                authStep.error = err instanceof TypeError ? networkError : err.message;
             }
+
             authStep.currentStatus = STATUS.IDLE;
         },
 
         async confirmLogout() {
             const authStep = this.steps[0];
+            authStep.error = '';
             authStep.currentStatus = STATUS.LOADING;
 
             try {
-                await fetch('api/form_logout', { method: 'POST' });
-            } catch (e) { }
+                const resp = await fetch('api/form_logout', { method: 'POST' });
 
-            await this.delay(1000);
-            authStep.currentStatus = STATUS.SUCCESS;
-            await this.delay(300);
-            this.steps = initSteps();
+                if(!resp) {
+                    throw new Error(networkError);
+                }
+                
+                await this.delay(1000);
+                authStep.currentStatus = STATUS.SUCCESS;
+                await this.delay(300);
+                this.steps = initSteps();
+                
+            } catch (err) {
+                authStep.error = err instanceof TypeError ? networkError : err.message;
+            }
+
+            authStep.currentStatus = STATUS.IDLE;
         },
 
         async cancelLogout() {
@@ -144,9 +158,10 @@ document.addEventListener('alpine:init', () => {
                 step.savedRelations.sort((a, b) => (a.relation === '帳號本人') ? -1 : (b.relation === '帳號本人') ? 1 : 0);
                 
             } catch (err) {
-                step.error = err.message;
+                step.error = err instanceof TypeError ? networkError : err.message;
                 step.pairingCode = '';
             }
+
             step.currentStatus = STATUS.IDLE;
         },
 
@@ -156,24 +171,24 @@ document.addEventListener('alpine:init', () => {
 
             // Resolve relation input & validate
             if (step.selectedIdx == -1) { // new
-                step.selectedRelation.relation = step.draft.new.relation;
-                step.selectedRelation.mrc = step.draft.new.mrc;
+                step.selectedRelation.relation = step.draft.new.relation.trim();
+                step.selectedRelation.mrc = step.draft.new.mrc.trim();
 
                 // Validate
                 const isDup = step.savedRelations.some(
                     r => r.relation === step.selectedRelation.relation || r.medical_record_num === step.selectedRelation.mrc);
                 if (isDup) {
-                    step.error = '稱呼和病歷號不可重複';
+                    step.error = '稱呼、病歷號不可重複';
                     return;
                 }
             }else if(step.selectedIdx == 0 && !step.hasSelf) { // self input
                 step.selectedRelation.relation = '帳號本人';
-                step.selectedRelation.mrc = step.draft.self.mrc;
+                step.selectedRelation.mrc = step.draft.self.mrc.trim();
 
                 // Validate
                 const isDup = step.savedRelations.some(r => r.medical_record_num === step.selectedRelation.mrc);
                 if (isDup) {
-                    step.error = '稱呼和病歷號不可重複';
+                    step.error = '病歷號不可重複';
                     return;
                 }
             }else { // select existing
@@ -210,19 +225,19 @@ document.addEventListener('alpine:init', () => {
                 });
                 const data = await res.json();
                 if (!data.success) {
-                    step.error = data.message || '儲存失敗';
-                    return;
+                    throw new Error(data.message);
                 }
-            } catch (e) {
-                console.error('Error saving patient:', e);
-                step.error = '網路錯誤，請再試一次';
+
+                step.currentStatus = STATUS.SUCCESS;
+                await this.delay(300);
+                step.completed = true;
+                this.nextStep();
+
+            } catch (err) {
+                step.error = err instanceof TypeError ? networkError : err.message;
                 return;
             }
 
-            step.currentStatus = STATUS.SUCCESS;
-            await this.delay(300);
-            step.completed = true;
-            this.nextStep();
             step.currentStatus = STATUS.IDLE;
         },
 
@@ -298,17 +313,21 @@ document.addEventListener('alpine:init', () => {
                     })
                 });
                 const data = await res.json();
-                if (data.success) {
-                    step.currentStatus = STATUS.SUCCESS
-                    await this.delay(300);
-                    step.value = step.selectedSymptoms.join(', ');
-                    step.completed = true;
-                    this.nextStep();
-                    step.currentStatus = STATUS.IDLE;
+                if (!data.success) {
+                    throw new Error(data.message);
                 }
-            } catch (e) {
-                console.error('Error saving symptoms:', e);
+
+                step.currentStatus = STATUS.SUCCESS
+                await this.delay(300);
+                step.value = step.selectedSymptoms.join(', ');
+                step.completed = true;
+                this.nextStep();
+                
+            } catch (err) {
+                step.error = err instanceof TypeError ? networkError : err.message;
             }
+
+            step.currentStatus = STATUS.IDLE;
         },
 
 
@@ -332,13 +351,15 @@ document.addEventListener('alpine:init', () => {
                 if (!data.success) {
                     throw new Error(data.message);
                 }
+                
                 if (data.redirect) {
                     window.location.href = data.redirect;
                     this.steps = initSteps();
                     this.currentStep = 0;
                 }
+
             } catch (err) {
-                step.error = err.message;
+                step.error = err instanceof TypeError ? networkError : err.message;
             }
 
             step.currentStatus = STATUS.IDLE;

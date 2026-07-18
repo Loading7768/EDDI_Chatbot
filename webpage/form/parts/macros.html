@@ -48,7 +48,7 @@
                     transition-all duration-200 ease-spring"
             :class="[
                 focused ? '-translate-y-7 text-blue-950 bg-blue-400 px-5' :
-                step.error ? '-translate-y-7 text-red-950 bg-red-400 px-5' :
+                step.error ? '-translate-y-7 text-red-950 bg-red-400 px-2.5' :
                 step.draft.{{ inputId }} ? '-translate-y-7 text-slate-950 bg-slate-400 px-2.5' : 'text-slate-400 px-2.5'
             ]">
         {{ label }}
@@ -73,19 +73,28 @@
             x-model="step.draft.{{ inputId }}"
             @focus="focused = true; step.error = null"
             @blur="focused = false"
-            class="w-full font-medium text-sm text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] pl-[4.5rem] pr-4 py-2 focus:outline-none peer"
+            class="w-full font-medium text-sm text-slate-200 bg-slate-700 border-2 border-transparent rounded-[1rem] pl-[4.75rem] pr-4 py-2 focus:outline-none peer"
             :class="focused ? 'border-blue-400' :
                     step.error ? 'border-red-400' : ''"
             placeholder=" " />
     <label for="{{ inputId }}"
-            class="absolute w-14 text-sm font-medium flex start-1.5 top-1.5 py-1 rounded-s-xl rounded-e-md z-10
+            class="absolute text-sm font-medium flex start-1.5 top-1.5 py-1 rounded-s-xl rounded-e-md z-10
                     transition-all duration-200 ease-spring"
             :class="[
-                focused ? 'justify-center text-blue-950 bg-blue-400' :
-                step.error ? 'justify-center text-red-950 bg-red-400' :
-                step.draft.{{ inputId }} ? 'justify-center text-slate-950 bg-slate-400' : 'start-6 text-slate-400'
+                focused ? 'justify-center text-blue-950 bg-blue-400 w-16' :
+                step.error ? 'justify-center text-red-950 bg-red-400 w-14' :
+                step.draft.{{ inputId }} ? 'justify-center text-slate-950 bg-slate-400 w-14' : 'start-6 text-slate-400 w-14'
             ]">
         {{ label }}
     </label>
+</div>
+{% endmacro %}
+
+{% macro error_display() %}
+<div class="w-fit flex justify-center mx-auto font-medium text-sm text-red-400 bg-red-950/40 rounded-2xl space-x-2 px-4 py-2 my-2
+        transition-all duration-200 ease-spring"
+     :class="step.error ? 'scale-100 visible' : 'scale-50 invisible'">
+    <span class="flex items-center material-symbols-rounded select-none">brightness_alert</span>
+    <span x-text="step.error || 'Error'"></span>
 </div>
 {% endmacro %}

@@ -134,7 +134,7 @@ def form_login():
     password = data.get('password')
     
     if not account or not password:
-        return jsonify({"success": False, "message": "帳號或密碼錯誤，或醫師帳號未啟用"})
+        return jsonify({"success": False, "message": "帳號密碼不可為空白"})
         
     hashed_pw = hashlib.sha256(password.encode()).hexdigest()
     
@@ -147,7 +147,7 @@ def form_login():
     conn.close()
     
     if not doctor:
-        return jsonify({"success": False, "message": "帳號或密碼錯誤，或醫師帳號未啟用"})
+        return jsonify({"success": False, "message": "帳號密碼錯誤，或未啟用"})
         
     session['doctor_id'] = doctor[0]
     session['doctor_name'] = doctor[1]
@@ -254,7 +254,7 @@ def form_submit():
     discharge_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     
     if not doctor_id or not line_id or not medical_record_num or not relation:
-        return jsonify({"success": False, "message": "資料不全，無法進行綁定"})
+        return jsonify({"success": False, "message": "資料不全，無法送出"})
         
     conn = None
     try:

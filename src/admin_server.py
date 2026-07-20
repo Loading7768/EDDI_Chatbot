@@ -402,17 +402,17 @@ def get_current_prompt_info():
 
 # ── routes ────────────────────────────────────────────────────────────────────
 
-@admin_bp.route('/admin')
+@admin_bp.route('/main')
 def index():
     return render_template('admin/html/admin.html')
 
 
-@admin_bp.route('/admin/css/<path:filename>')
+@admin_bp.route('/main/css/<path:filename>')
 def admin_css(filename):
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'css'), filename)
 
 
-@admin_bp.route('/admin/js/<path:filename>')
+@admin_bp.route('/main/js/<path:filename>')
 def admin_js(filename):
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'js'), filename)
 

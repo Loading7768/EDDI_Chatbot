@@ -627,7 +627,7 @@ def handle_message(event):
         user_name = user_profile.display_name
 
         # 1. 修改病患表單 (這是 app.py 原有的邏輯)
-        if user_message == '綁定病患':
+        if user_message == 'Bind':
             from form_handler import pairing_codes, cleanup_expired_codes
             import random
             import time
@@ -638,7 +638,7 @@ def handle_message(event):
                     del pairing_codes[code]
                     break
             while True:
-                random_number = str(random.randint(100000, 999999))
+                random_number = f"{random.randint(0, 9999):04d}"
                 if random_number not in pairing_codes:
                     break
             expires_at = time.time() + 600

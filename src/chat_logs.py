@@ -103,6 +103,34 @@ def save_chat_to_json(mrn, role, content, current_time=None):
         print("[ChatLog] 傳入的病歷號為空，略過記錄。")
         return
 
+    # Update database has_chatted and status based on keywords
+    status_to_update = None
+    if "就近至醫療院所看診" in content:
+        status_to_update = "須看診"
+    elif "請立即前往急診回診" in content:
+        status_to_update = "須回診"
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if status_to_update:
+            cursor.execute("""
+                UPDATE patients
+                SET has_chatted = 1, status = ?
+                WHERE medical_record_number = ?
+            """, (status_to_update, mrn))
+        else:
+            cursor.execute("""
+                UPDATE patients
+                SET has_chatted = 1
+                WHERE medical_record_number = ? AND has_chatted = 0
+            """, (mrn,))
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"[ChatLog DB Error] Failed to update patient state: {e}")
+    finally:
+        conn.close()
+
     # 確保該病患的儲存目錄存在 ({專案根目錄}/chat_logs/{病歷號})
     log_dir = os.path.join(BASE_DIR, 'chat_logs', mrn)
     os.makedirs(log_dir, exist_ok=True)

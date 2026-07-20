@@ -67,7 +67,8 @@ function renderFormPatientList(patients) {
         <div class="patient-mrn">
           ${esc(p.medical_record_num)}
           ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
-          ${p.needs_return_visit ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
+          ${p.status === '須看診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #f59e0b; color: white;">需看診</span>` : ''}
+          ${p.status === '須回診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
         </div>
         <div class="patient-meta">
           <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
@@ -339,8 +340,18 @@ async function selectFormVisit(idx, el) {
   if (displayDate) displayDate.textContent = f.checkout_date;
 
   if (displayFormReturnBadge) {
-    if (patientObj && patientObj.needs_return_visit) {
-      displayFormReturnBadge.style.display = '';
+    if (patientObj) {
+      if (patientObj.status === '須看診') {
+        displayFormReturnBadge.textContent = '需看診';
+        displayFormReturnBadge.style.backgroundColor = '#f59e0b';
+        displayFormReturnBadge.style.display = '';
+      } else if (patientObj.status === '須回診') {
+        displayFormReturnBadge.textContent = '需回診';
+        displayFormReturnBadge.style.backgroundColor = '#ef4444';
+        displayFormReturnBadge.style.display = '';
+      } else {
+        displayFormReturnBadge.style.display = 'none';
+      }
     } else {
       displayFormReturnBadge.style.display = 'none';
     }

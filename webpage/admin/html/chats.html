@@ -45,6 +45,12 @@
           <div class="chat-panel-sub"   id="chat-sub">點擊左側病患查看詳情</div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="btn-refresh-chat" class="btn btn-gray btn-sm" onclick="refreshChatHistory()" style="display: none; white-space: nowrap; gap: 6px; align-items: center;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink: 0;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+            </svg>
+            <span>重新整理</span>
+          </button>
           <button id="btn-clear-return-visit" class="btn btn-danger btn-sm" onclick="confirmClearReturnVisit()" style="display: none; background-color: #ef4444; color: white; border: none; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;">已回診</button>
           <div id="session-select-wrapper" style="display: none !important;">
             <select id="session-select"></select>

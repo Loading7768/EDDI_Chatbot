@@ -1,0 +1,231 @@
+<!-- 醫師帳號管理（管理員）-->
+<section id="section-doctors" class="section">
+  <div class="section-title">
+    醫師帳號管理
+    <span class="role-tag role-admin" style="margin-left:8px;vertical-align:middle;">管理員</span>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin-top:6px;">
+    可修改醫師姓名、啟用狀態，以及幫醫師重設密碼。
+  </p>
+  <div style="margin-top: 14px; margin-bottom: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+    <button class="btn btn-blue btn-sm" onclick="openDepartmentModal()">
+      🏥 科別管理
+    </button>
+    <button class="btn btn-accent btn-sm" onclick="openAddDoctorModal()">
+      ➕ 新增醫師帳號
+    </button>
+  </div>
+  <div class="doctor-table-wrap">
+    <table id="doctor-table">
+      <thead>
+        <tr>
+          <th>帳號</th>
+          <th>姓名</th>
+          <th>科別</th>
+          <th>狀態</th>
+          <th>角色</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="doctor-tbody">
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Modal：修改科別名稱 ── -->
+<div class="modal-backdrop" id="modal-rename-department" style="z-index: 600;">
+  <div class="modal" style="max-width: 450px; width: 90%;">
+    <div class="modal-title">✏️ 修改科別名稱</div>
+    <input type="hidden" id="rename-dept-old-name">
+    <div class="form-group">
+      <label>原科別名稱</label>
+      <input type="text" id="rename-dept-old-name-show" disabled style="background:#f3f4f6;color:var(--muted)">
+    </div>
+    <div class="form-group">
+      <label>新科別名稱</label>
+      <input type="text" id="rename-dept-new-name" placeholder="輸入新名稱，如：小兒科">
+    </div>
+    <p class="error-msg" id="rename-dept-error" style="text-align:left"></p>
+    <div class="modal-actions">
+      <button class="btn btn-gray btn-sm" onclick="closeModal('modal-rename-department')">取消</button>
+      <button class="btn btn-accent btn-sm" onclick="executeRenameDepartment()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：確認停用或刪除科別 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-dept-action">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap warning" id="dept-action-icon-wrap">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title" id="dept-action-title">確認操作</div>
+    <div class="modal-alert-banner warning" id="dept-action-banner">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div id="dept-action-banner-text" style="font-weight: 600; font-size: 14px; line-height: 1.45;">-</div>
+    </div>
+    <div class="modal-alert-subtitle" id="dept-action-subtitle">確定要執行此操作嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-dept-action')">取消</button>
+      <button class="btn btn-danger" id="btn-dept-action-confirm" onclick="executeDeptAction()">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：科別管理 ── -->
+<div class="modal-backdrop" id="modal-departments">
+  <div class="modal" style="max-width: 600px; width: 90%;">
+    <div class="modal-title">🏥 科別管理</div>
+    
+    <!-- 新增科別表單 -->
+    <div style="background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+      <input type="text" id="new-department-name" placeholder="輸入新科別名稱，如：急診科" style="padding: 8px 12px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; flex: 1; background: var(--bg, #fff); color: var(--text, #333);">
+      <button class="btn btn-accent btn-sm" onclick="addDepartment()" style="padding: 8px 16px; white-space: nowrap;">新增科別</button>
+    </div>
+    
+    <!-- 科別列表 -->
+    <div style="max-height: 300px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 8px;">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+        <thead>
+          <tr style="background: var(--bg); border-bottom: 1.5px solid var(--border); color: var(--text);">
+            <th style="padding: 10px 12px; font-weight: 600;">科別名稱</th>
+            <th style="padding: 10px 12px; font-weight: 600; width: 100px;">狀態</th>
+            <th style="padding: 10px 12px; font-weight: 600; width: 200px; text-align: right;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="department-tbody" style="color: var(--text);">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+    </div>
+    
+    <p class="error-msg" id="department-modal-error" style="text-align:left; margin-top: 10px;"></p>
+    <div class="modal-actions" style="margin-top: 16px;">
+      <button class="btn btn-gray btn-sm" onclick="closeDepartmentModal()">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：修改醫師 ── -->
+<div class="modal-backdrop" id="modal-doctor">
+  <div class="modal">
+    <div class="modal-title">✏️ 修改醫師資料</div>
+    <input type="hidden" id="edit-doctor-account">
+    <div class="form-group">
+      <label>帳號（不可修改）</label>
+      <input type="text" id="edit-doctor-account-show" disabled style="background:#f3f4f6;color:var(--muted)">
+    </div>
+    <div class="form-group">
+      <label>姓名</label>
+      <input type="text" id="edit-doctor-name" placeholder="醫師姓名">
+    </div>
+    <div class="form-group">
+      <label>科別</label>
+      <select id="edit-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'edit-doctor-specialty-custom-group', 'edit-doctor-specialty')">
+        <!-- Will be loaded dynamically -->
+      </select>
+    </div>
+    <div class="form-group" id="edit-doctor-specialty-custom-group" style="display: none;">
+      <label>自訂科別名稱</label>
+      <input type="text" id="edit-doctor-specialty" placeholder="例如: 骨科">
+    </div>
+    <div class="form-group">
+      <label>新密碼（留空則不修改）</label>
+      <input type="password" id="edit-doctor-pw" placeholder="輸入新密碼">
+    </div>
+    <div class="form-group">
+      <label>帳號狀態</label>
+      <select id="edit-doctor-active">
+        <option value="1">啟用</option>
+        <option value="0">停用</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>角色</label>
+      <select id="edit-doctor-admin">
+        <option value="0">醫師</option>
+        <option value="1">管理員</option>
+      </select>
+    </div>
+    <p class="error-msg" id="doctor-modal-error" style="text-align:left"></p>
+    <div class="modal-actions">
+      <button class="btn btn-gray btn-sm" onclick="closeModal('modal-doctor')">取消</button>
+      <button class="btn btn-accent btn-sm" onclick="saveDoctorEdit()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：新增醫師 ── -->
+<div class="modal-backdrop" id="modal-add-doctor">
+  <div class="modal">
+    <div id="add-doctor-form-container">
+      <div class="modal-title">➕ 新增醫師帳號</div>
+      <div class="form-group">
+        <label>帳號名稱（僅限英文、數字、底線，新增後無法修改）</label>
+        <input type="text" id="add-doctor-account" placeholder="例如: dr_wang">
+      </div>
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" id="add-doctor-name" placeholder="例如: 王大明">
+      </div>
+      <div class="form-group">
+        <label>科別</label>
+        <select id="add-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'add-doctor-specialty-custom-group', 'add-doctor-specialty')">
+          <!-- Will be loaded dynamically -->
+        </select>
+      </div>
+      <div class="form-group" id="add-doctor-specialty-custom-group" style="display: none;">
+        <label>自訂科別名稱</label>
+        <input type="text" id="add-doctor-specialty" placeholder="例如: 骨科">
+      </div>
+      <div class="form-group">
+        <label>狀態</label>
+        <select id="add-doctor-active">
+          <option value="1">啟用</option>
+          <option value="0">停用</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>角色</label>
+        <select id="add-doctor-admin">
+          <option value="0">醫師</option>
+          <option value="1">管理員</option>
+        </select>
+      </div>
+      <p class="error-msg" id="add-doctor-modal-error" style="text-align:left"></p>
+      <div class="modal-actions">
+        <button class="btn btn-gray btn-sm" onclick="closeAddDoctorModal()">取消</button>
+        <button class="btn btn-accent btn-sm" onclick="submitAddDoctor()">建立帳號</button>
+      </div>
+    </div>
+    
+    <!-- 建立成功後顯示的密碼資訊面板 -->
+    <div id="add-doctor-success-container" style="display: none; text-align: center;">
+      <div class="modal-title" style="color: var(--accent);">🎉 帳號建立成功</div>
+      <p style="font-size: 14px; margin-bottom: 16px;">帳號已成功建立，系統已自動為此醫師生成隨機密碼：</p>
+      
+      <div style="background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">登入帳號</div>
+        <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 14px;" id="success-doctor-account">—</div>
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">自動生成密碼</div>
+        <div style="font-size: 20px; font-weight: 800; color: var(--primary); font-family: monospace; letter-spacing: 1px;" id="success-doctor-password">—</div>
+      </div>
+      
+      <p style="font-size: 12px; color: var(--danger); font-weight: 600; margin-bottom: 20px;">
+        ⚠️ 請複製此密碼並轉交給該醫師。<br>
+        此密碼僅顯示這一次，關閉視窗後將無法再次檢視！
+      </p>
+      
+      <div class="modal-actions" style="justify-content: center; gap: 12px;">
+          <button class="btn btn-primary btn-sm" onclick="copyGeneratedPassword()">📋 複製密碼</button>
+          <button class="btn btn-gray btn-sm" onclick="closeAddDoctorModal(true)" style="min-width: 60px; line-height: 1.4;">關閉<br>視窗</button>
+      </div>
+    </div>
+  </div>
+</div>

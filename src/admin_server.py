@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session, send_from_directory
+from flask import Blueprint, request, render_template, jsonify, session, send_from_directory
 import sqlite3
 import hashlib
 import json
@@ -130,45 +130,6 @@ def check_needs_return_visit(mrn: str) -> bool:
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-ACTIVE_SESSIONS_FILE = os.path.join(BASE_DIR, 'data', 'active_sessions.json')
-active_sessions_lock = threading.Lock()
-
-def load_active_sessions() -> dict:
-    if not os.path.exists(ACTIVE_SESSIONS_FILE):
-        return {}
-    try:
-        with open(ACTIVE_SESSIONS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"[Active Sessions Load Error] {e}")
-        return {}
-
-def save_active_sessions(sessions: dict):
-    try:
-        os.makedirs(os.path.dirname(ACTIVE_SESSIONS_FILE), exist_ok=True)
-        with open(ACTIVE_SESSIONS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(sessions, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"[Active Sessions Save Error] {e}")
-
-def get_active_session(account: str) -> str:
-    with active_sessions_lock:
-        sessions = load_active_sessions()
-        return sessions.get(account)
-
-def set_active_session(account: str, token: str):
-    with active_sessions_lock:
-        sessions = load_active_sessions()
-        sessions[account] = token
-        save_active_sessions(sessions)
-
-def clear_active_session(account: str):
-    with active_sessions_lock:
-        sessions = load_active_sessions()
-        if account in sessions:
-            del sessions[account]
-            save_active_sessions(sessions)
-
 def hash_pw(pw: str) -> str:
     return hashlib.sha256(pw.encode()).hexdigest()
 
@@ -184,11 +145,6 @@ def login_required(f):
     def wrapper(*args, **kwargs):
         if 'account' not in session:
             return jsonify({'error': '請先登入'}), 401
-        stored_token = session.get('session_token')
-        active_token = get_active_session(session['account'])
-        if not stored_token or stored_token != active_token:
-            session.clear()
-            return jsonify({'error': '您的帳號已在其他地方登入，此連線已被登出。'}), 401
         return f(*args, **kwargs)
     return wrapper
 
@@ -198,11 +154,6 @@ def admin_required(f):
     def wrapper(*args, **kwargs):
         if 'account' not in session:
             return jsonify({'error': '請先登入'}), 401
-        stored_token = session.get('session_token')
-        active_token = get_active_session(session['account'])
-        if not stored_token or stored_token != active_token:
-            session.clear()
-            return jsonify({'error': '您的帳號已在其他地方登入，此連線已被登出。'}), 401
         if not session.get('is_admin'):
             return jsonify({'error': '此功能僅限管理員'}), 403
         return f(*args, **kwargs)
@@ -453,7 +404,7 @@ def get_current_prompt_info():
 
 @admin_bp.route('/admin')
 def index():
-    return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'html'), 'admin.html')
+    return render_template('admin/html/admin.html')
 
 
 @admin_bp.route('/admin/css/<path:filename>')
@@ -470,12 +421,6 @@ def admin_js(filename):
 def get_me():
     if 'account' not in session:
         return jsonify({'logged_in': False})
-    
-    stored_token = session.get('session_token')
-    active_token = get_active_session(session['account'])
-    if not stored_token or stored_token != active_token:
-        session.clear()
-        return jsonify({'logged_in': False, 'kicked_out': True})
         
     return jsonify({
         'logged_in':   True,
@@ -487,11 +432,9 @@ def get_me():
 
 @admin_bp.route('/api/login', methods=['POST'])
 def login():
-    import uuid
     data     = request.get_json() or {}
     account  = data.get('username', '').strip()
     password = data.get('password', '')
-    force    = data.get('force', False)
 
     if not account or not password:
         return jsonify({'success': False, 'error': '請填寫帳號和密碼'}), 400
@@ -513,19 +456,10 @@ def login():
     if not row:
         return jsonify({'success': False, 'error': '帳號或密碼錯誤，或帳號已停用'}), 401
 
-    # Check for active session conflict
-    active_token = get_active_session(row['account_name'])
-    if active_token and not force:
-        return jsonify({'success': False, 'conflict': True, 'error': '此帳號已在其他地方登入。'}), 200
-
-    session_token = uuid.uuid4().hex
     session.permanent = True
     session['account']       = row['account_name']
     session['doctor_name']   = row['doctor_name']
     session['is_admin']      = bool(row['is_admin'])
-    session['session_token'] = session_token
-    
-    set_active_session(row['account_name'], session_token)
 
     return jsonify({
         'success':     True,
@@ -536,9 +470,6 @@ def login():
 
 @admin_bp.route('/api/logout', methods=['POST'])
 def logout():
-    account = session.get('account')
-    if account:
-        clear_active_session(account)
     session.clear()
     return jsonify({'success': True})
 

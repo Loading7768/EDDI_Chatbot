@@ -1,0 +1,18 @@
+<!-- 統計數據 -->
+<section id="section-stats" class="section active">
+  <div class="section-title">統計數據</div>
+  <div class="stats-grid">
+    <div class="stat-card green" data-definition="已在系統中建立就診紀錄（病歷表單）的獨特病患病歷號碼總數。">
+      <div class="stat-icon">🧑‍⚕️</div>
+      <div class="stat-value" id="s-patients">—</div>
+      <div class="stat-label">病患總數</div>
+    </div>
+    <div class="stat-card orange" data-definition="已開始對話聊天（有 chat_logs 聊天記錄檔）的病患數，佔 LINE 帳號好友總數的百分比。">
+      <div class="stat-icon">📱</div>
+      <div class="stat-value" id="s-usage">—</div>
+      <div class="stat-label">LINE Bot 使用率</div>
+    </div>
+  </div>
+  <div class="last-updated" id="s-updated"></div>
+  <p style="color:var(--danger);font-size:13px;margin-top:8px;" id="s-error"></p>
+</section>

@@ -1,0 +1,87 @@
+<!-- 聊天紀錄 -->
+<section id="section-chats" class="section">
+  <div class="section-title">聊天紀錄</div>
+  <div class="chat-layout">
+    <div class="patient-list">
+      <div class="plist-header" style="justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          病患列表
+          <span class="badge badge-gray" id="patient-count">0</span>
+        </div>
+        <select id="patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
+          <option value="checkout_desc">就診日期 ⬇</option>
+          <option value="checkout_asc">就診日期 ⬆</option>
+          <option value="mrn_desc">病歷號 ⬇</option>
+          <option value="mrn_asc">病歷號 ⬆</option>
+        </select>
+      </div>
+      <div id="patient-list-body">
+        <div class="empty-state" style="padding:32px 0;">
+          <div class="empty-icon">👤</div><p>載入中…</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="visit-list">
+      <div class="plist-header">
+        就診紀錄
+        <span class="badge badge-gray" id="visit-count">0</span>
+      </div>
+      <div id="visit-list-body" class="visit-list-body">
+        <div class="empty-state" style="padding:32px 0;">
+          <div class="empty-icon">📋</div><p>請先選擇病患</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel">
+      <div class="chat-panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div class="chat-panel-title" id="chat-title">請選擇病患</div>
+            <span id="chat-relation-badge" class="badge badge-relation" style="display: none; font-weight: 500;"></span>
+            <span id="chat-return-badge" class="badge" style="display: none; background-color: #ef4444; color: white; font-weight: 500;">需回診</span>
+          </div>
+          <div class="chat-panel-sub"   id="chat-sub">點擊左側病患查看詳情</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="btn-clear-return-visit" class="btn btn-danger btn-sm" onclick="confirmClearReturnVisit()" style="display: none; background-color: #ef4444; color: white; border: none; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;">已回診</button>
+          <div id="session-select-wrapper" style="display: none !important;">
+            <select id="session-select"></select>
+          </div>
+        </div>
+      </div>
+      <div class="chat-panel-body" id="chat-body">
+        <div class="empty-state">
+          <div class="empty-icon">💬</div>
+          <p>選擇左側病患以查看表單與聊天紀錄</p>
+        </div>
+      </div>
+      <!-- Timeline Navigation -->
+      <div class="chat-timeline-nav" id="chat-timeline-nav" style="display: none;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Modal：確認已回診 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-return-visit">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap success">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認已回診</div>
+    <div class="modal-alert-banner success">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">已回診後將清除該病患的「需回診」標記，按鈕與標籤亦會隨之隱藏。</div>
+    </div>
+    <div class="modal-alert-subtitle">確定要清除該病患的「需回診」狀態嗎？</div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-return-visit')">取消</button>
+      <button class="btn btn-danger" onclick="executeClearReturnVisit()">確認已回診</button>
+    </div>
+  </div>
+</div>

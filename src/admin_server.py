@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session, send_from_directory
+from flask import Blueprint, request, render_template, jsonify, session, send_from_directory
 import sqlite3
 import hashlib
 import json
@@ -95,12 +95,14 @@ def check_needs_return_visit(mrn: str) -> bool:
         except Exception:
             pass
             
+    returnVisitTerms = ['請立即前往急診回診', '情況緊急，請立即撥打 119 或前往最近的急診室']
+
     for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for msg in data.get('messages', []):
-                if msg.get('role') == 'assistant' and '請立即前往急診回診' in msg.get('content', ''):
+                if msg.get('role') == 'assistant' and any(term in msg.get('content', '') for term in returnVisitTerms):
                     ts_str = msg.get('timestamp', '')
                     if ts_str:
                         try:
@@ -402,7 +404,7 @@ def get_current_prompt_info():
 
 @admin_bp.route('/admin')
 def index():
-    return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'html'), 'admin.html')
+    return render_template('admin/html/admin.html')
 
 
 @admin_bp.route('/admin/css/<path:filename>')
@@ -419,6 +421,7 @@ def admin_js(filename):
 def get_me():
     if 'account' not in session:
         return jsonify({'logged_in': False})
+        
     return jsonify({
         'logged_in':   True,
         'account':     session['account'],
@@ -453,9 +456,10 @@ def login():
     if not row:
         return jsonify({'success': False, 'error': '帳號或密碼錯誤，或帳號已停用'}), 401
 
-    session['account']     = row['account_name']
-    session['doctor_name'] = row['doctor_name']
-    session['is_admin']    = bool(row['is_admin'])
+    session.permanent = True
+    session['account']       = row['account_name']
+    session['doctor_name']   = row['doctor_name']
+    session['is_admin']      = bool(row['is_admin'])
 
     return jsonify({
         'success':     True,

@@ -15,13 +15,13 @@ run_admin.py — 放在 src/ 資料夾內，直接執行即可啟動後台。
 import sys
 import os
 
-# 確保可以 import 同目錄的 admin_server
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 確保可以 import src 資料夾內的 admin_server
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
 from flask import Flask
 from admin_server import admin_bp, BASE_DIR
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'webpage'))
 app.secret_key = 'eddi_admin_2026_secure_key'
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
@@ -38,9 +38,9 @@ if __name__ == '__main__':
     print('=' * 48)
 
     # 啟動前檢查資料庫是否存在
-    db_path = os.path.join(BASE_DIR, 'database', 'doctor.db')
+    db_path = os.path.join(BASE_DIR, 'database', 'hospital.db')
     if not os.path.exists(db_path):
-        print('\n⚠️  找不到 database/doctor.db')
+        print('\n⚠️  找不到 database/hospital.db')
         print('   請先執行：python init_db.py\n')
 
     app.run(debug=True, port=5001, host='0.0.0.0')

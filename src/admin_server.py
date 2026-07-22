@@ -19,6 +19,7 @@ PROMPTS_DIR   = os.path.join(BASE_DIR, 'assets', 'prompts')
 CONFIG_FILE   = os.path.join(BASE_DIR, 'data', 'prompt_config.json')
 STATS_CACHE   = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
 CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
+EDUCATION_FILE = os.path.join(BASE_DIR, 'assets','discharge', 'category.json')
 
 DB_HOSPITAL = os.path.join(BASE_DIR, 'database', 'hospital.db')
 
@@ -27,6 +28,8 @@ import threading
 return_visit_lock = threading.Lock()
 DEPARTMENTS_FILE = os.path.join(BASE_DIR, 'data', 'departments.json')
 RETURN_VISIT_RECORDS_FILE = os.path.join(BASE_DIR, 'data', 'return_visit_records.json')
+
+education_lock = threading.Lock()
 
 def load_departments() -> list:
     """讀取科別設定 JSON"""
@@ -75,6 +78,40 @@ def save_return_visit_records(records: dict):
             json.dump(records, f, ensure_ascii=False, indent=4)
     except Exception as e:
         print(f"[Return Visit Records Save Error] {e}")
+
+
+def load_education() -> dict:
+    """讀取衛教資料 JSON，key 為類別，value 為衛教內容文字。
+    相容舊格式（list of {topic_zh, topic_en, content}），讀取時會自動轉換並存回新格式。"""
+    if not os.path.exists(EDUCATION_FILE):
+        return {}
+    try:
+        with open(EDUCATION_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            converted = {}
+            for item in data:
+                key = (item.get('topic_zh') or item.get('topic_en') or '').strip()
+                if key:
+                    converted[key] = item.get('content', '')
+            save_education(converted)
+            return converted
+        if isinstance(data, dict):
+            return data
+        return {}
+    except Exception as e:
+        print(f"[Education Load Error] {e}")
+        return {}
+
+
+def save_education(edu: dict):
+    """寫入衛教資料 JSON"""
+    try:
+        os.makedirs(os.path.dirname(EDUCATION_FILE), exist_ok=True)
+        with open(EDUCATION_FILE, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Education Save Error] {e}")
 
 def check_needs_return_visit(mrn: str) -> bool:
     """
@@ -1406,3 +1443,120 @@ def delete_or_disable_department(name: str):
         deps = [d for d in deps if d['name'] != name]
         save_departments(deps)
         return jsonify({'success': True, 'action': 'deleted', 'message': '科別已成功刪除。'})
+
+# ── 衛教資料管理（醫師自行維護，僅限管理員新增/編輯/刪除）──────────────────────
+@admin_bp.route('/api/education', methods=['GET'])
+@login_required
+def list_education():
+    """回傳所有衛教資料類別與內容，供列表顯示（登入醫師皆可查看）。"""
+    test_file = EDUCATION_FILE
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+    result = [{'category': k, 'content': v} for k, v in edu.items()]
+    result.sort(key=lambda x: x['category'])
+    return jsonify(result)
+
+
+@admin_bp.route('/api/education', methods=['POST'])
+@admin_required
+def create_education():
+    """新增衛教資料類別"""
+    test_file = EDUCATION_FILE
+
+    data = request.get_json() or {}
+    category = data.get('category', '').strip()
+    content_text = data.get('content', '').strip()
+
+    if not category or not content_text:
+        return jsonify({'error': '類別名稱與衛教內容皆不可空白'}), 400
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+        if category in edu:
+            return jsonify({'error': '此類別已存在'}), 400
+        edu[category] = content_text
+
+        with open(test_file, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+
+    return jsonify({'success': True, 'category': category})
+
+
+@admin_bp.route('/api/education/<category>', methods=['PUT'])
+@admin_required
+def update_education(category: str):
+    """編輯衛教資料類別（可同時修改類別名稱與內容）"""
+    test_file = EDUCATION_FILE
+
+    category = category.strip()
+    data = request.get_json() or {}
+    new_category = data.get('category', category).strip()
+    content_text = data.get('content', '').strip()
+
+    if not new_category or not content_text:
+        return jsonify({'error': '類別名稱與衛教內容皆不可空白'}), 400
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+        if category not in edu:
+            return jsonify({'error': '找不到此類別'}), 404
+        if new_category != category and new_category in edu:
+            return jsonify({'error': '該類別名稱已存在'}), 400
+
+        if new_category != category:
+            # 重新命名：保留原本的順序重建 dict
+            new_edu = {}
+            for k, v in edu.items():
+                if k == category:
+                    new_edu[new_category] = content_text
+                else:
+                    new_edu[k] = v
+            edu = new_edu
+        else:
+            edu[category] = content_text
+
+        with open(test_file, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+
+    return jsonify({'success': True, 'category': new_category})
+
+
+@admin_bp.route('/api/education/<category>', methods=['DELETE'])
+@admin_required
+def delete_education(category: str):
+    """刪除衛教資料類別"""
+    test_file = EDUCATION_FILE
+
+    category = category.strip()
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+        if category not in edu:
+            return jsonify({'error': '找不到此類別'}), 404
+        del edu[category]
+
+        with open(test_file, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+
+    return jsonify({'success': True})

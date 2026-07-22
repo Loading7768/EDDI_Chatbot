@@ -69,6 +69,8 @@
       <div class="nav-item admin-only" data-sec="prompt"  onclick="showSection('prompt')"  style="display:none">
         <span class="nav-icon">✏️</span> Prompt 修改
       </div>
+      <div class="nav-item"        data-sec="education" onclick="showSection('education')">
+        <span class="nav-icon">📚</span> 衛教資料管理
     </div>
   </nav>
 
@@ -90,6 +92,9 @@
       <!-- Prompt 修改 -->
       {% include 'admin/html/prompt.html' %}
 
+      <!-- 衛教資料管理 -->
+      {% include 'admin/html/education.html' %}
+      
     </main>
   </div>
 </div>
@@ -201,5 +206,6 @@
   <script src="/admin/js/forms.js"></script>
   <script src="/admin/js/doctors.js"></script>
   <script src="/admin/js/prompt.js"></script>
+  <script src="/admin/js/education.js"></script>
 </body>
 </html>

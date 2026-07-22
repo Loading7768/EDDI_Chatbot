@@ -627,36 +627,33 @@ def handle_message(event):
         user_name = user_profile.display_name
 
         # 1. 修改病患表單 (這是 app.py 原有的邏輯)
-        if user_message == '綁定病患':
-            from form_handler import pairing_codes, cleanup_expired_codes
-            import random
-            import time
-            
-            cleanup_expired_codes()
-            for code, data in list(pairing_codes.items()):
-                if data["line_uuid"] == user_id:
-                    del pairing_codes[code]
-                    break
-            while True:
-                random_number = str(random.randint(100000, 999999))
-                if random_number not in pairing_codes:
-                    break
-            expires_at = time.time() + 600
-            pairing_codes[random_number] = {
-                "line_uuid": user_id,
-                "line_uname": user_name,
-                "expires_at": expires_at
-            }
-            formatted_expiry = datetime.fromtimestamp(expires_at, tz=tw_tz).strftime("%Y-%m-%d %H:%M:%S")
-            reply_text = f"您的配對碼是：{random_number}\n此配對碼將於 10 分鐘後失效（{formatted_expiry}）"
-            
+        if user_message == 'Bind':
+            db_path = os.path.join(BASE_DIR, 'database', 'hospital.db')
+            conn = None
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO line_accounts (uuid, name) VALUES (?, ?)",
+                    (user_id, user_name)
+                )
+                conn.commit()
+                reply_text = "綁定完成"
+            except sqlite3.IntegrityError:
+                reply_text = "帳號已綁定"
+            except Exception as e:
+                reply_text = f"綁定失敗：{e}"
+            finally:
+                if conn:
+                    conn.close()
+
             line_bot_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=reply_text)]
                 )
             )
-            return      
+            return
           
         # 2. 查詢該 line_id 綁定的病患
         bound_patients = chat_logs.get_patients_for_line_id(user_id)

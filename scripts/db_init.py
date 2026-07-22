@@ -53,19 +53,29 @@ def init_hospital_db():
         )
     ''')
     
-    # 3. line_patient_pairs 表格
+    # 3. line_accounts 表格
+    c.execute('''
+        CREATE TABLE line_accounts (
+	        line_account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+	        uuid            TEXT    UNIQUE NOT NULL,
+	        name            TEXT    NOT NULL
+        )
+    ''')
+    
+    # 4. line_patient_pairs 表格
     c.execute('''
         CREATE TABLE line_patient_pairs (
             line_patient_pairs_id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id            INTEGER NOT NULL,
-            line_uuid             TEXT    NOT NULL,
+            line_account_id       INTEGER NOT NULL,
             relation              TEXT,
             FOREIGN KEY (patient_id) REFERENCES patients (patient_id),
-            UNIQUE (line_uuid, patient_id)
+            FOREIGN KEY (line_account_id) REFERENCES line_accounts (line_account_id),
+            UNIQUE (line_account_id, patient_id)
         )
     ''')
     
-    # 4. record 表格
+    # 5. record 表格
     c.execute('''
         CREATE TABLE record (
             record_id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,7 +91,7 @@ def init_hospital_db():
     # 建立 Indexes
     c.execute('CREATE INDEX idx_record_lookup ON record (line_patient_pairs_id, doctor_id, checkout_date DESC)')
     c.execute('CREATE INDEX idx_doctors_department ON doctors (department)')
-    c.execute('CREATE INDEX idx_line_patient_pairs_uuid ON line_patient_pairs (line_uuid)')
+    c.execute('CREATE INDEX idx_line_patient_pairs_uuid ON line_patient_pairs (line_account_id)')
 
     
     conn.commit()

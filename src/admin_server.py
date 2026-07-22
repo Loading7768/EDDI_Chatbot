@@ -483,8 +483,8 @@ def get_stats():
 
     try:
         conn = get_db()
-        # LINE 好友總數仍以 line_patient_pairs 的 distinct LINE UUID 計算
-        stats['total_friends'] = conn.execute('SELECT COUNT(DISTINCT line_uuid) FROM line_patient_pairs').fetchone()[0]
+        # LINE 好友總數以 line_accounts 表格的數量計算
+        stats['total_friends'] = conn.execute('SELECT COUNT(*) FROM line_accounts').fetchone()[0]
         # 1. 病患總數改成查詢資料庫中 patients 的 medical_record_number 數量
         stats['total_patients'] = conn.execute('SELECT COUNT(medical_record_number) FROM patients').fetchone()[0]
         stats['total_forms'] = conn.execute('SELECT COUNT(*) FROM record').fetchone()[0]
@@ -542,12 +542,13 @@ def get_chats():
             rows = conn.execute('''
                 SELECT 
                     p.medical_record_number AS medical_record_num,
-                    MIN(lpp.line_uuid) AS line_id,
+                    MIN(la.uuid) AS line_id,
                     MIN(lpp.relation) AS relation,
                     COUNT(r.record_id) AS form_count,
                     MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout
                 FROM record r
                 JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
+                JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
                 JOIN patients p ON lpp.patient_id = p.patient_id
                 GROUP BY p.medical_record_number
                 ORDER BY latest_checkout DESC
@@ -556,12 +557,13 @@ def get_chats():
             rows = conn.execute('''
                 SELECT 
                     p.medical_record_number AS medical_record_num,
-                    MIN(lpp.line_uuid) AS line_id,
+                    MIN(la.uuid) AS line_id,
                     MIN(lpp.relation) AS relation,
                     COUNT(r.record_id) AS form_count,
                     MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout
                 FROM record r
                 JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
+                JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
                 JOIN patients p ON lpp.patient_id = p.patient_id
                 JOIN doctors d ON r.doctor_id = d.doctor_id
                 WHERE d.account_name = ?
@@ -645,9 +647,10 @@ def get_chat_detail(mrn: str):
             return jsonify({'error': '無查看權限'}), 403
 
     patient = conn.execute('''
-        SELECT p.medical_record_number, MIN(lpp.line_uuid) AS line_uuid, MIN(lpp.relation) AS relation
+        SELECT p.medical_record_number, MIN(la.uuid) AS line_uuid, MIN(lpp.relation) AS relation
         FROM patients p
         LEFT JOIN line_patient_pairs lpp ON p.patient_id = lpp.patient_id
+        LEFT JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
         WHERE p.medical_record_number = ?
         GROUP BY p.medical_record_number
     ''', (mrn,)).fetchone()
@@ -749,8 +752,9 @@ def update_form(mrn: str, checkout_date: str):
 
         # 獲取原始的配對與病患資料
         current_pair = conn.execute('''
-            SELECT lpp.line_uuid, lpp.relation, p.medical_record_number, lpp.patient_id
+            SELECT la.uuid AS line_uuid, lpp.relation, p.medical_record_number, lpp.patient_id
             FROM line_patient_pairs lpp
+            JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
             JOIN record r ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
             JOIN patients p ON lpp.patient_id = p.patient_id
             WHERE r.record_id = ?

@@ -17,7 +17,7 @@ def get_db_connection():
     return sqlite3.connect(db_path)
 
 def get_patients_for_line_id(line_id):
-    """透過 line_id 從資料庫查詢綁定的所有病患關係及病歷號"""
+    """透過 line_id (uuid) 從資料庫查詢綁定的所有病患關係及病歷號"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -25,7 +25,8 @@ def get_patients_for_line_id(line_id):
             SELECT p.medical_record_number, lpp.relation, p.patient_id
             FROM line_patient_pairs lpp
             JOIN patients p ON lpp.patient_id = p.patient_id
-            WHERE lpp.line_uuid = ?
+            JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
+            WHERE la.uuid = ?
         """, (line_id,))
         rows = cursor.fetchall()
         # 回傳 [(medical_record_number, relation, patient_id), ...]
@@ -43,9 +44,10 @@ def get_symptoms_for_patient(line_id, relation):
     try:
         # 先找出 line_patient_pairs_id
         cursor.execute("""
-            SELECT line_patient_pairs_id
-            FROM line_patient_pairs
-            WHERE line_uuid = ? AND relation = ?
+            SELECT lpp.line_patient_pairs_id
+            FROM line_patient_pairs lpp
+            JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
+            WHERE la.uuid = ? AND lpp.relation = ?
         """, (line_id, relation))
         row = cursor.fetchone()
         if not row:
@@ -85,7 +87,8 @@ def get_patient_mrn(line_id, relation):
             SELECT p.medical_record_number
             FROM line_patient_pairs lpp
             JOIN patients p ON lpp.patient_id = p.patient_id
-            WHERE lpp.line_uuid = ? AND lpp.relation = ?
+            JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
+            WHERE la.uuid = ? AND lpp.relation = ?
         """, (line_id, relation))
         row = cursor.fetchone()
         return row[0] if row else None

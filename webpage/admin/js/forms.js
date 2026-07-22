@@ -68,7 +68,9 @@ function renderFormPatientList(patients) {
           ${esc(p.medical_record_num)}
           ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
           ${p.status === '須看診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #f59e0b; color: white;">需看診</span>` : ''}
+          ${p.status === '已看診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d;">已看診</span>` : ''}
           ${p.status === '須回診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
+          ${p.status === '已回診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">已回診</span>` : ''}
         </div>
         <div class="patient-meta">
           <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
@@ -344,10 +346,26 @@ async function selectFormVisit(idx, el) {
       if (patientObj.status === '須看診') {
         displayFormReturnBadge.textContent = '需看診';
         displayFormReturnBadge.style.backgroundColor = '#f59e0b';
+        displayFormReturnBadge.style.color = '#ffffff';
+        displayFormReturnBadge.style.border = 'none';
+        displayFormReturnBadge.style.display = '';
+      } else if (patientObj.status === '已看診') {
+        displayFormReturnBadge.textContent = '已看診';
+        displayFormReturnBadge.style.backgroundColor = '#fef3c7';
+        displayFormReturnBadge.style.color = '#b45309';
+        displayFormReturnBadge.style.border = '1px solid #fcd34d';
         displayFormReturnBadge.style.display = '';
       } else if (patientObj.status === '須回診') {
         displayFormReturnBadge.textContent = '需回診';
         displayFormReturnBadge.style.backgroundColor = '#ef4444';
+        displayFormReturnBadge.style.color = '#ffffff';
+        displayFormReturnBadge.style.border = 'none';
+        displayFormReturnBadge.style.display = '';
+      } else if (patientObj.status === '已回診') {
+        displayFormReturnBadge.textContent = '已回診';
+        displayFormReturnBadge.style.backgroundColor = '#fee2e2';
+        displayFormReturnBadge.style.color = '#991b1b';
+        displayFormReturnBadge.style.border = '1px solid #fca5a5';
         displayFormReturnBadge.style.display = '';
       } else {
         displayFormReturnBadge.style.display = 'none';

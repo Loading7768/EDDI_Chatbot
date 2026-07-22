@@ -19,7 +19,7 @@ PROMPTS_DIR   = os.path.join(BASE_DIR, 'assets', 'prompts')
 CONFIG_FILE   = os.path.join(BASE_DIR, 'data', 'prompt_config.json')
 STATS_CACHE   = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
 CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
-EDUCATION_FILE = os.path.join(BASE_DIR, 'docs', 'category.json')
+EDUCATION_FILE = os.path.join(BASE_DIR, 'assets','discharge', 'category.json')
 
 DB_HOSPITAL = os.path.join(BASE_DIR, 'database', 'hospital.db')
 

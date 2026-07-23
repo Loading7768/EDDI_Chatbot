@@ -2,7 +2,7 @@
 <section class="section" id="section-education">
   <div class="section-title">📚 衛教資料管理</div>
   <p style="color:var(--muted); font-size:13px; margin-top:4px;">
-    新增、編輯、刪除聊天機器人使用的衛教資料類別
+    新增、編輯、刪除聊天機器人使用的衛教資料類別（點部位可展開/收合）。
   </p>
 
   <div style="display:flex; justify-content:flex-end; margin-top:16px;">
@@ -10,18 +10,7 @@
   </div>
 
   <div class="doctor-table-wrap" id="education-table-wrap">
-    <table id="education-table">
-      <thead>
-        <tr>
-          <th style="width:240px;">類別</th>
-          <th>衛教內容（預覽）</th>
-          <th style="width:150px;">操作</th>
-        </tr>
-      </thead>
-      <tbody id="education-tbody">
-        <!-- 由 education.js 動態產生 -->
-      </tbody>
-    </table>
+    <div id="education-groups"></div>
   </div>
 
   <div class="empty-state" id="education-empty" style="display:none;">
@@ -38,8 +27,18 @@
     </div>
 
     <div class="form-group">
+      <label>部位</label>
+      <input type="text" id="education-input-bodypart" placeholder="例如：頭、脖子、軀幹上半部">
+    </div>
+
+    <div class="form-group">
       <label>類別名稱</label>
-      <input type="text" id="education-input-category" placeholder="例如：腹痛衛教">
+      <input type="text" id="education-input-category" placeholder="例如：頭暈">
+    </div>
+
+    <div class="form-group">
+      <label>對應 md 檔名</label>
+      <input type="text" id="education-input-filename" placeholder="例如：dizziness.md 或 dizziness（會自動補 .md）">
     </div>
 
     <div class="form-group">

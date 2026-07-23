@@ -49,7 +49,7 @@ def init_hospital_db():
             medical_record_number TEXT    UNIQUE NOT NULL,
             has_chatted           INTEGER NOT NULL DEFAULT 0,
             status                TEXT    NOT NULL DEFAULT '出院'
-            CHECK (status IN ('出院', '須回診', '已回診'))
+            CHECK (status IN ('出院', '須看診', '已看診', '須回診', '已回診'))
         )
     ''')
     

@@ -3,9 +3,9 @@
     "total_friends": 4,
     "total_patients": 10,
     "total_forms": 7,
-    "patients_chatted": 1,
-    "bot_usage_rate": 10.0,
+    "patients_chatted": 3,
+    "bot_usage_rate": 30.0,
     "return_visits": 0
   },
-  "last_updated": "2026-06-22 11:33:38"
+  "last_updated": "2026-07-20 18:48:20"
 }

@@ -88,7 +88,7 @@ function initApp(me) {
 
   document.getElementById('header-name').textContent = me.doctor_name;
   const roleEl = document.getElementById('header-role');
-  roleEl.textContent = me.is_admin ? '管理員' : '醫師';
+  roleEl.textContent = me.is_admin ? '醫師 (管理員)' : '醫師';
   roleEl.className   = 'role-tag ' + (me.is_admin ? 'role-admin' : 'role-doctor');
 
   document.querySelectorAll('.admin-only').forEach(el => {

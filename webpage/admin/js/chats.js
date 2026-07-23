@@ -63,11 +63,15 @@ function renderPatientList(patients) {
     }
     return `
       <div class="patient-item${p.medical_record_num === state.currentMrn ? ' active' : ''}"
+           data-mrn="${esc(p.medical_record_num)}"
            onclick="loadDetail('${esc(p.medical_record_num)}', this)">
         <div class="patient-mrn">
           ${esc(p.medical_record_num)}
           ${p.relation ? `<span class="badge badge-relation" style="margin-left: 6px; font-weight: 500;">${esc(p.relation)}</span>` : ''}
-          ${p.needs_return_visit ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
+          ${p.status === '須看診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #f59e0b; color: white;">需看診</span>` : ''}
+          ${p.status === '已看診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d;">已看診</span>` : ''}
+          ${p.status === '須回診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #ef4444; color: white;">需回診</span>` : ''}
+          ${p.status === '已回診' ? `<span class="badge badge-return-visit" style="margin-left: 6px; font-weight: 500; background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">已回診</span>` : ''}
         </div>
         <div class="patient-meta">
           <span class="badge badge-blue" ${specialtyTitle ? `title="${esc(specialtyTitle)}"` : ''}>${specialtyText}</span>
@@ -83,14 +87,24 @@ function renderPatientList(patients) {
 
 // ── chat detail ──
 async function loadDetail(mrn, el) {
+  if (state.currentMrn !== mrn) {
+    state.currentVisitDate = null;
+  }
   state.currentMrn = mrn;
+
+  if (!el && mrn) {
+    el = document.querySelector(`#patient-list-body .patient-item[data-mrn="${mrn}"]`);
+  }
+
   document.querySelectorAll('#patient-list-body .patient-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
 
-  // Hide return visit and relation badges/buttons while loading
+  // Hide return visit, relation, and refresh badges/buttons while loading
   document.getElementById('chat-relation-badge').style.display = 'none';
   document.getElementById('chat-return-badge').style.display = 'none';
   document.getElementById('btn-clear-return-visit').style.display = 'none';
+  const btnRefreshChat = document.getElementById('btn-refresh-chat');
+  if (btnRefreshChat) btnRefreshChat.style.display = 'none';
 
   document.getElementById('visit-list-body').innerHTML =
     '<div class="empty-state"><div class="spinner-dark"></div><p>載入中…</p></div>';
@@ -123,12 +137,77 @@ async function loadDetail(mrn, el) {
       chatRelationBadge.style.display = 'none';
     }
 
-    if (d.patient.needs_return_visit) {
+    const status = d.patient.status;
+    if (status === '須看診') {
+      chatReturnBadge.textContent = '需看診';
+      chatReturnBadge.style.backgroundColor = '#f59e0b';
+      chatReturnBadge.style.color = '#ffffff';
+      chatReturnBadge.style.border = 'none';
       chatReturnBadge.style.display = '';
+      
+      btnClearReturnVisit.textContent = '已看診';
+      btnClearReturnVisit.style.backgroundColor = '#f59e0b';
+      btnClearReturnVisit.style.color = '#ffffff';
+      btnClearReturnVisit.style.border = 'none';
       btnClearReturnVisit.style.display = '';
+      btnClearReturnVisit.disabled = false;
+      btnClearReturnVisit.style.cursor = 'pointer';
+      btnClearReturnVisit.style.opacity = '1';
+    } else if (status === '已看診') {
+      chatReturnBadge.textContent = '已看診';
+      chatReturnBadge.style.backgroundColor = '#fef3c7';
+      chatReturnBadge.style.color = '#b45309';
+      chatReturnBadge.style.border = '1px solid #fcd34d';
+      chatReturnBadge.style.display = '';
+      
+      btnClearReturnVisit.textContent = '已看診';
+      btnClearReturnVisit.style.backgroundColor = '#fef3c7';
+      btnClearReturnVisit.style.color = '#b45309';
+      btnClearReturnVisit.style.border = '1px solid #fcd34d';
+      btnClearReturnVisit.style.display = '';
+      btnClearReturnVisit.disabled = true;
+      btnClearReturnVisit.style.cursor = 'not-allowed';
+      btnClearReturnVisit.style.opacity = '0.7';
+    } else if (status === '須回診') {
+      chatReturnBadge.textContent = '需回診';
+      chatReturnBadge.style.backgroundColor = '#ef4444';
+      chatReturnBadge.style.color = '#ffffff';
+      chatReturnBadge.style.border = 'none';
+      chatReturnBadge.style.display = '';
+      
+      btnClearReturnVisit.textContent = '已回診';
+      btnClearReturnVisit.style.backgroundColor = '#ef4444';
+      btnClearReturnVisit.style.color = '#ffffff';
+      btnClearReturnVisit.style.border = 'none';
+      btnClearReturnVisit.style.display = '';
+      btnClearReturnVisit.disabled = false;
+      btnClearReturnVisit.style.cursor = 'pointer';
+      btnClearReturnVisit.style.opacity = '1';
+    } else if (status === '已回診') {
+      chatReturnBadge.textContent = '已回診';
+      chatReturnBadge.style.backgroundColor = '#fee2e2';
+      chatReturnBadge.style.color = '#991b1b';
+      chatReturnBadge.style.border = '1px solid #fca5a5';
+      chatReturnBadge.style.display = '';
+      
+      btnClearReturnVisit.textContent = '已回診';
+      btnClearReturnVisit.style.backgroundColor = '#fee2e2';
+      btnClearReturnVisit.style.color = '#991b1b';
+      btnClearReturnVisit.style.border = '1px solid #fca5a5';
+      btnClearReturnVisit.style.display = '';
+      btnClearReturnVisit.disabled = true;
+      btnClearReturnVisit.style.cursor = 'not-allowed';
+      btnClearReturnVisit.style.opacity = '0.7';
     } else {
       chatReturnBadge.style.display = 'none';
       btnClearReturnVisit.style.display = 'none';
+      btnClearReturnVisit.disabled = false;
+      btnClearReturnVisit.style.cursor = 'pointer';
+      btnClearReturnVisit.style.opacity = '1';
+    }
+
+    if (btnRefreshChat) {
+      btnRefreshChat.style.display = 'inline-flex';
     }
     
     renderVisits();
@@ -167,7 +246,7 @@ function renderVisits() {
     });
     
     return `
-      <div class="visit-item" id="visit-item-${index}" onclick="selectVisit('${esc(f.checkout_date)}', this)">
+      <div class="visit-item" id="visit-item-${index}" data-date="${esc(f.checkout_date)}" onclick="selectVisit('${esc(f.checkout_date)}', this)">
         <div class="visit-title">${esc(f.checkout_date)}</div>
         <div class="visit-meta">
           <span class="badge badge-blue">${esc(f.specialty)}</span>
@@ -179,13 +258,21 @@ function renderVisits() {
     `;
   }).join('');
   
-  const firstVisitItem = body.querySelector('.visit-item');
-  if (firstVisitItem) {
-    firstVisitItem.click();
+  let targetVisitItem = null;
+  if (state.currentVisitDate) {
+    targetVisitItem = Array.from(body.querySelectorAll('.visit-item')).find(item => item.getAttribute('data-date') === state.currentVisitDate);
+  }
+  if (!targetVisitItem) {
+    targetVisitItem = body.querySelector('.visit-item');
+  }
+  
+  if (targetVisitItem) {
+    targetVisitItem.click();
   }
 }
 
 function selectVisit(checkoutDate, el) {
+  state.currentVisitDate = checkoutDate;
   document.querySelectorAll('#visit-list-body .visit-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
   
@@ -305,6 +392,34 @@ function scrollToSession(idx) {
 }
 
 function confirmClearReturnVisit() {
+  const btn = document.getElementById('btn-clear-return-visit');
+  if (btn && btn.disabled) return;
+  const isLook = btn && btn.textContent === '已看診';
+  
+  const modal = document.getElementById('modal-confirm-return-visit');
+  if (modal) {
+    if (isLook) {
+      modal.querySelector('.modal-alert-title').textContent = '確認已看診';
+      modal.querySelector('.modal-alert-banner div').textContent = '將該病患狀態更新為「已看診」。';
+      modal.querySelector('.modal-alert-subtitle').textContent = '確定要將該病患狀態更新為「已看診」嗎？';
+      
+      const confirmBtn = modal.querySelector('.modal-alert-actions .btn-danger');
+      if (confirmBtn) {
+        confirmBtn.textContent = '確認已看診';
+        confirmBtn.style.backgroundColor = '#f59e0b';
+      }
+    } else {
+      modal.querySelector('.modal-alert-title').textContent = '確認已回診';
+      modal.querySelector('.modal-alert-banner div').textContent = '將該病患狀態更新為「已回診」。';
+      modal.querySelector('.modal-alert-subtitle').textContent = '確定要將該病患狀態更新為「已回診」嗎？';
+      
+      const confirmBtn = modal.querySelector('.modal-alert-actions .btn-danger');
+      if (confirmBtn) {
+        confirmBtn.textContent = '確認已回診';
+        confirmBtn.style.backgroundColor = '#ef4444';
+      }
+    }
+  }
   openModal('modal-confirm-return-visit');
 }
 
@@ -312,28 +427,80 @@ async function executeClearReturnVisit() {
   const mrn = state.currentMrn;
   if (!mrn) return;
   
+  const btn = document.getElementById('btn-clear-return-visit');
+  const isLook = btn && btn.textContent === '已看診';
+  const targetStatus = isLook ? '已看診' : '已回診';
+  
   try {
-    const res = await api('POST', `/api/patients/${encodeURIComponent(mrn)}/clear_return_visit`);
+    const res = await api('POST', `/api/patients/${encodeURIComponent(mrn)}/clear_return_visit`, { status: targetStatus });
     if (res.success) {
       closeModal('modal-confirm-return-visit');
-      showToast('✅ 已清除回診狀態', 'ok');
+      showToast(isLook ? '✅ 已更新看診狀態' : '✅ 已更新回診狀態', 'ok');
       
-      // Instantly clear patient badges in client side
-      document.getElementById('chat-return-badge').style.display = 'none';
-      document.getElementById('btn-clear-return-visit').style.display = 'none';
+      // Update patient badges in client side with light colors
+      const chatReturnBadge = document.getElementById('chat-return-badge');
+      if (targetStatus === '已看診') {
+        if (chatReturnBadge) {
+          chatReturnBadge.textContent = '已看診';
+          chatReturnBadge.style.backgroundColor = '#fef3c7';
+          chatReturnBadge.style.color = '#b45309';
+          chatReturnBadge.style.border = '1px solid #fcd34d';
+          chatReturnBadge.style.display = '';
+        }
+        if (btn) {
+          btn.textContent = '已看診';
+          btn.style.backgroundColor = '#fef3c7';
+          btn.style.color = '#b45309';
+          btn.style.border = '1px solid #fcd34d';
+          btn.style.display = '';
+          btn.disabled = true;
+          btn.style.cursor = 'not-allowed';
+          btn.style.opacity = '0.7';
+        }
+      } else {
+        if (chatReturnBadge) {
+          chatReturnBadge.textContent = '已回診';
+          chatReturnBadge.style.backgroundColor = '#fee2e2';
+          chatReturnBadge.style.color = '#991b1b';
+          chatReturnBadge.style.border = '1px solid #fca5a5';
+          chatReturnBadge.style.display = '';
+        }
+        if (btn) {
+          btn.textContent = '已回診';
+          btn.style.backgroundColor = '#fee2e2';
+          btn.style.color = '#991b1b';
+          btn.style.border = '1px solid #fca5a5';
+          btn.style.display = '';
+          btn.disabled = true;
+          btn.style.cursor = 'not-allowed';
+          btn.style.opacity = '0.7';
+        }
+      }
       
       if (state.allPatients) {
         const p = state.allPatients.find(x => x.medical_record_num === mrn);
-        if (p) p.needs_return_visit = false;
+        if (p) p.status = targetStatus;
       }
       if (state.allFormPatients) {
         const p = state.allFormPatients.find(x => x.medical_record_num === mrn);
-        if (p) p.needs_return_visit = false;
+        if (p) p.status = targetStatus;
       }
       
       const displayFormReturnBadge = document.getElementById('display-form-return-badge');
       if (displayFormReturnBadge && state.formCurrentMrn === mrn) {
-        displayFormReturnBadge.style.display = 'none';
+        if (targetStatus === '已看診') {
+          displayFormReturnBadge.textContent = '已看診';
+          displayFormReturnBadge.style.backgroundColor = '#fef3c7';
+          displayFormReturnBadge.style.color = '#b45309';
+          displayFormReturnBadge.style.border = '1px solid #fcd34d';
+          displayFormReturnBadge.style.display = '';
+        } else {
+          displayFormReturnBadge.textContent = '已回診';
+          displayFormReturnBadge.style.backgroundColor = '#fee2e2';
+          displayFormReturnBadge.style.color = '#991b1b';
+          displayFormReturnBadge.style.border = '1px solid #fca5a5';
+          displayFormReturnBadge.style.display = '';
+        }
       }
       
       const sortCriteria = document.getElementById('patient-sort-select')?.value || 'checkout_desc';
@@ -346,6 +513,34 @@ async function executeClearReturnVisit() {
   } catch (err) {
     console.error(err);
     alert('連線失敗: ' + err);
+  }
+}
+
+async function refreshChatHistory() {
+  const mrn = state.currentMrn;
+  if (!mrn) return;
+
+  const btn = document.getElementById('btn-refresh-chat');
+  if (!btn) return;
+
+  const svg = btn.querySelector('svg');
+  if (svg) svg.classList.add('spinning');
+  btn.disabled = true;
+
+  try {
+    const list = await api('GET', '/api/chats');
+    state.allPatients = Array.isArray(list) ? list : [];
+    const sortCriteria = document.getElementById('patient-sort-select')?.value || 'checkout_desc';
+    sortAndRenderPatients(sortCriteria);
+
+    await loadDetail(mrn);
+    showToast('✅ 對話紀錄已更新', 'ok');
+  } catch (err) {
+    console.error(err);
+    showToast('❌ 更新失敗', 'fail');
+  } finally {
+    if (svg) svg.classList.remove('spinning');
+    btn.disabled = false;
   }
 }
 

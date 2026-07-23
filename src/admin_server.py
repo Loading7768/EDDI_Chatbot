@@ -25,9 +25,7 @@ DB_HOSPITAL = os.path.join(BASE_DIR, 'database', 'hospital.db')
 
 import threading
 
-return_visit_lock = threading.Lock()
 DEPARTMENTS_FILE = os.path.join(BASE_DIR, 'data', 'departments.json')
-RETURN_VISIT_RECORDS_FILE = os.path.join(BASE_DIR, 'data', 'return_visit_records.json')
 
 education_lock = threading.Lock()
 
@@ -58,27 +56,6 @@ def save_departments(deps: list):
             json.dump(deps, f, ensure_ascii=False, indent=4)
     except Exception as e:
         print(f"[Departments Save Error] {e}")
-
-def load_return_visit_records() -> dict:
-    """讀取已回診時間紀錄 JSON"""
-    if not os.path.exists(RETURN_VISIT_RECORDS_FILE):
-        return {}
-    try:
-        with open(RETURN_VISIT_RECORDS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"[Return Visit Records Load Error] {e}")
-        return {}
-
-def save_return_visit_records(records: dict):
-    """寫入已回診時間紀錄 JSON"""
-    try:
-        os.makedirs(os.path.dirname(RETURN_VISIT_RECORDS_FILE), exist_ok=True)
-        with open(RETURN_VISIT_RECORDS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(records, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"[Return Visit Records Save Error] {e}")
-
 
 def load_education() -> dict:
     """讀取衛教資料 JSON，key 為類別，value 為衛教內容文字。
@@ -112,59 +89,7 @@ def save_education(edu: dict):
             json.dump(edu, f, ensure_ascii=False, indent=4)
     except Exception as e:
         print(f"[Education Save Error] {e}")
-
-def check_needs_return_visit(mrn: str) -> bool:
-    """
-    判斷 Line bot 歷史訊息中是否曾回覆過該病患需要「回診」，
-    且訊息時間戳晚於最後一次已回診清除時間。
-    """
-    mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
-    if not os.path.isdir(mrn_dir):
-        return False
         
-    records = load_return_visit_records()
-    last_clear_str = records.get(mrn)
-    
-    last_clear_time = None
-    if last_clear_str:
-        try:
-            last_clear_time = datetime.fromisoformat(last_clear_str)
-        except Exception:
-            pass
-            
-    returnVisitTerms = ['請立即前往急診回診', '情況緊急，請立即撥打 119 或前往最近的急診室']
-
-    for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            for msg in data.get('messages', []):
-                if msg.get('role') == 'assistant' and any(term in msg.get('content', '') for term in returnVisitTerms):
-                    ts_str = msg.get('timestamp', '')
-                    if ts_str:
-                        try:
-                            msg_time = datetime.fromisoformat(ts_str)
-                            if last_clear_time:
-                                # 統一時區進行比較
-                                if msg_time.tzinfo is not None and last_clear_time.tzinfo is None:
-                                    last_clear_time = last_clear_time.replace(tzinfo=msg_time.tzinfo)
-                                elif msg_time.tzinfo is None and last_clear_time.tzinfo is not None:
-                                    msg_time = msg_time.replace(tzinfo=last_clear_time.tzinfo)
-                                
-                                if msg_time > last_clear_time:
-                                    return True
-                            else:
-                                return True
-                        except Exception as te:
-                            print(f"[check_needs_return_visit] 解析時間失敗: {te}")
-                            if not last_clear_time:
-                                return True
-        except Exception as e:
-            print(f'[check_needs_return_visit] 讀取失敗 {os.path.basename(filepath)}: {e}')
-            
-    return False
-
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def hash_pw(pw: str) -> str:
@@ -439,17 +364,17 @@ def get_current_prompt_info():
 
 # ── routes ────────────────────────────────────────────────────────────────────
 
-@admin_bp.route('/admin')
+@admin_bp.route('/main')
 def index():
     return render_template('admin/html/admin.html')
 
 
-@admin_bp.route('/admin/css/<path:filename>')
+@admin_bp.route('/main/css/<path:filename>')
 def admin_css(filename):
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'css'), filename)
 
 
-@admin_bp.route('/admin/js/<path:filename>')
+@admin_bp.route('/main/js/<path:filename>')
 def admin_js(filename):
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'js'), filename)
 
@@ -582,7 +507,8 @@ def get_chats():
                     MIN(lpp.line_uuid) AS line_id,
                     MIN(lpp.relation) AS relation,
                     COUNT(r.record_id) AS form_count,
-                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout
+                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout,
+                    MIN(p.status) AS status
                 FROM record r
                 JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
                 JOIN patients p ON lpp.patient_id = p.patient_id
@@ -596,7 +522,8 @@ def get_chats():
                     MIN(lpp.line_uuid) AS line_id,
                     MIN(lpp.relation) AS relation,
                     COUNT(r.record_id) AS form_count,
-                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout
+                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout,
+                    MIN(p.status) AS status
                 FROM record r
                 JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
                 JOIN patients p ON lpp.patient_id = p.patient_id
@@ -647,7 +574,8 @@ def get_chats():
                 'latest_checkout':    row['latest_checkout'],
                 'specialty':          specialty,
                 'specialties':        specialties,
-                'needs_return_visit': check_needs_return_visit(mrn),
+                'status':             row['status'],
+                'needs_return_visit': row['status'] == '須回診',
             })
 
         conn.close()
@@ -682,7 +610,7 @@ def get_chat_detail(mrn: str):
             return jsonify({'error': '無查看權限'}), 403
 
     patient = conn.execute('''
-        SELECT p.medical_record_number, MIN(lpp.line_uuid) AS line_uuid, MIN(lpp.relation) AS relation
+        SELECT p.medical_record_number, MIN(lpp.line_uuid) AS line_uuid, MIN(lpp.relation) AS relation, MIN(p.status) AS status
         FROM patients p
         LEFT JOIN line_patient_pairs lpp ON p.patient_id = lpp.patient_id
         WHERE p.medical_record_number = ?
@@ -726,14 +654,13 @@ def get_chat_detail(mrn: str):
         for r in forms
     ]
 
-    # 增加：獲取回診標記
-    needs_return_visit = check_needs_return_visit(mrn)
     return jsonify({
         'patient': {
             'medical_record_num': patient['medical_record_number'],
             'line_id':            patient['line_uuid'],
             'relation':           patient['relation'] if patient['relation'] else '本人',
-            'needs_return_visit': needs_return_visit
+            'status':             patient['status'],
+            'needs_return_visit': patient['status'] == '須回診'
         },
         'forms':    forms_list,
         'sessions': sessions_list,
@@ -1307,14 +1234,40 @@ def save_prompt_nickname():
 @login_required
 def clear_return_visit(mrn: str):
     mrn = mrn.strip()
-    now_str = datetime.now().isoformat()
+    data = request.get_json() or {}
+    target_status = data.get('status')
     
-    with return_visit_lock:
-        records = load_return_visit_records()
-        records[mrn] = now_str
-        save_return_visit_records(records)
+    conn = get_db()
+    try:
+        if not target_status:
+            row = conn.execute('SELECT status FROM patients WHERE medical_record_number = ?', (mrn,)).fetchone()
+            if row:
+                current_status = row['status']
+                if current_status == '須看診':
+                    target_status = '已看診'
+                elif current_status == '須回診':
+                    target_status = '已回診'
+                else:
+                    target_status = '已回診'
+            else:
+                target_status = '已回診'
+                
+        if target_status not in ('已看診', '已回診'):
+            return jsonify({'error': '無效的狀態更新'}), 400
+            
+        conn.execute('''
+            UPDATE patients
+            SET status = ?
+            WHERE medical_record_number = ?
+        ''', (target_status, mrn))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
         
-    return jsonify({'success': True, 'cleared_at': now_str})
+    return jsonify({'success': True, 'status': target_status})
 
 
 @admin_bp.route('/api/departments', methods=['GET'])

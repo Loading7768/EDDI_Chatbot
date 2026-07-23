@@ -3,6 +3,7 @@ import sqlite3
 import hashlib
 import json
 import os
+import re
 import glob
 from datetime import datetime
 from functools import wraps
@@ -19,7 +20,8 @@ PROMPTS_DIR   = os.path.join(BASE_DIR, 'assets', 'prompts')
 CONFIG_FILE   = os.path.join(BASE_DIR, 'data', 'prompt_config.json')
 STATS_CACHE   = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
 CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
-EDUCATION_FILE = os.path.join(BASE_DIR, 'assets','discharge', 'category.json')
+DISCHARGE_MD_DIR   = os.path.join(BASE_DIR, 'assets', 'discharge')
+EDUCATION_FILE = os.path.join(DISCHARGE_MD_DIR, 'category.json')
 
 DB_HOSPITAL = os.path.join(BASE_DIR, 'database', 'hospital.db')
 
@@ -1445,10 +1447,50 @@ def delete_or_disable_department(name: str):
         return jsonify({'success': True, 'action': 'deleted', 'message': '科別已成功刪除。'})
 
 # ── 衛教資料管理（醫師自行維護，僅限管理員新增/編輯/刪除）──────────────────────
+# 輔助函式
+def _sanitize_md_filename(filename: str) -> str:
+    """限制自訂檔名只能是純檔名（擋掉路徑符號），並確保副檔名是 .md。"""
+    filename = os.path.basename((filename or '').strip())
+    if not filename:
+        return ''
+    if not filename.lower().endswith('.md'):
+        filename += '.md'
+    return filename
+
+
+def _write_md_content(filename: str, content: str) -> None:
+    os.makedirs(DISCHARGE_MD_DIR, exist_ok=True)
+    with open(os.path.join(DISCHARGE_MD_DIR, filename), 'w', encoding='utf-8') as f:
+        f.write(content)
+
+
+def _read_md_content(filename: str) -> str | None:
+    path = os.path.join(DISCHARGE_MD_DIR, filename)
+    if not os.path.exists(path):
+        return None
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def _delete_md_file_if_unshared(filename: str, edu_after_delete: dict) -> None:
+    """只有在刪除後，沒有其他「部位/類別」還指向同一個檔名時，才真的刪除 .md 檔。"""
+    still_used = any(
+        isinstance(info, dict) and info.get('filename') == filename
+        for categories in edu_after_delete.values()
+        for info in categories.values()
+    )
+    if still_used:
+        return
+    path = os.path.join(DISCHARGE_MD_DIR, filename)
+    if os.path.exists(path):
+        os.remove(path)
+
+
+# ── 衛教資料管理 main function ──────────────────────
 @admin_bp.route('/api/education', methods=['GET'])
 @login_required
 def list_education():
-    """回傳所有衛教資料類別與內容，供列表顯示（登入醫師皆可查看）。"""
+    """回傳所有「部位/類別/檔名」，攤平成列表供顯示（不含 content，內容另外抓）。"""
     test_file = EDUCATION_FILE
 
     with education_lock:
@@ -1458,23 +1500,43 @@ def list_education():
         else:
             edu = {}
 
-    result = [{'category': k, 'content': v} for k, v in edu.items()]
-    result.sort(key=lambda x: x['category'])
+    result = []
+    for bodypart, categories in edu.items():
+        for category, info in categories.items():
+            result.append({
+                'bodypart': bodypart,
+                'category': category,
+                'filename': info.get('filename', '')
+            })
+    result.sort(key=lambda x: (x['bodypart'], x['category']))
     return jsonify(result)
+
+
+@admin_bp.route('/api/education-content/<path:filename>', methods=['GET'])
+@login_required
+def get_education_content(filename: str):
+    """讀取指定 md 檔的實際內容，供編輯 Modal 帶入現有內容。"""
+    filename = _sanitize_md_filename(filename)
+    content = _read_md_content(filename)
+    if content is None:
+        return jsonify({'error': '找不到此檔案'}), 404
+    return jsonify({'filename': filename, 'content': content})
 
 
 @admin_bp.route('/api/education', methods=['POST'])
 @admin_required
 def create_education():
-    """新增衛教資料類別"""
+    """新增衛教類別（部位 + 類別 + 自訂檔名），同步寫入對應的 md 檔"""
     test_file = EDUCATION_FILE
 
     data = request.get_json() or {}
+    bodypart = data.get('bodypart', '').strip()
     category = data.get('category', '').strip()
     content_text = data.get('content', '').strip()
+    filename = _sanitize_md_filename(data.get('filename', ''))
 
-    if not category or not content_text:
-        return jsonify({'error': '類別名稱與衛教內容皆不可空白'}), 400
+    if not bodypart or not category or not content_text or not filename:
+        return jsonify({'error': '部位、類別名稱、衛教內容與檔名皆不可空白'}), 400
 
     with education_lock:
         if os.path.exists(test_file):
@@ -1483,29 +1545,36 @@ def create_education():
         else:
             edu = {}
 
-        if category in edu:
-            return jsonify({'error': '此類別已存在'}), 400
-        edu[category] = content_text
+        categories = edu.setdefault(bodypart, {})
+        if category in categories:
+            return jsonify({'error': '此部位底下已有相同類別'}), 400
+
+        categories[category] = {'filename': filename}
 
         with open(test_file, 'w', encoding='utf-8') as f:
             json.dump(edu, f, ensure_ascii=False, indent=4)
 
-    return jsonify({'success': True, 'category': category})
+        _write_md_content(filename, content_text)
+
+    return jsonify({'success': True, 'bodypart': bodypart, 'category': category, 'filename': filename})
 
 
-@admin_bp.route('/api/education/<category>', methods=['PUT'])
+@admin_bp.route('/api/education/<bodypart>/<category>', methods=['PUT'])
 @admin_required
-def update_education(category: str):
-    """編輯衛教資料類別（可同時修改類別名稱與內容）"""
+def update_education(bodypart: str, category: str):
+    """編輯衛教類別（可同時修改部位、類別名稱、檔名，並同步寫入內容到 md 檔）"""
     test_file = EDUCATION_FILE
 
+    bodypart = bodypart.strip()
     category = category.strip()
     data = request.get_json() or {}
+    new_bodypart = data.get('bodypart', bodypart).strip()
     new_category = data.get('category', category).strip()
     content_text = data.get('content', '').strip()
+    filename = _sanitize_md_filename(data.get('filename', ''))
 
-    if not new_category or not content_text:
-        return jsonify({'error': '類別名稱與衛教內容皆不可空白'}), 400
+    if not new_bodypart or not new_category or not content_text or not filename:
+        return jsonify({'error': '部位、類別名稱、衛教內容與檔名皆不可空白'}), 400
 
     with education_lock:
         if os.path.exists(test_file):
@@ -1514,35 +1583,36 @@ def update_education(category: str):
         else:
             edu = {}
 
-        if category not in edu:
+        if bodypart not in edu or category not in edu[bodypart]:
             return jsonify({'error': '找不到此類別'}), 404
-        if new_category != category and new_category in edu:
-            return jsonify({'error': '該類別名稱已存在'}), 400
 
-        if new_category != category:
-            # 重新命名：保留原本的順序重建 dict
-            new_edu = {}
-            for k, v in edu.items():
-                if k == category:
-                    new_edu[new_category] = content_text
-                else:
-                    new_edu[k] = v
-            edu = new_edu
-        else:
-            edu[category] = content_text
+        moved = (new_bodypart != bodypart) or (new_category != category)
+        if moved and new_category in edu.get(new_bodypart, {}):
+            return jsonify({'error': '該部位底下已有相同類別名稱'}), 400
+
+        # 從原本位置移除
+        del edu[bodypart][category]
+        if not edu[bodypart]:
+            del edu[bodypart]
+
+        # 寫入(可能是新的)部位/類別
+        edu.setdefault(new_bodypart, {})[new_category] = {'filename': filename}
 
         with open(test_file, 'w', encoding='utf-8') as f:
             json.dump(edu, f, ensure_ascii=False, indent=4)
 
-    return jsonify({'success': True, 'category': new_category})
+        _write_md_content(filename, content_text)
+
+    return jsonify({'success': True, 'bodypart': new_bodypart, 'category': new_category, 'filename': filename})
 
 
-@admin_bp.route('/api/education/<category>', methods=['DELETE'])
+@admin_bp.route('/api/education/<bodypart>/<category>', methods=['DELETE'])
 @admin_required
-def delete_education(category: str):
-    """刪除衛教資料類別"""
+def delete_education(bodypart: str, category: str):
+    """刪除衛教類別（若沒有其他類別共用同一個 md 檔，才一併刪除該檔案）"""
     test_file = EDUCATION_FILE
 
+    bodypart = bodypart.strip()
     category = category.strip()
 
     with education_lock:
@@ -1552,11 +1622,18 @@ def delete_education(category: str):
         else:
             edu = {}
 
-        if category not in edu:
+        if bodypart not in edu or category not in edu[bodypart]:
             return jsonify({'error': '找不到此類別'}), 404
-        del edu[category]
+
+        filename = edu[bodypart][category].get('filename', '')
+        del edu[bodypart][category]
+        if not edu[bodypart]:
+            del edu[bodypart]
 
         with open(test_file, 'w', encoding='utf-8') as f:
             json.dump(edu, f, ensure_ascii=False, indent=4)
+
+        if filename:
+            _delete_md_file_if_unshared(filename, edu)
 
     return jsonify({'success': True})

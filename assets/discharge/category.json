@@ -1,57 +1,132 @@
 {
-    "頭": [
-        "頭暈",
-        "流鼻血",
-        "發燒",
-        "頭痛",
-        "偏頭痛",
-        "噁心嘔吐",
-        "眩暈"
-    ],
-    "脖子": [
-        "咳嗽",
-        "咳血",
-        "打嗝"
-    ],
-    "手": [],
-    "軀幹上半部": [
-        "胸痛",
-        "心悸",
-        "呼吸急促/呼吸困難",
-        "上背痛"
-    ],
-    "軀幹下半部": [
-        "腹痛",
-        "腸胃炎/病毒性腸胃炎",
-        "便秘",
-        "腹瀉",
-        "腰痛",
-        "吐血、解黑便、解血便、胃腸道出血",
-        "血尿",
-        "下背痛",
-        "尿滯留",
-        "懷孕早期陰道出血",
-        "懷孕後期陰道出血",
-        "月經週期間陰道出血"
-    ],
-    "腳": [],
-    "皮膚": [
-        "燒燙傷",
-        "水腫",
-        "皮膚疹子(皮疹)"
-    ],
-    "精神": [
-        "譫妄、意識混亂",
-        "虛弱",
-        "暈厥、暈倒"
-    ],
-    "其他": [
-        "高血壓",
-        "肌肉、關節和骨骼疼痛",
-        "癲癇",
-        "休克",
-        "一般外傷、鈍挫傷、扭傷、拉傷",
-        "傷口處置原則"
-    ],
-    "123": "56432532"
+    "頭": {
+        "頭暈": {
+            "filename": "dizziness.md"
+        },
+        "流鼻血": {
+            "filename": "epistaxis_nosebleeds.md"
+        },
+        "發燒": {
+            "filename": "fever.md"
+        },
+        "頭痛": {
+            "filename": "headache.md"
+        },
+        "偏頭痛": {
+            "filename": "migraine.md"
+        },
+        "噁心嘔吐": {
+            "filename": "nausea_and_vomiting.md"
+        },
+        "眩暈": {
+            "filename": "vertigo.md"
+        }
+    },
+    "脖子": {
+        "咳嗽": {
+            "filename": "cough.md"
+        },
+        "咳血": {
+            "filename": "hemoptysis.md"
+        },
+        "打嗝": {
+            "filename": "hiccups.md"
+        }
+    },
+    "手": {},
+    "軀幹上半部": {
+        "胸痛": {
+            "filename": "chest_pain.md"
+        },
+        "心悸": {
+            "filename": "palpitation.md"
+        },
+        "呼吸急促/呼吸困難": {
+            "filename": "shortness_of_breath_dyspnea.md"
+        },
+        "上背痛": {
+            "filename": "upper_back_pain.md"
+        }
+    },
+    "軀幹下半部": {
+        "腹痛": {
+            "filename": "abdominal_pain.md"
+        },
+        "腸胃炎/病毒性腸胃炎": {
+            "filename": "acute_viral_gastroenteritis.md"
+        },
+        "便秘": {
+            "filename": "constipation.md"
+        },
+        "腹瀉": {
+            "filename": "diarrhea.md"
+        },
+        "腰痛": {
+            "filename": "flank_pain.md"
+        },
+        "吐血、解黑便、解血便、胃腸道出血": {
+            "filename": "hematemesis_gi_bleed.md"
+        },
+        "血尿": {
+            "filename": "hematuria.md"
+        },
+        "下背痛": {
+            "filename": "low_back_pain.md"
+        },
+        "尿滯留": {
+            "filename": "urinary_retention.md"
+        },
+        "懷孕早期陰道出血": {
+            "filename": "vaginal_bleeding_early_pregnancy.md"
+        },
+        "懷孕後期陰道出血": {
+            "filename": "vaginal_bleeding_late_pregnancy.md"
+        },
+        "月經週期間陰道出血": {
+            "filename": "vaginal_bleeding_between_periods.md"
+        }
+    },
+    "腳": {},
+    "皮膚": {
+        "燒燙傷": {
+            "filename": "burn_injury.md"
+        },
+        "水腫": {
+            "filename": "edema.md"
+        },
+        "皮膚疹子(皮疹)": {
+            "filename": "skin_rash.md"
+        }
+    },
+    "精神": {
+        "譫妄、意識混亂": {
+            "filename": "delirium_confusion.md"
+        },
+        "虛弱": {
+            "filename": "general_weakness.md"
+        },
+        "暈厥、暈倒": {
+            "filename": "syncope.md"
+        }
+    },
+    "其他": {
+        "高血壓": {
+            "filename": "hypertension_emergency.md"
+        },
+        "肌肉、關節和骨骼疼痛": {
+            "filename": "myalgia_arthralgia_bone_pain.md"
+        },
+        "癲癇": {
+            "filename": "seizure.md"
+        },
+        "休克": {
+            "filename": "shock.md"
+        },
+        "一般外傷、鈍挫傷、扭傷、拉傷": {
+            "filename": "trauma_contusion_sprain.md"
+        },
+        "傷口處置原則": {
+            "filename": "trauma_suture_abrasion_wound.md"
+        }
+    }
 }

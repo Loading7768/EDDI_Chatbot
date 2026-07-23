@@ -26,8 +26,8 @@ def init_hospital_db():
     
     # 刪除舊表
     c.execute('DROP TABLE IF EXISTS record')
-    c.execute('DROP TABLE IF EXISTS line_accounts')
     c.execute('DROP TABLE IF EXISTS line_patient_pairs')
+    c.execute('DROP TABLE IF EXISTS line_accounts')
     c.execute('DROP TABLE IF EXISTS patients')
     c.execute('DROP TABLE IF EXISTS doctors')
     

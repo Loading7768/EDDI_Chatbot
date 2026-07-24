@@ -1,30 +1,65 @@
-<!-- 修改表單 -->
+<!-- 出院單管理 -->
 <section id="section-forms" class="section">
-  <div class="section-title">修改表單</div>
-  <div class="chat-layout">
-    <!-- Column 1: Patient List -->
-    <div class="patient-list">
-      <div class="plist-header" style="justify-content: space-between; align-items: center; display: flex;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          病患列表
-          <span class="badge badge-gray" id="form-patient-count">0</span>
-        </div>
-        <select id="form-patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderFormPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
-          <option value="checkout_desc">就診日期 ⬇</option>
-          <option value="checkout_asc">就診日期 ⬆</option>
-          <option value="mrn_desc">病歷號 ⬇</option>
-          <option value="mrn_asc">病歷號 ⬆</option>
-        </select>
-      </div>
-      <div id="form-patient-list-body">
-        <div class="empty-state" style="padding:32px 0;">
-          <div class="empty-icon">👤</div><p>載入中…</p>
+  <div class="section-title">出院單管理</div>
+  <div class="forms-layout" id="forms-layout" data-state="view">
+
+    <!-- ═══ Column 1: Main ═══ -->
+    <div class="forms-main-col" id="forms-main-col">
+
+      <!-- Button: 護理師填單 (Nurse) -->
+      <button class="forms-state-btn" id="btn-state-nurse" onclick="setFormsState('nurse')">
+        🩺 護理師填單
+      </button>
+      <div class="forms-state-content" id="content-state-nurse">
+        <div class="forms-state-placeholder" style="opacity: 0.5;">
+          <div style="font-size: 56px; margin-bottom: 8px;">🩺</div>
+          <div class="forms-state-placeholder-title">護理師填單</div>
         </div>
       </div>
+
+      <!-- Button: 醫師填單 (Doctor) -->
+      <button class="forms-state-btn" id="btn-state-doctor" onclick="setFormsState('doctor')">
+        <span>👨‍⚕️ 醫師填單</span>
+        <span class="draft-count-badge" id="doctor-draft-badge" style="display:none;">0</span>
+      </button>
+      <div class="forms-state-content" id="content-state-doctor">
+        <div class="plist-header" style="justify-content: space-between; align-items: center; display: flex;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            未完成出院單
+            <span class="badge badge-gray" id="doctor-draft-header-count">0</span>
+          </div>
+        </div>
+        <div class="patient-list-body" id="doctor-draft-list" style="flex:1; overflow-y:auto;"></div>
+      </div>
+
+      <!-- Button: 查看出院單紀錄 (View) — default active -->
+      <button class="forms-state-btn active" id="btn-state-view" onclick="setFormsState('view')">
+        📋 出院單紀錄
+      </button>
+      <div class="forms-state-content active" id="content-state-view">
+        <div class="plist-header" style="justify-content: space-between; align-items: center; display: flex;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            病患列表
+            <span class="badge badge-gray" id="form-patient-count">0</span>
+          </div>
+          <select id="form-patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderFormPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
+            <option value="checkout_desc">就診日期 ⬇</option>
+            <option value="checkout_asc">就診日期 ⬆</option>
+            <option value="mrn_desc">病歷號 ⬇</option>
+            <option value="mrn_asc">病歷號 ⬆</option>
+          </select>
+        </div>
+        <div id="form-patient-list-body">
+          <div class="empty-state" style="padding:32px 0;">
+            <div class="empty-icon">👤</div><p>載入中…</p>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- Column 2: Visit List -->
-    <div class="visit-list">
+    <!-- ═══ Column 2: Sub (visible in View state only) ═══ -->
+    <div class="forms-sub-col" id="forms-sub-col">
       <div class="plist-header">
         就診紀錄
         <span class="badge badge-gray" id="form-visit-count">0</span>
@@ -36,154 +71,390 @@
       </div>
     </div>
 
-    <!-- Column 3: Edit Form Content -->
-    <div class="chat-panel">
-      <div class="chat-panel-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <div>
-          <div class="chat-panel-title" id="form-edit-title">請選擇就診紀錄</div>
-          <div class="chat-panel-sub"   id="form-edit-sub">點擊就診紀錄載入表單進行修改</div>
+    <!-- ═══ Column 3: Form (always present) ═══ -->
+    <div class="forms-form-col" id="forms-form-col">
+
+      <!-- Nurse form panel (visible only in nurse state) -->
+      <div class="nurse-form-panel" id="nurse-form-panel">
+
+        <!-- Header: title + save button -->
+        <div class="nurse-fp-header">
+          <div>
+            <div class="chat-panel-title">建立新出院單</div>
+            <div class="chat-panel-sub" id="nurse-fp-sub">請選擇 LINE 帳號與病患</div>
+          </div>
+          <button class="btn btn-accent" id="btn-nurse-save" disabled onclick="saveNurseForm()">&#128190; 儲存</button>
         </div>
-        <div id="form-edit-save-btn-wrapper" style="display: none;">
-          <button class="btn btn-accent" id="btn-save-form-edit" onclick="saveFormEdit()">💾 儲存修改</button>
+
+        <!-- Form body: scrollable content -->
+        <div class="nurse-fp-body">
+
+          <!-- Group 1: LINE select (custom dropdown with search at top) -->
+          <div class="nurse-fp-row" id="nurse-fp-line-row">
+            <label class="nurse-fp-label">LINE 帳號</label>
+            <div class="nurse-custom-dd" id="nurse-line-dd">
+              <button class="nurse-custom-dd-btn" id="nurse-line-btn" onclick="toggleNurseLineDropdown()">
+                <span id="nurse-line-btn-text">請選擇 LINE 帳號</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="nurse-custom-dd-list" id="nurse-line-list">
+                <div style="padding: 10px 12px 6px 12px; border-bottom: 1px solid var(--border); background: var(--card); position: sticky; top: 0; z-index: 10;">
+                  <input type="text" id="nurse-line-search" class="nurse-draft-input" placeholder="🔍 搜尋 LINE 帳號…" oninput="filterNurseLineAccounts(this.value)" style="padding: 6px 10px; font-size: 13px;" />
+                  <div id="nurse-line-search-sub" style="font-size: 11px; color: var(--muted); margin-top: 4px; display: none;"></div>
+                </div>
+                <div id="nurse-line-items-container"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Group 2: Patient dropdown + draft text fields (hidden until LINE account selected) -->
+          <div class="nurse-fp-group" id="nurse-fp-patient-group" style="display:none;">
+            <!-- Custom patient dropdown -->
+            <div class="nurse-fp-row" id="nurse-fp-patient-row">
+              <label class="nurse-fp-label">病患</label>
+              <div class="nurse-custom-dd" id="nurse-patient-dd">
+                <button class="nurse-custom-dd-btn" id="nurse-patient-btn" disabled onclick="toggleNursePatientDropdown()">
+                  <span id="nurse-patient-btn-text">請選擇病患</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="nurse-custom-dd-list" id="nurse-patient-list"></div>
+              </div>
+            </div>
+
+            <!-- Draft text fields (shown conditionally by JS) -->
+            <div id="nurse-draft-fields" style="display:none; flex-direction:column; gap:16px; margin-top:16px;">
+              <!-- self: MRC input (when 帳號本人 has no MRC) -->
+              <div class="nurse-fp-row" id="nurse-draft-self-mrn-row" style="display:none;">
+                <label class="nurse-fp-label">病歷號（帳號本人）</label>
+                <input type="text" id="nurse-draft-self-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateNurseForm()" />
+              </div>
+              <!-- new: relation input -->
+              <div class="nurse-fp-row" id="nurse-draft-new-relation-row" style="display:none;">
+                <label class="nurse-fp-label">關係</label>
+                <input type="text" id="nurse-draft-new-relation" class="nurse-draft-input" placeholder="請輸入關係（如：子女）" oninput="validateNurseForm()" />
+              </div>
+              <!-- new: MRC input -->
+              <div class="nurse-fp-row" id="nurse-draft-new-mrn-row" style="display:none;">
+                <label class="nurse-fp-label">病歷號（新增）</label>
+                <input type="text" id="nurse-draft-new-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateNurseForm()" />
+              </div>
+            </div>
+          </div><!-- /nurse-fp-group -->
+
+        </div><!-- /nurse-fp-body -->
+
+      </div>
+
+      <!-- Doctor form panel (visible only in doctor state) -->
+      <div class="doctor-form-panel" id="doctor-form-panel" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+
+        <!-- Header: title + sub + action buttons -->
+        <div class="doctor-fp-header" id="doctor-fp-header">
+          <div>
+            <div class="chat-panel-title" id="doctor-fp-title">請選擇未完成出院單</div>
+            <div class="chat-panel-sub" id="doctor-fp-sub">點擊未完成出院單來填寫</div>
+          </div>
+          <div id="doctor-fp-btns" style="display:none; gap:8px; align-items:center;">
+            <button class="btn btn-danger" id="btn-doctor-delete" onclick="deleteDoctorDraft()">🗑 刪除</button>
+            <button class="btn btn-accent" id="btn-doctor-save" onclick="saveDoctorForm()">💾 傳送出院單</button>
+          </div>
+        </div>
+
+        <!-- Body: scrollable content -->
+        <div class="doctor-fp-body" id="doctor-fp-body">
+
+          <!-- Default placeholder when no draft selected -->
+          <div id="doctor-fp-placeholder" class="forms-state-placeholder" style="opacity: 0.5;">
+            <div style="font-size: 56px; margin-bottom: 8px;">📋</div>
+            <div class="forms-state-placeholder-title">請先選擇出院單來完成填寫</div>
+          </div>
+
+          <!-- Active draft content (hidden by default) -->
+          <div id="doctor-fp-content" style="display:none; flex-direction:column; justify-content:space-evenly; flex:1; gap:20px; padding:20px 24px;">
+
+            <!-- Display / Meta Box: 3 rows with dividers -->
+            <div class="doctor-meta-box">
+              <div class="doctor-meta-row">
+                <div class="doctor-meta-label">📅 就診日期</div>
+                <div class="doctor-meta-val" id="doctor-meta-date">-</div>
+              </div>
+              <div class="doctor-meta-divider"></div>
+              <div class="doctor-meta-row">
+                <div class="doctor-meta-label">👨‍⚕️ 負責醫師</div>
+                <div class="doctor-meta-val" id="doctor-meta-doctor">-</div>
+              </div>
+              <div class="doctor-meta-divider"></div>
+              <div class="doctor-meta-row">
+                <div class="doctor-meta-label" style="display:flex; align-items:center; gap:6px;">
+                  <img src="/assets/svgs/line_icon.svg" width="18" height="18" alt="LINE" />
+                  <span id="doctor-meta-line-name">-</span>
+                </div>
+                <div style="color:var(--muted); font-size:14px;">🔗</div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                  <span style="font-weight:700; font-size:13px;" id="doctor-meta-relation">-</span>
+                  <span style="font-size:12px; color:var(--muted); font-family:monospace;" id="doctor-meta-mrc">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Symptom selection: 3 equal-width columns -->
+            <div class="symptom-selection-container">
+              <!-- Main Column (Categories) -->
+              <div class="symptom-col" id="symptom-main-col">
+                <div class="symptom-col-header">部位 / 類別</div>
+                <div class="symptom-col-body" id="symptom-main-list"></div>
+              </div>
+
+              <!-- Sub Column (Items under category) -->
+              <div class="symptom-col" id="symptom-sub-col" style="display:none;">
+                <div class="symptom-col-header" id="symptom-sub-header">衛教項目</div>
+                <div class="symptom-col-body" id="symptom-sub-list"></div>
+              </div>
+
+              <!-- Selected Column (Chips) -->
+              <div class="symptom-col" id="symptom-selected-col" style="display:none;">
+                <div class="symptom-col-header">已選擇項目</div>
+                <div class="symptom-col-body" id="symptom-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; padding:10px;"></div>
+              </div>
+            </div>
+
+          </div><!-- /doctor-fp-content -->
+
+        </div><!-- /doctor-fp-body -->
+
+      </div><!-- /doctor-form-panel -->
+
+      <!-- Regular form content (hidden in nurse/doctor state) -->
+      <div class="doctor-fp-header chat-panel-header">
+        <div>
+          <div class="chat-panel-title" id="form-edit-title">查看或修改表單</div>
+          <div class="chat-panel-sub"   id="form-edit-sub">點擊就診紀錄載入出院單進行修改</div>
+        </div>
+        <!-- Header action buttons -->
+        <div style="display:flex; gap:6px; align-items:center;">
+          <!-- Edit button (shown in view mode when record loaded) -->
+          <button class="btn btn-blue" id="btn-view-edit" title="編輯" style="display:none;" onclick="enterViewEditMode()">✏️ 修改</button>
+          <!-- Cancel button (shown in edit mode) -->
+          <button class="btn btn-gray" id="btn-view-cancel" title="取消" style="display:none;" onclick="exitViewEditMode(true)">✕ 取消</button>
+          <!-- Confirm button (shown in edit mode, disabled until valid) -->
+          <button class="btn btn-accent" id="btn-view-confirm" title="確認修改" style="display:none;" disabled onclick="openConfirmEditModal()">💾 儲存</button>
         </div>
       </div>
-      <div class="chat-panel-body" id="form-edit-body" style="position: relative;">
+
+      <div class="form-view-body" id="form-edit-body">
         <!-- Empty state before select -->
         <div class="empty-state" id="form-edit-empty">
           <div class="empty-icon">📋</div>
-          <p>請先選擇就診紀錄以修改表單</p>
+          <p>請先選擇就診紀錄以修改出院單</p>
         </div>
-        
-        <!-- Form container which is hidden by default -->
-        <div id="form-edit-container" style="display: none;">
+
+        <!-- ── View mode: meta-box (hidden in edit mode) ── -->
+        <div id="form-view-container" style="display:none; padding:20px 24px; flex-direction:column; gap:20px;">
+          <!-- Hidden compat inputs -->
           <input type="hidden" id="edit-form-mrn">
           <input type="hidden" id="edit-form-orig-date">
-          
-          <!-- Redesigned Card style layout -->
-          <div style="display: flex; align-items: stretch; margin-bottom: 20px; gap: 12px;">
-              <!-- Left: Meta Box (Patient field + details) -->
-              <div style="flex: 1; display: flex; flex-direction: column; align-items: stretch; background-color: #f5f6f7; border-radius: 6px; overflow: hidden; border-left: 4px solid #06C755; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                  
-                  <!-- View Mode Container -->
-                  <div id="card-view-mode" style="display: block;">
-                      <!-- Patient Row (Always visible in view mode) -->
-                      <div style="background-color: #e8f5e9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c8e6c9;">
-                          <span style="font-weight: bold; color: #666; font-size: 13px;">病患：</span>
-                          <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3;">
-                              <div style="display: flex; align-items: center; gap: 6px;">
-                                  <span id="display-form-relation" style="font-weight: bold; font-size: 16px; color: #333;">-</span>
-                                  <span id="display-form-return-badge" class="badge" style="display: none; background-color: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">需回診</span>
-                              </div>
-                              <span id="display-form-mrn" style="font-size: 13px; color: #666;">-</span>
-                          </div>
-                      </div>
-                      
-                      <!-- Details in View Mode (No LINE Account) -->
-                      <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
-                          <!-- 就診日期 -->
-                          <div style="display: flex; justify-content: space-between; align-items: center;">
-                              <span style="font-weight: bold; color: #666; font-size: 13px;">就診日期：</span>
-                              <span id="display-form-date" style="color: #333; font-weight: 600; font-size: 13px;">-</span>
-                          </div>
-                          <div style="height: 1px; background-color: var(--border, #e2e8f0); margin: 4px 0;"></div>
-                          
-                          <!-- 醫師 -->
-                          <div style="display: flex; justify-content: space-between; align-items: center;">
-                              <span style="font-weight: bold; color: #666; font-size: 13px;">醫師：</span>
-                              <span id="display-form-doctor" style="color: #333; font-weight: 600; font-size: 13px;">-</span>
-                          </div>
-                      </div>
-                  </div>
+          <input type="hidden" id="edit-form-relation-input">
+          <input type="hidden" id="edit-form-mrn-input">
+          <input type="hidden" id="edit-form-date-input">
+          <select id="edit-form-doctor-select" style="display:none;"></select>
+          <span id="edit-form-mrn-warning" style="display:none;"></span>
+          <div id="card-view-mode" style="display:none;"></div>
+          <div id="card-edit-mode" style="display:none;"></div>
+          <div id="edit-form-admin-fields" style="display:none;"></div>
+          <div id="edit-form-doctor-group" style="display:none;"></div>
+          <div id="btn-edit-card" style="display:none;"></div>
 
-                  <!-- Edit Mode Container (Vertical Form Layout, No LINE Account) -->
-                  <div id="card-edit-mode" style="display: none; padding: 16px; flex-direction: column; gap: 12px;">
-                      <!-- Relation field (Always visible to all doctors in edit mode) -->
-                      <div style="display: flex; flex-direction: column; gap: 4px;">
-                          <label style="font-weight: bold; color: #666; font-size: 13px;">關係</label>
-                          <input type="text" id="edit-form-relation-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
-                      </div>
-                      
-                      <!-- Admin fields for MRN (Visible to admins only) -->
-                      <div id="edit-form-admin-fields" style="display: none; flex-direction: column; gap: 12px;">
-                          <div style="display: flex; flex-direction: column; gap: 4px;">
-                              <label style="font-weight: bold; color: #666; font-size: 13px;">病歷號</label>
-                              <input type="text" id="edit-form-mrn-input" style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg, #fff); color: var(--text, #333); box-sizing: border-box; width: 100%;">
-                              <span id="edit-form-mrn-warning" style="color: var(--danger); font-size: 12px; font-weight: 500; display: none; margin-top: 4px; text-align: left;">⚠️ 此病歷號已存在於系統中，無法使用</span>
-                          </div>
-                      </div>
-                      
-                      <!-- 就診日期 (Disabled / Read-only) -->
-                      <div style="display: flex; flex-direction: column; gap: 4px;">
-                          <label style="font-weight: bold; color: #666; font-size: 13px;">就診日期</label>
-                          <input type="datetime-local" id="edit-form-date-input" disabled style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: #e2e8f0; color: #64748b; box-sizing: border-box; width: 100%;">
-                      </div>
-                      
-                      <!-- 醫師 (Disabled / Read-only) -->
-                      <div id="edit-form-doctor-group" style="display: none; flex-direction: column; gap: 4px;">
-                          <label style="font-weight: bold; color: #666; font-size: 13px;">醫師</label>
-                          <select id="edit-form-doctor-select" disabled style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: #e2e8f0; color: #64748b; box-sizing: border-box; width: 100%;"></select>
-                      </div>
-                  </div>
-
-              </div>
-
-              <!-- Change Relation Button Outside -->
-              <button type="button" class="btn-change-relation" id="btn-edit-card" onclick="toggleCardEditMode()">
-                  <svg id="edit-card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 20h9"></path>
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                  </svg>
-              </button>
-          </div>
-          
-          <div class="form-group">
-            <div class="confirmation-section" style="display: none; margin-bottom: 20px;">
-              <h3 style="margin-top: 0; color: #05883b; font-size: 14px; margin-bottom: 10px;">已選擇的衛教資料確認清單：</h3>
-              <p id="empty-msg" style="color: #777; font-size: 13px; font-style: italic;">尚未選擇任何衛教資料</p>
-              <div class="chip-list" id="confirmed-list"></div>
+          <!-- Meta Box -->
+          <div class="doctor-meta-box">
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">📅 就診日期</div>
+              <div class="doctor-meta-val" id="display-form-date">-</div>
             </div>
-
-            <div class="image-wrapper" id="image-wrapper">
-              <div class="interactive-layout">
-                <!-- Left Column: Human Body -->
-                <div class="body-column">
-                  <div class="image-container" id="body-image-container">
-                    <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
-                    <div class="hotspot" data-region="頭" data-position="body" style="top: 2%; left: 15.97%; width: 38.27%; height: 11%;" title="頭"></div>
-                    <div class="hotspot" data-region="脖子" data-position="body" style="top: 13.5%; left: 22.88%; width: 23.55%; height: 6%;" title="脖子"></div>
-                    <div class="hotspot" data-region="手" data-position="body" style="top: 24%; left: 63.94%; width: 32.38%; height: 32%;" title="手"></div>
-                    <div class="hotspot" data-region="軀幹上半部" data-position="body" style="top: 20%; left: 5.22%; width: 58.88%; height: 17%;" title="軀幹上半部 (肺臟、心臟)"></div>
-                    <div class="hotspot" data-region="軀幹下半部" data-position="body" style="top: 38%; left: 2.13%; width: 64.77%; height: 19%;" title="軀幹下半部 (腸胃、器官)"></div>
-                    <div class="hotspot" data-region="腳" data-position="body" style="top: 59%; left: 31.56%; width: 38.27%; height: 39%;" title="腳"></div>
-                  </div>
+            <div class="doctor-meta-divider"></div>
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">👨‍⚕️ 負責醫師</div>
+              <div class="doctor-meta-val" id="display-form-doctor">-</div>
+            </div>
+            <div class="doctor-meta-divider"></div>
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">🏥 病患</div>
+              <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="doctor-meta-val" id="display-form-relation">-</span>
+                  <span id="display-form-return-badge" class="badge" style="display:none; background-color:#ef4444; color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:bold;">需回診</span>
                 </div>
-
-                <!-- Middle Column: Popover -->
-                <div class="popover-column">
-                  <div id="popover" style="display: none;">
-                    <div class="popover-content">
-                      <h4>
-                        <span id="popover-title">選擇衛教資料</span>
-                        <span class="close-btn" id="popover-close">✕</span>
-                      </h4>
-                      <div class="pop-checkbox-list" id="popover-checkboxes"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Right Column: 3 Buttons -->
-                <div class="buttons-column">
-                  <div class="hotspot bottom-btn btn-skin" data-region="皮膚" data-position="bottom">皮膚</div>
-                  <div class="hotspot bottom-btn btn-mental" data-region="精神" data-position="bottom">精神</div>
-                  <div class="hotspot bottom-btn btn-other" data-region="其他" data-position="bottom">其他</div>
-                </div>
+                <span style="font-size:12px; color:var(--muted); font-family:monospace;" id="display-form-mrn">-</span>
+              </div>
+            </div>
+            <div class="doctor-meta-divider"></div>
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">📋 衛教資料</div>
+              <div id="view-form-symptoms" style="display:flex; flex-wrap:wrap; gap:5px; justify-content:center; align-items:center; max-width:65%;">
+                <span style="font-size:12px; color:var(--muted);">—</span>
               </div>
             </div>
           </div>
-          
-          <p class="error-msg" id="form-edit-error" style="text-align:left; color: var(--danger);"></p>
-        </div>
-      </div>
+
+          <p class="error-msg" id="form-edit-error" style="text-align:left; color:var(--danger);"></p>
+        </div><!-- /form-view-container -->
+
+        <!-- ── Edit mode layout (hidden by default) ── -->
+        <div id="form-edit-container" class="view-edit-body" style="display:none;">
+
+          <!-- Non-admin read-only info -->
+          <div id="ve-nonadmin-info" class="doctor-meta-box" style="display:none;">
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">📅 就診日期</div>
+              <div class="doctor-meta-val" id="ve-nonadmin-date">-</div>
+            </div>
+            <div class="doctor-meta-divider"></div>
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">👨‍⚕️ 負責醫師</div>
+              <div class="doctor-meta-val" id="ve-nonadmin-doctor">-</div>
+            </div>
+            <div class="doctor-meta-divider"></div>
+            <div class="doctor-meta-row">
+              <div class="doctor-meta-label">🏥 病患</div>
+              <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="doctor-meta-val" id="ve-nonadmin-relation">-</span>
+                </div>
+                <span style="font-size:12px; color:var(--muted); font-family:monospace;" id="ve-nonadmin-mrn">-</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin-only fields: LINE + patient dropdowns (hidden for non-admin) -->
+          <div id="ve-admin-fields" style="display:contents;">
+            <!-- LINE dropdown -->
+            <div class="view-edit-row">
+              <label class="view-edit-label">LINE 帳號</label>
+              <div class="nurse-custom-dd" id="ve-line-dd">
+                <button class="nurse-custom-dd-btn" id="ve-line-btn" onclick="toggleVELineDropdown()">
+                  <span id="ve-line-btn-text">請選擇 LINE 帳號</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="nurse-custom-dd-list" id="ve-line-list">
+                  <div style="padding:10px 12px 6px; border-bottom:1px solid var(--border); background:var(--card); position:sticky; top:0; z-index:10;">
+                    <input type="text" id="ve-line-search" class="nurse-draft-input" placeholder="🔍 搜尋 LINE 帳號…" oninput="filterVELineAccounts(this.value)" style="padding:6px 10px; font-size:13px;" />
+                    <div id="ve-line-search-sub" style="font-size:11px; color:var(--muted); margin-top:4px; display:none;"></div>
+                  </div>
+                  <div id="ve-line-items-container"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Patient dropdown (shown after LINE selected) -->
+            <div class="view-edit-row" id="ve-patient-group" style="display:none;">
+              <label class="view-edit-label">病患</label>
+              <div class="nurse-custom-dd" id="ve-patient-dd">
+                <button class="nurse-custom-dd-btn" id="ve-patient-btn" disabled onclick="toggleVEPatientDropdown()">
+                  <span id="ve-patient-btn-text">請選擇病患</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="nurse-custom-dd-list" id="ve-patient-list"></div>
+              </div>
+            </div>
+
+            <!-- Text inputs: relation + MRN (shown conditionally) -->
+            <div id="ve-draft-fields" style="display:none; flex-direction:column; gap:16px;">
+              <!-- self: MRN only -->
+              <div class="view-edit-row" id="ve-self-mrn-row" style="display:none;">
+                <label class="view-edit-label">病歷號（帳號本人）</label>
+                <input type="text" id="ve-self-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateViewEdit()">
+              </div>
+              <!-- new: relation input -->
+              <div class="view-edit-row" id="ve-new-relation-row" style="display:none;">
+                <label class="view-edit-label">關係</label>
+                <input type="text" id="ve-new-relation" class="nurse-draft-input" placeholder="請輸入關係（如：子女）" oninput="validateViewEdit()">
+              </div>
+              <!-- new: MRC input -->
+              <div class="view-edit-row" id="ve-new-mrn-row" style="display:none;">
+                <label class="view-edit-label">病歷號（新增）</label>
+                <input type="text" id="ve-new-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateViewEdit()">
+              </div>
+            </div>
+          </div><!-- /ve-admin-fields -->
+
+
+          <!-- Symptom selection columns (cloned with ve- prefix) -->
+          <div class="symptom-selection-container" id="ve-symptom-selection">
+            <!-- Main column -->
+            <div class="symptom-col" id="ve-symptom-main-col">
+              <div class="symptom-col-header">部位 / 類別</div>
+              <div class="symptom-col-body" id="ve-symptom-main-list"></div>
+            </div>
+            <!-- Sub column -->
+            <div class="symptom-col" id="ve-symptom-sub-col" style="display:none;">
+              <div class="symptom-col-header" id="ve-symptom-sub-header">衛教項目</div>
+              <div class="symptom-col-body" id="ve-symptom-sub-list"></div>
+            </div>
+            <!-- Selected chips column -->
+            <div class="symptom-col" id="ve-symptom-selected-col" style="display:none;">
+              <div class="symptom-col-header">已選擇項目</div>
+              <div class="symptom-col-body" id="ve-symptom-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; padding:10px;"></div>
+            </div>
+          </div>
+
+        </div><!-- /form-edit-container -->
+
+      </div><!-- /form-view-body -->
+    </div><!-- /forms-form-col -->
+  </div><!-- /forms-layout -->
+
+<!-- ── Modal：確認刪除草稿 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-delete-draft" style="z-index: 600;">
+  <div class="modal-alert">
+    <div class="modal-alert-icon-wrap danger">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認刪除出院單</div>
+    <div class="modal-alert-banner danger">
+      <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">確定要刪除這份未完成出院單草稿嗎？此動作無法復原。</div>
+    </div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-delete-draft')">取消</button>
+      <button class="btn btn-danger" onclick="doDeleteDoctorDraft()">確定刪除</button>
     </div>
   </div>
+</div>
+
+<!-- ── Modal：確認傳送出院單 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-save-draft" style="z-index: 600;">
+  <div class="modal-alert" style="max-width: 440px;">
+    <div class="modal-alert-icon-wrap primary">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認傳送出院單</div>
+    <div class="modal-alert-subtitle">請確認所選擇的衛教項目：</div>
+    <div id="modal-save-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; justify-content:center; max-height:130px; overflow-y:auto; padding:4px;"></div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-save-draft')">返回修改</button>
+      <button class="btn btn-accent" id="btn-modal-confirm-save" onclick="doSaveDoctorForm()">確認傳送</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal：確認修改表單 ── -->
+<div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-edit" style="z-index: 600;">
+  <div class="modal-alert" style="max-width: 480px;">
+    <div class="modal-alert-icon-wrap primary">
+      <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+      </svg>
+    </div>
+    <div class="modal-alert-title">確認修改出院單</div>
+    <div class="modal-alert-subtitle">請確認以下修改內容：</div>
+    <div id="ve-confirm-diff" style="margin:12px 0; font-size:13px; display:flex; flex-direction:column; gap:8px;"></div>
+    <div class="modal-alert-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm-edit')">返回修改</button>
+      <button class="btn btn-accent" id="btn-modal-confirm-edit" onclick="submitViewEdit()">確認修改</button>
+    </div>
+</div>
+</div>
 </section>
+

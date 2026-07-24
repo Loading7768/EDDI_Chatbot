@@ -667,11 +667,15 @@ def get_chat_detail(mrn: str):
             d.department AS specialty,
             r.checkout_date AS checkout_date,
             r.symptoms AS symptoms,
-            p.has_chatted AS is_chatted
+            p.has_chatted AS is_chatted,
+            la.line_account_id AS line_account_id,
+            la.name AS line_name,
+            lpp.relation AS relation
         FROM record r
         JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
         JOIN patients p ON lpp.patient_id = p.patient_id
         JOIN doctors d ON r.doctor_id = d.doctor_id
+        LEFT JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
         WHERE p.medical_record_number = ?
         ORDER BY r.checkout_date ASC
     ''', (mrn,)).fetchall()
@@ -688,6 +692,9 @@ def get_chat_detail(mrn: str):
             'checkout_date':      r['checkout_date'],
             'symptoms':           json.loads(r['symptoms']) if r['symptoms'] else [],
             'is_chatted':         bool(r['is_chatted']),
+            'line_account_id':    r['line_account_id'],
+            'line_name':          r['line_name'],
+            'relation':           r['relation'],
         }
         for r in forms
     ]
@@ -698,7 +705,7 @@ def get_chat_detail(mrn: str):
         'patient': {
             'medical_record_num': patient['medical_record_number'],
             'line_id':            patient['line_uuid'],
-            'relation':           patient['relation'] if patient['relation'] else '本人',
+            'relation':           patient['relation'] if patient['relation'] else '帳號本人',
             'needs_return_visit': needs_return_visit
         },
         'forms':    forms_list,
@@ -707,6 +714,369 @@ def get_chat_detail(mrn: str):
 
 
 # ── 修改表單 ──────────────────────────────────────────────────────────────────
+
+@admin_bp.route('/api/forms/get_line_accounts', methods=['GET'])
+@login_required
+def get_line_accounts():
+    account = session['account']
+    conn = get_db()
+    try:
+        doctor_row = conn.execute(
+            'SELECT doctor_id FROM doctors WHERE account_name = ? LIMIT 1', (account,)
+        ).fetchone()
+        doctor_id = doctor_row['doctor_id'] if doctor_row else 0
+
+        # Read recent line accounts cache if exists
+        recent_ids = []
+        if doctor_id:
+            cache_path = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}', '.recent_line_accounts.json')
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        recent_ids = json.load(f)
+                except Exception:
+                    recent_ids = []
+
+        rows = conn.execute(
+            'SELECT line_account_id, name FROM line_accounts ORDER BY name'
+        ).fetchall()
+        accounts = [{'id': r['line_account_id'], 'name': r['name']} for r in rows]
+
+        return jsonify({
+            'accounts': accounts,
+            'recent_ids': recent_ids if isinstance(recent_ids, list) else []
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/forms/doctor_drafts', methods=['GET'])
+@login_required
+def get_doctor_drafts():
+    account = session['account']
+    conn = get_db()
+    try:
+        doctor_row = conn.execute(
+            'SELECT doctor_id FROM doctors WHERE account_name = ? LIMIT 1', (account,)
+        ).fetchone()
+        if not doctor_row:
+            return jsonify({'error': '找不到醫師帳號'}), 404
+        doctor_id = doctor_row['doctor_id']
+
+        draft_dir = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}')
+        drafts = []
+        if os.path.exists(draft_dir):
+            for filename in sorted(os.listdir(draft_dir), reverse=True):
+                if not filename.endswith('.json') or filename in ('.recent_line_accounts.json', 'placeholder.json'):
+                    continue
+                name_part = filename[:-5]
+                parts = name_part.split('_')
+                mrn = parts[0] if parts else name_part
+                raw_date = parts[1] if len(parts) > 1 else ''
+                if len(raw_date) == 8 and raw_date.isdigit():
+                    formatted_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}"
+                else:
+                    formatted_date = raw_date or '-'
+
+                drafts.append({
+                    'filename': filename,
+                    'mrn': mrn,
+                    'date': formatted_date
+                })
+
+        return jsonify({'drafts': drafts})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/forms/doctor_draft/<filename>', methods=['GET'])
+@login_required
+def get_doctor_draft_detail(filename):
+    account = session['account']
+    conn = get_db()
+    try:
+        doctor_row = conn.execute(
+            'SELECT doctor_id FROM doctors WHERE account_name = ? LIMIT 1', (account,)
+        ).fetchone()
+        if not doctor_row:
+            return jsonify({'error': '找不到醫師帳號'}), 404
+        doctor_id = doctor_row['doctor_id']
+
+        # Prevent directory traversal
+        safe_filename = os.path.basename(filename)
+        draft_path = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}', safe_filename)
+        if not os.path.exists(draft_path):
+            return jsonify({'error': '找不到草稿檔案'}), 404
+
+        with open(draft_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        return jsonify({'success': True, 'data': data, 'filename': safe_filename})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/forms/doctor_draft/<filename>', methods=['DELETE'])
+@login_required
+def delete_doctor_draft(filename):
+    account = session['account']
+    conn = get_db()
+    try:
+        doctor_row = conn.execute(
+            'SELECT doctor_id FROM doctors WHERE account_name = ? LIMIT 1', (account,)
+        ).fetchone()
+        if not doctor_row:
+            return jsonify({'error': '找不到醫師帳號'}), 404
+        doctor_id = doctor_row['doctor_id']
+
+        safe_filename = os.path.basename(filename)
+        draft_path = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}', safe_filename)
+        if os.path.exists(draft_path):
+            os.remove(draft_path)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/forms/doctor_submit', methods=['POST'])
+@login_required
+def doctor_submit():
+    data = request.get_json() or {}
+    filename = data.get('filename')
+    symptoms = data.get('symptoms', [])
+
+    if not filename:
+        return jsonify({'error': 'filename required'}), 400
+
+    account = session['account']
+    conn = get_db()
+    try:
+        conn.execute('PRAGMA foreign_keys = ON')
+
+        doctor_row = conn.execute(
+            'SELECT doctor_id FROM doctors WHERE account_name = ? LIMIT 1', (account,)
+        ).fetchone()
+        if not doctor_row:
+            return jsonify({'error': '找不到醫師帳號'}), 404
+        doctor_id = doctor_row['doctor_id']
+
+        safe_filename = os.path.basename(filename)
+        draft_path = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}', safe_filename)
+
+        # Read draft data if line_patient_pair_id / checkout_date not passed
+        lpp_id = data.get('line_patient_pair_id')
+        checkout_date = data.get('checkout_date')
+
+        if not lpp_id or not checkout_date:
+            if not os.path.exists(draft_path):
+                return jsonify({'error': '草稿檔案不存在'}), 404
+            with open(draft_path, 'r', encoding='utf-8') as f:
+                draft_content = json.load(f)
+            lpp_id = lpp_id or draft_content.get('line_patient_pair_id')
+            checkout_date = checkout_date or draft_content.get('checkout_date')
+
+        if not lpp_id or not checkout_date:
+            return jsonify({'error': '無法取得完整出院單資訊'}), 400
+
+        # Execute DB transaction
+        symptoms_json = json.dumps(symptoms, ensure_ascii=False)
+        conn.execute('''
+            INSERT INTO record (line_patient_pairs_id, checkout_date, doctor_id, symptoms)
+            VALUES (?, ?, ?, ?)
+        ''', (lpp_id, checkout_date, doctor_id, symptoms_json))
+
+        # Delete draft JSON file on success
+        if os.path.exists(draft_path):
+            os.remove(draft_path)
+
+        conn.commit()
+        return jsonify({'success': True})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@admin_bp.route('/api/forms/get_existing_relations', methods=['GET'])
+@login_required
+def get_existing_relations():
+    line_account_id = request.args.get('line_account_id', type=int)
+    if not line_account_id:
+        return jsonify({'error': 'line_account_id required'}), 400
+    conn = get_db()
+    try:
+        rows = conn.execute('''
+            SELECT lpp.line_patient_pairs_id, lpp.relation, p.medical_record_number
+            FROM line_patient_pairs lpp
+            JOIN patients p ON lpp.patient_id = p.patient_id
+            WHERE lpp.line_account_id = ?
+            ORDER BY lpp.relation
+        ''', (line_account_id,)).fetchall()
+        return jsonify([{
+            'pair_id':  r['line_patient_pairs_id'],
+            'relation': r['relation'] or '帳號本人',
+            'mrn':      r['medical_record_number']
+        } for r in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+
+@admin_bp.route('/api/forms/nurse_create', methods=['POST'])
+@login_required
+def nurse_create():
+    data           = request.get_json() or {}
+    line_account_id = data.get('line_account_id')
+    pair_id        = data.get('pair_id')        # 'self', 'new', or existing int
+    relation       = (data.get('relation') or '').strip()
+    mrn            = (data.get('mrn') or '').strip()
+
+    if not line_account_id:
+        return jsonify({'error': 'line_account_id required'}), 400
+
+    account = session['account']
+    conn = get_db()
+    try:
+        conn.execute('PRAGMA foreign_keys = ON')
+
+        # 1. Resolve doctor_id and doctor_name from session account
+        doctor_row = conn.execute(
+            'SELECT doctor_id, doctor_name FROM doctors WHERE account_name = ? LIMIT 1', (account,)
+        ).fetchone()
+        if not doctor_row:
+            return jsonify({'error': '找不到醫師帳號'}), 404
+        doctor_id   = doctor_row['doctor_id']
+        doctor_name = doctor_row['doctor_name'] or ''
+
+        # Resolve line_name from line_accounts
+        line_acc_row = conn.execute(
+            'SELECT name FROM line_accounts WHERE line_account_id = ? LIMIT 1', (line_account_id,)
+        ).fetchone()
+        line_name = line_acc_row['name'] if line_acc_row else ''
+
+        # 2. If existing pair (int pair_id) → skip upsert, just get lpp_id, mrn, relation
+        if pair_id not in ('self', 'new'):
+            try:
+                lpp_id = int(pair_id)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'invalid pair_id'}), 400
+            # Verify lpp belongs to this line_account_id and fetch mrn and relation
+            lpp_row = conn.execute('''
+                SELECT lpp.line_patient_pairs_id, lpp.relation, p.medical_record_number
+                FROM line_patient_pairs lpp
+                JOIN patients p ON lpp.patient_id = p.patient_id
+                WHERE lpp.line_patient_pairs_id = ? AND lpp.line_account_id = ?
+            ''', (lpp_id, line_account_id)).fetchone()
+            if not lpp_row:
+                return jsonify({'error': '病患配對不存在'}), 404
+            if not mrn:
+                mrn = lpp_row['medical_record_number']
+            if not relation:
+                relation = lpp_row['relation'] or '帳號本人'
+        else:
+            # Validate inputs
+            if not mrn:
+                return jsonify({'error': '病歷號不可為空'}), 400
+            if pair_id == 'new' and not relation:
+                return jsonify({'error': '關係不可為空'}), 400
+            if pair_id == 'self':
+                relation = '帳號本人'
+
+            # 2a. Upsert patient by MRN
+            existing_patient = conn.execute(
+                'SELECT patient_id FROM patients WHERE medical_record_number = ?', (mrn,)
+            ).fetchone()
+            if existing_patient:
+                patient_id = existing_patient['patient_id']
+            else:
+                conn.execute(
+                    'INSERT INTO patients (medical_record_number) VALUES (?)', (mrn,)
+                )
+                patient_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+            # 2b. Upsert line_patient_pairs
+            existing_pair = conn.execute(
+                'SELECT line_patient_pairs_id FROM line_patient_pairs WHERE line_account_id = ? AND patient_id = ?',
+                (line_account_id, patient_id)
+            ).fetchone()
+            if existing_pair:
+                lpp_id = existing_pair['line_patient_pairs_id']
+            else:
+                conn.execute(
+                    'INSERT INTO line_patient_pairs (patient_id, line_account_id, relation) VALUES (?, ?, ?)',
+                    (patient_id, line_account_id, relation)
+                )
+                lpp_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+        # 3. Save draft JSON file
+        now = datetime.now()
+        date_str_ymd = now.strftime('%Y%m%d')
+        datetime_str = now.strftime('%Y-%m-%dT%H:%M:%S.') + f'{now.microsecond // 1000:03d}'
+        draft_dir  = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}')
+        draft_path = os.path.join(draft_dir, f'{mrn}_{date_str_ymd}.json')
+        draft_data = {
+            'checkout_date':       datetime_str,
+            'doctor_id':           doctor_id,
+            'line_patient_pair_id': lpp_id,
+            'symptoms':            [],
+            'doctor_name':         doctor_name,
+            'line_name':           line_name,
+            'relation':            relation,
+            'mrc':                 mrn
+        }
+
+        try:
+            os.makedirs(draft_dir, exist_ok=True)
+            with open(draft_path, 'w', encoding='utf-8') as f:
+                json.dump(draft_data, f, ensure_ascii=False, indent=4)
+        except Exception as file_err:
+            # File write failed — rollback DB and report error
+            conn.rollback()
+            return jsonify({'error': f'草稿檔案儲存失敗：{file_err}'}), 500
+
+        # Update recent line accounts stack (max=4, no duplicates) in drafts/D{doctor_id:07d}/.recent_line_accounts.json
+        try:
+            cache_path = os.path.join(draft_dir, '.recent_line_accounts.json')
+            recent_ids = []
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        recent_ids = json.load(f)
+                    if not isinstance(recent_ids, list):
+                        recent_ids = []
+                except Exception:
+                    recent_ids = []
+            # Push line_account_id to top, remove dupes, max 4
+            recent_ids = [line_account_id] + [x for x in recent_ids if x != line_account_id]
+            recent_ids = recent_ids[:4]
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(recent_ids, f, ensure_ascii=False, indent=2)
+        except Exception as cache_err:
+            print(f"[Recent LINE Accounts Cache Error] {cache_err}")
+
+        conn.commit()
+        return jsonify({'success': True, 'lpp_id': lpp_id, 'draft_path': draft_path})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 
 @admin_bp.route('/api/forms/<mrn>/<checkout_date>', methods=['PUT'])
 @login_required
@@ -845,7 +1215,147 @@ def update_form(mrn: str, checkout_date: str):
         return jsonify({'error': f'修改表單時發生資料庫錯誤: {str(e)}'}), 500
 
 
+@admin_bp.route('/api/forms/view_edit', methods=['PUT'])
+@login_required
+def view_edit_form():
+    data = request.get_json() or {}
+    mrn = data.get('mrn')
+    checkout_date = data.get('checkout_date')
+    symptoms = data.get('symptoms', [])
+    is_admin = session.get('is_admin', False)
+    account = session.get('account')
+
+    if not mrn or not checkout_date:
+        return jsonify({'error': '缺少必要參數'}), 400
+
+    conn = get_db()
+    try:
+        conn.execute('PRAGMA foreign_keys = ON')
+
+        if not is_admin:
+            # ── Non-admin: symptoms-only update, must own the record ──
+            row = conn.execute('''
+                SELECT r.record_id
+                FROM record r
+                JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
+                JOIN patients p ON lpp.patient_id = p.patient_id
+                JOIN doctors d ON r.doctor_id = d.doctor_id
+                WHERE p.medical_record_number = ? AND r.checkout_date = ? AND d.account_name = ?
+                LIMIT 1
+            ''', (mrn, checkout_date, account)).fetchone()
+
+            if not row:
+                conn.close()
+                return jsonify({'error': '找不到此表單紀錄或您無修改權限'}), 404
+
+            symptoms_json = json.dumps(symptoms, ensure_ascii=False)
+            conn.execute(
+                'UPDATE record SET symptoms = ? WHERE record_id = ?',
+                (symptoms_json, row['record_id'])
+            )
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True})
+
+        # ── Admin: full update (LINE + patient + symptoms) ──
+        line_account_id = data.get('line_account_id')
+        pair_id = data.get('pair_id')
+        relation = (data.get('relation') or '').strip()
+        new_mrn = (data.get('new_mrn') or '').strip()
+
+        if not line_account_id or not pair_id:
+            return jsonify({'error': '缺少必要參數'}), 400
+
+        # 1. 尋找原紀錄
+        row = conn.execute('''
+            SELECT r.record_id
+            FROM record r
+            JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
+            JOIN patients p ON lpp.patient_id = p.patient_id
+            WHERE p.medical_record_number = ? AND r.checkout_date = ?
+            LIMIT 1
+        ''', (mrn, checkout_date)).fetchone()
+
+        if not row:
+            conn.close()
+            return jsonify({'error': '找不到此表單紀錄'}), 404
+
+        record_id = row['record_id']
+
+        # 2. 處理病患配對與病歷號
+        final_lpp_id = None
+        if pair_id not in ('self', 'new'):
+            try:
+                lpp_id = int(pair_id)
+            except (TypeError, ValueError):
+                return jsonify({'error': '無效的配對 ID'}), 400
+
+            lpp_row = conn.execute('''
+                SELECT line_patient_pairs_id FROM line_patient_pairs
+                WHERE line_patient_pairs_id = ? AND line_account_id = ?
+            ''', (lpp_id, line_account_id)).fetchone()
+            if not lpp_row:
+                return jsonify({'error': '該 LINE 帳號下找不到此病患配對'}), 404
+            final_lpp_id = lpp_id
+        else:
+            if not new_mrn:
+                return jsonify({'error': '病歷號不可為空'}), 400
+            if pair_id == 'new' and not relation:
+                return jsonify({'error': '關係不可為空'}), 400
+            if pair_id == 'self':
+                relation = '帳號本人'
+
+            # 2a. Upsert patient
+            existing_patient = conn.execute(
+                'SELECT patient_id FROM patients WHERE medical_record_number = ?', (new_mrn,)
+            ).fetchone()
+            if existing_patient:
+                patient_id = existing_patient['patient_id']
+            else:
+                conn.execute(
+                    'INSERT INTO patients (medical_record_number) VALUES (?)', (new_mrn,)
+                )
+                patient_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+            # 2b. Upsert line_patient_pairs
+            existing_pair = conn.execute(
+                'SELECT line_patient_pairs_id FROM line_patient_pairs WHERE line_account_id = ? AND patient_id = ?',
+                (line_account_id, patient_id)
+            ).fetchone()
+            if existing_pair:
+                final_lpp_id = existing_pair['line_patient_pairs_id']
+                conn.execute(
+                    'UPDATE line_patient_pairs SET relation = ? WHERE line_patient_pairs_id = ?',
+                    (relation, final_lpp_id)
+                )
+            else:
+                conn.execute(
+                    'INSERT INTO line_patient_pairs (patient_id, line_account_id, relation) VALUES (?, ?, ?)',
+                    (patient_id, line_account_id, relation)
+                )
+                final_lpp_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+        # 3. 更新 record 內容
+        symptoms_json = json.dumps(symptoms, ensure_ascii=False)
+        conn.execute('''
+            UPDATE record
+            SET line_patient_pairs_id = ?, symptoms = ?
+            WHERE record_id = ?
+        ''', (final_lpp_id, symptoms_json, record_id))
+
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': f'資料庫事務失敗: {str(e)}'}), 500
+
+
+
 # ── 醫師帳號管理（管理員）────────────────────────────────────────────────────
+
 
 import secrets
 import string

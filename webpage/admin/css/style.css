@@ -788,19 +788,587 @@
       opacity: 0.5;
   }
 
-  /* Three-column layout specific for chats and forms */
-  #section-chats .chat-layout, #section-forms .chat-layout {
+  /* ═══ FORMS 3-COLUMN LAYOUT ═══ */
+  .forms-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr 2fr;
+    gap: 16px;
+    height: calc(100vh - 196px);
+    margin-top: 20px;
+    max-width: 1400px;
+    /* margin-left: auto; */
+    margin-right: auto;
+  }
+
+  /* Column 1: Main — always 1 grid unit */
+  .forms-main-col {
+    grid-column: 1 / 2; /* 1/4 fw */
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  /* Column 2: Sub — 1 grid unit, only in View state */
+  .forms-sub-col {
+    grid-column: 2 / 3; /* 1/4 fw */
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Column 3: Form — 2 grid units normally */
+  .forms-form-col {
+    grid-column: 3 / 4; /* 1/2 fw */
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* When Sub is hidden (Nurse/Doctor), collapse to 2-col grid at 75% max-width
+     so Main stays 1/4 fw and Form stays 1/2 fw — same pixel widths as View state */
+  .forms-layout[data-state="nurse"],
+  .forms-layout[data-state="doctor"] {
+    grid-template-columns: 1fr 2fr;
+    max-width: calc(1400px * 0.75);
+  }
+  .forms-layout[data-state="nurse"] .forms-sub-col,
+  .forms-layout[data-state="doctor"] .forms-sub-col {
+    display: none;
+  }
+  /* Re-place Form onto track 2 of the 2-col grid (track 3 no longer exists) */
+  .forms-layout[data-state="nurse"] .forms-form-col,
+  .forms-layout[data-state="doctor"] .forms-form-col {
+    grid-column: 2 / 3;
+  }
+
+  /* ── State Buttons ── */
+  .forms-state-btn {
+    flex-shrink: 0;
+    height: 42px;
+    width: 100%;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .forms-state-btn:hover {
+    background: #eff6ff;
+    border-color: var(--primary-l);
+    color: var(--primary);
+  }
+  .forms-state-btn.active {
+    display: none !important;
+  }
+
+  /* ── State Content (expanded area) ── */
+  .forms-state-content {
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+  }
+  .forms-state-content.active {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ── Nurse form panel (in form column) ── */
+  .nurse-form-panel {
+    display: none; /* hidden by default, shown in nurse state via CSS below */
+    flex-direction: column;
+    justify-content: space-evenly;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .forms-layout[data-state="nurse"] .nurse-form-panel {
+    display: flex;
+  }
+  /* Hide regular form content in nurse and doctor states */
+  .forms-layout[data-state="nurse"] .forms-form-col > .doctor-fp-header,
+  .forms-layout[data-state="nurse"] .forms-form-col > .chat-panel-header,
+  .forms-layout[data-state="nurse"] .forms-form-col > .chat-panel-body,
+  .forms-layout[data-state="nurse"] .forms-form-col > .form-view-body,
+  .forms-layout[data-state="doctor"] .forms-form-col > .doctor-fp-header,
+  .forms-layout[data-state="doctor"] .forms-form-col > .chat-panel-header,
+  .forms-layout[data-state="doctor"] .forms-form-col > .chat-panel-body,
+  .forms-layout[data-state="doctor"] .forms-form-col > .form-view-body {
+    display: none !important;
+  }
+
+  /* Doctor form panel (in form column) */
+  .doctor-form-panel {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+  .forms-layout[data-state="doctor"] .doctor-form-panel {
+    display: flex !important;
+  }
+
+  /* Doctor panel header */
+  .doctor-fp-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .doctor-fp-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Doctor Meta Box */
+  .doctor-meta-box {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .doctor-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .doctor-meta-divider {
+    height: 1px;
+    background: var(--border);
+  }
+  .doctor-meta-label {
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--text);
+  }
+  .doctor-meta-val {
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--text);
+  }
+
+  /* Symptom Selection: centered equal-width columns */
+  .symptom-selection-container {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    height: 290px;
+    flex-shrink: 0;
+    width: 100%;
+  }
+  .symptom-col {
+    flex: 1;
+    max-width: 230px;
+    display: flex;
+    flex-direction: column;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    overflow: hidden;
+  }
+  .symptom-col-header {
+    padding: 8px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .symptom-col-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+  .symptom-item {
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-light, #f3f4f6);
+    transition: background .15s, color .15s;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .symptom-item:hover:not(.disabled) {
+    background: var(--bg);
+  }
+  .symptom-item.active {
+    background: #eff6ff;
+    color: var(--primary);
+    font-weight: 700;
+  }
+  .symptom-item.disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+    pointer-events: none;
+    background: var(--bg);
+  }
+  .symptom-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 16px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #bfdbfe;
+    transition: all .15s;
+    user-select: none;
+  }
+  .symptom-chip:hover:not(.readonly) {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+  }
+  .symptom-chip.readonly {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  /* ── View form body (replaces inline style on #form-edit-body) ── */
+  .form-view-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* ── View Edit layout body ── */
+  .view-edit-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    gap: 0;
+  }
+  .view-edit-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .view-edit-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .view-edit-text-row {
+    display: flex;
+    gap: 12px;
+  }
+  .view-edit-text-row .view-edit-row {
+    flex: 1;
+  }
+
+  /* ── Header icon buttons ── */
+  .btn-icon-sm {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: background .15s, border-color .15s, color .15s;
+    flex-shrink: 0;
+  }
+  .btn-icon-sm:hover { background: var(--card); border-color: var(--text); }
+  .btn-icon-sm.danger:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+  .btn-icon-sm.success { border-color: var(--accent); color: var(--accent); }
+  .btn-icon-sm.success:hover { background: #dcfce7; }
+  .btn-icon-sm:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+
+  .nurse-fp-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  /* Nurse form body: content area with space-evenly between line row and patient group */
+  .nurse-fp-body {
+    display: flex;
+    flex-direction: column;
+    /* justify-content: space-between; */
+    margin-top: 72px;
+    padding: 24px 28px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .nurse-fp-group {
+    display: flex;
+    flex-direction: column;
+    margin-top: 128px;
+    min-height: 160px; /* reserve space so text fields appear below patient without shifting space-evenly layout */
+  }
+
+  .nurse-fp-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .nurse-fp-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* Draft text inputs */
+  .nurse-draft-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    box-sizing: border-box;
+  }
+  .nurse-draft-input:focus {
+    border-color: var(--primary-l);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+  }
+  .nurse-draft-input.invalid {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239,68,68,.1);
+  }
+
+  /* LINE native select (reuse nurse-select styles) */
+  .nurse-select-wrap { width: 100%; position: relative; }
+  .nurse-select {
+    width: 100%;
+    padding: 10px 36px 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .nurse-select:focus:not(:disabled) {
+    border-color: var(--primary-l);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+  }
+  .nurse-select:disabled {
+    color: var(--muted); cursor: not-allowed; opacity: 0.55; border-style: dashed;
+  }
+
+  /* ── Custom patient dropdown ── */
+  .nurse-custom-dd {
+    position: relative;
+    width: 100%;
+  }
+  .nurse-custom-dd-btn {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: border-color .2s, box-shadow .2s;
+    text-align: left;
+  }
+  .nurse-custom-dd-btn #nurse-patient-btn-text,
+  .nurse-custom-dd-btn #nurse-line-btn-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  .nurse-dd-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 8px 14px 4px 14px;
+    letter-spacing: 0.5px;
+    background: var(--card);
+  }
+  .nurse-custom-dd-btn:focus:not(:disabled) {
+    border-color: var(--primary-l);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    outline: none;
+  }
+  .nurse-custom-dd-btn:disabled {
+    color: var(--muted); cursor: not-allowed; opacity: 0.55; border-style: dashed;
+  }
+  .nurse-custom-dd-btn svg {
+    flex-shrink: 0;
+    transition: transform .2s;
+    color: var(--muted);
+  }
+  .nurse-custom-dd.open .nurse-custom-dd-btn svg {
+    transform: rotate(180deg);
+  }
+
+  /* Dropdown list */
+  .nurse-custom-dd-list {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    z-index: 200;
+    overflow: hidden;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .nurse-custom-dd.open .nurse-custom-dd-list { display: block; }
+
+  /* Regular patient row: relation left, mrn right */
+  .nurse-patient-item {
+    display: flex;
+    align-items: center;
+    padding: 11px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .nurse-patient-item:last-child { border-bottom: none; }
+  .nurse-patient-item:hover { background: #eff6ff; }
+  .nurse-patient-item.selected { background: #eff6ff; color: var(--primary); }
+
+  .npi-relation {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .npi-spacer { flex: 1; } /* pushes mrn to the right */
+  .npi-mrn {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: monospace;
+    white-space: nowrap;
+  }
+
+  /* "新增" item — centered, accent color */
+  .nurse-patient-item.new-item {
+    justify-content: center;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 14px;
+    background: transparent;
+  }
+  .nurse-patient-item.new-item:hover { background: #eff6ff; }
+
+
+  /* ── Placeholder for not-yet-implemented states ── */
+  .forms-state-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: var(--muted);
+  }
+  .forms-state-placeholder-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* ── Form column internals (re-use chat-panel classes) ── */
+  .forms-form-col .chat-panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .forms-form-col .chat-panel-body,
+  .forms-form-col .form-view-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* ── Chats layout (keep original rules for chats section only) ── */
+  #section-chats .chat-layout {
     display: flex;
     gap: 16px;
     height: calc(100vh - 196px);
     margin-top: 20px;
     position: relative;
   }
-  #section-chats .patient-list, #section-forms .patient-list {
+  #section-chats .patient-list {
     width: 250px !important;
     flex-shrink: 0;
   }
-  #section-chats .visit-list, #section-forms .visit-list {
+  #section-chats .visit-list {
     width: 260px;
     flex-shrink: 0;
     background: var(--card);
@@ -810,7 +1378,7 @@
     display: flex;
     flex-direction: column;
   }
-  #section-chats .chat-panel, #section-forms .chat-panel {
+  #section-chats .chat-panel {
     flex: 1;
     min-width: 0;
     position: relative; /* relative parent for timeline navigation */
@@ -917,6 +1485,20 @@
   .timeline-dot:hover, .timeline-dot.active {
     background: var(--primary);
     transform: scale(1.3);
+  }
+  .draft-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: auto;
   }
   .timeline-dot::after {
     content: attr(data-label);

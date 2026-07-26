@@ -1485,6 +1485,22 @@ def _delete_md_file_if_unshared(filename: str, edu_after_delete: dict) -> None:
     if os.path.exists(path):
         os.remove(path)
 
+def _find_category_location(edu: dict, category: str):
+    """整份資料裡，只要任何部位底下已經有這個類別名稱，就回傳該部位名稱；否則回傳 None。"""
+    for bp, categories in edu.items():
+        if category in categories:
+            return bp
+    return None
+
+
+def _find_filename_owner(edu: dict, filename: str):
+    """回傳目前是哪個 (部位, 類別) 在用這個檔名；沒人用就回傳 None。"""
+    for bp, categories in edu.items():
+        for cat, info in categories.items():
+            if info.get('filename') == filename:
+                return (bp, cat)
+    return None
+
 
 # ── 衛教資料管理 main function ──────────────────────
 @admin_bp.route('/api/education', methods=['GET'])
@@ -1545,10 +1561,16 @@ def create_education():
         else:
             edu = {}
 
-        categories = edu.setdefault(bodypart, {})
-        if category in categories:
-            return jsonify({'error': '此部位底下已有相同類別'}), 400
+        existing_bodypart = _find_category_location(edu, category)
+        if existing_bodypart is not None:
+            return jsonify({'error': f'類別「{category}」已存在於「{existing_bodypart}」底下，類別名稱不可重複'}), 400
 
+        owner = _find_filename_owner(edu, filename)
+        if owner is not None:
+            owner_bp, owner_cat = owner
+            return jsonify({'error': f'檔名「{filename}」已經被「{owner_bp}／{owner_cat}」使用，請換一個檔名'}), 400
+
+        categories = edu.setdefault(bodypart, {})
         categories[category] = {'filename': filename}
 
         with open(test_file, 'w', encoding='utf-8') as f:
@@ -1557,6 +1579,7 @@ def create_education():
         _write_md_content(filename, content_text)
 
     return jsonify({'success': True, 'bodypart': bodypart, 'category': category, 'filename': filename})
+
 
 
 @admin_bp.route('/api/education/<bodypart>/<category>', methods=['PUT'])
@@ -1586,9 +1609,16 @@ def update_education(bodypart: str, category: str):
         if bodypart not in edu or category not in edu[bodypart]:
             return jsonify({'error': '找不到此類別'}), 404
 
-        moved = (new_bodypart != bodypart) or (new_category != category)
-        if moved and new_category in edu.get(new_bodypart, {}):
-            return jsonify({'error': '該部位底下已有相同類別名稱'}), 400
+        renamed = (new_bodypart != bodypart) or (new_category != category)
+        if renamed:
+            existing_bodypart = _find_category_location(edu, new_category)
+            if existing_bodypart is not None:
+                return jsonify({'error': f'類別「{new_category}」已存在於「{existing_bodypart}」底下，類別名稱不可重複'}), 400
+
+        owner = _find_filename_owner(edu, filename)
+        if owner is not None and owner != (bodypart, category):
+            owner_bp, owner_cat = owner
+            return jsonify({'error': f'檔名「{filename}」已經被「{owner_bp}／{owner_cat}」使用，請換一個檔名'}), 400
 
         # 從原本位置移除
         del edu[bodypart][category]

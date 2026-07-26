@@ -28,7 +28,12 @@
 
     <div class="form-group">
       <label>部位</label>
-      <input type="text" id="education-input-bodypart" placeholder="例如：頭、脖子、軀幹上半部">
+      <select id="education-input-bodypart-select" onchange="onBodypartSelectChange()">
+        <!-- 由 education.js 動態產生 -->
+      </select>
+      <input type="text" id="education-input-bodypart-new"
+            placeholder="輸入新的部位名稱，例如：頭"
+            style="margin-top:6px; display:none;">
     </div>
 
     <div class="form-group">

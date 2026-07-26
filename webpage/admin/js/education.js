@@ -1,10 +1,4 @@
-// ════════════════════════════════════════════════════════════════════════
 // 衛教資料管理（管理員）
-// 列表 API：/api/education → [{bodypart, category, filename}, ...]（不含內容）
-// 內容 API：/api/education-content/<filename> → {filename, content}
-// 儲存的 test.json 結構：{ 部位: { 類別: {filename} } }
-// 畫面採「部位」分組的手風琴樣式，預設收合，點部位標題展開/收合。
-// ════════════════════════════════════════════════════════════════════════
 
 let educationList = [];               // [{bodypart, category, filename}, ...]
 let educationEditingBodypart = null;  // 編輯中的原始部位（null 代表「新增」模式）
@@ -12,7 +6,7 @@ let educationEditingCategory = null;  // 編輯中的原始類別
 let educationDeleteTarget = null;     // {bodypart, category}
 let expandedBodyparts = new Set();    // 目前展開中的部位名稱，重新 render 後會保留狀態
 
-// ── 共用小工具（若 script.js 已提供同名函式則優先使用，否則使用以下備援實作）──
+// ── 共用小工具 ──
 
 function eduShowLoading() {
   if (typeof showLoading === 'function') { showLoading(); return; }
@@ -166,13 +160,53 @@ function renderEducationTable() {
   });
 }
 
-// ── 新增 / 編輯 Modal ────────────────────────────────────────────────────
+const NEW_BODYPART_VALUE = '__new__';
 
+// 依目前 educationList 裡出現過的部位產生下拉選項，最後加一個「+ 新增部位…」。
+// selectedBodypart 有值且已存在於選項裡 → 直接選中它；否則自動切到「新增」模式並把
+// 值帶進新增用的文字框（例如編輯一筆目前部位已被刪掉的舊資料時，不會選到錯的選項）。
+function populateBodypartOptions(selectedBodypart) {
+  const select = document.getElementById('education-input-bodypart-select');
+  const newInput = document.getElementById('education-input-bodypart-new');
+  if (!select) return;
+
+  const bodyparts = Array.from(new Set(educationList.map(i => i.bodypart))).sort();
+  const isNewSelection = !selectedBodypart || !bodyparts.includes(selectedBodypart);
+
+  select.innerHTML = bodyparts.map(bp =>
+    `<option value="${escapeHtml(bp)}">${escapeHtml(bp)}</option>`
+  ).join('') + `<option value="${NEW_BODYPART_VALUE}">+ 新增部位…</option>`;
+
+  select.value = isNewSelection ? NEW_BODYPART_VALUE : selectedBodypart;
+  newInput.value = isNewSelection && selectedBodypart ? selectedBodypart : '';
+  newInput.style.display = (select.value === NEW_BODYPART_VALUE) ? 'block' : 'none';
+}
+
+function onBodypartSelectChange() {
+  const select = document.getElementById('education-input-bodypart-select');
+  const newInput = document.getElementById('education-input-bodypart-new');
+  if (!select || !newInput) return;
+  const isNew = select.value === NEW_BODYPART_VALUE;
+  newInput.style.display = isNew ? 'block' : 'none';
+  if (isNew) newInput.focus();
+}
+
+// 送出表單時，實際要用的部位名稱從這裡取（下拉選了現有的就直接用，選「新增」就用文字框的值）
+function getSelectedBodypart() {
+  const select = document.getElementById('education-input-bodypart-select');
+  const newInput = document.getElementById('education-input-bodypart-new');
+  if (!select) return '';
+  return select.value === NEW_BODYPART_VALUE
+    ? (newInput ? newInput.value.trim() : '')
+    : select.value;
+}
+
+// ── 新增 / 編輯 Modal ────────────────────────────────────────────────────
 function openEducationCreateModal() {
   educationEditingBodypart = null;
   educationEditingCategory = null;
   document.getElementById('education-modal-title-text').textContent = '新增衛教類別';
-  document.getElementById('education-input-bodypart').value = '';
+  populateBodypartOptions(null);
   document.getElementById('education-input-category').value = '';
   document.getElementById('education-input-filename').value = '';
   document.getElementById('education-input-content').value = '';
@@ -190,7 +224,7 @@ async function openEducationEditModal(bodypart, category) {
   educationEditingBodypart = bodypart;
   educationEditingCategory = category;
   document.getElementById('education-modal-title-text').textContent = '編輯衛教類別';
-  document.getElementById('education-input-bodypart').value = item.bodypart;
+  populateBodypartOptions(item.bodypart);
   document.getElementById('education-input-category').value = item.category;
   document.getElementById('education-input-filename').value = item.filename;
   document.getElementById('education-input-content').value = '載入中...';
@@ -232,7 +266,7 @@ function hideEducationModalError() {
 }
 
 async function submitEducationForm() {
-  const bodypart = document.getElementById('education-input-bodypart').value.trim();
+  const bodypart = getSelectedBodypart();
   const category = document.getElementById('education-input-category').value.trim();
   const filename = document.getElementById('education-input-filename').value.trim();
   const content = document.getElementById('education-input-content').value.trim();

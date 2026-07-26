@@ -168,17 +168,31 @@ const NEW_BODYPART_VALUE = '__new__';
 function populateBodypartOptions(selectedBodypart) {
   const select = document.getElementById('education-input-bodypart-select');
   const newInput = document.getElementById('education-input-bodypart-new');
-  if (!select) return;
+  if (!select || !newInput) return;
 
   const bodyparts = Array.from(new Set(educationList.map(i => i.bodypart))).sort();
-  const isNewSelection = !selectedBodypart || !bodyparts.includes(selectedBodypart);
 
   select.innerHTML = bodyparts.map(bp =>
     `<option value="${escapeHtml(bp)}">${escapeHtml(bp)}</option>`
   ).join('') + `<option value="${NEW_BODYPART_VALUE}">+ 新增部位…</option>`;
 
-  select.value = isNewSelection ? NEW_BODYPART_VALUE : selectedBodypart;
-  newInput.value = isNewSelection && selectedBodypart ? selectedBodypart : '';
+  let valueToSelect;
+  let prefillNewInput = '';
+
+  if (selectedBodypart && bodyparts.includes(selectedBodypart)) {
+    // 編輯既有類別：選中它目前所在的部位
+    valueToSelect = selectedBodypart;
+  } else if (selectedBodypart) {
+      valueToSelect = NEW_BODYPART_VALUE;
+      prefillNewInput = selectedBodypart;
+  } else if (bodyparts.length > 0) {
+      valueToSelect = bodyparts[0];
+  } else {
+      valueToSelect = NEW_BODYPART_VALUE;
+  }
+
+  select.value = valueToSelect;
+  newInput.value = prefillNewInput;
   newInput.style.display = (select.value === NEW_BODYPART_VALUE) ? 'block' : 'none';
 }
 

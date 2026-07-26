@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "medical_record_num": "P2026003",
+        "session_date": "2026-07-20",
+        "session_sequence": null,
+        "message_count": 1,
+        "start_time": "2026-07-20T18:40:30.305351+08:00",
+        "end_time": "2026-07-20T18:40:30.305351+08:00"
+    },
+    "messages": [
+        {
+            "role": "assistant",
+            "content": "特別提醒：請立即前往急診回診以防萬一。",
+            "timestamp": "2026-07-20T18:40:30.305351+08:00"
+        }
+    ]
+}

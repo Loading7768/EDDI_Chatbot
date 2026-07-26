@@ -3,6 +3,7 @@ import sqlite3
 import hashlib
 import json
 import os
+import re
 import glob
 from datetime import datetime
 from functools import wraps
@@ -19,14 +20,16 @@ PROMPTS_DIR   = os.path.join(BASE_DIR, 'assets', 'prompts')
 CONFIG_FILE   = os.path.join(BASE_DIR, 'data', 'prompt_config.json')
 STATS_CACHE   = os.path.join(BASE_DIR, 'data', 'stats_cache.json')
 CHAT_LOGS_DIR = os.path.join(BASE_DIR, 'chat_logs')   # chat_logs/<MRN>/*.json
+DISCHARGE_MD_DIR   = os.path.join(BASE_DIR, 'assets', 'discharge')
+EDUCATION_FILE = os.path.join(DISCHARGE_MD_DIR, 'category.json')
 
 DB_HOSPITAL = os.path.join(BASE_DIR, 'database', 'hospital.db')
 
 import threading
 
-return_visit_lock = threading.Lock()
 DEPARTMENTS_FILE = os.path.join(BASE_DIR, 'data', 'departments.json')
-RETURN_VISIT_RECORDS_FILE = os.path.join(BASE_DIR, 'data', 'return_visit_records.json')
+
+education_lock = threading.Lock()
 
 def load_departments() -> list:
     """讀取科別設定 JSON"""
@@ -56,78 +59,39 @@ def save_departments(deps: list):
     except Exception as e:
         print(f"[Departments Save Error] {e}")
 
-def load_return_visit_records() -> dict:
-    """讀取已回診時間紀錄 JSON"""
-    if not os.path.exists(RETURN_VISIT_RECORDS_FILE):
+def load_education() -> dict:
+    """讀取衛教資料 JSON，key 為類別，value 為衛教內容文字。
+    相容舊格式（list of {topic_zh, topic_en, content}），讀取時會自動轉換並存回新格式。"""
+    if not os.path.exists(EDUCATION_FILE):
         return {}
     try:
-        with open(RETURN_VISIT_RECORDS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        with open(EDUCATION_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            converted = {}
+            for item in data:
+                key = (item.get('topic_zh') or item.get('topic_en') or '').strip()
+                if key:
+                    converted[key] = item.get('content', '')
+            save_education(converted)
+            return converted
+        if isinstance(data, dict):
+            return data
+        return {}
     except Exception as e:
-        print(f"[Return Visit Records Load Error] {e}")
+        print(f"[Education Load Error] {e}")
         return {}
 
-def save_return_visit_records(records: dict):
-    """寫入已回診時間紀錄 JSON"""
-    try:
-        os.makedirs(os.path.dirname(RETURN_VISIT_RECORDS_FILE), exist_ok=True)
-        with open(RETURN_VISIT_RECORDS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(records, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"[Return Visit Records Save Error] {e}")
 
-def check_needs_return_visit(mrn: str) -> bool:
-    """
-    判斷 Line bot 歷史訊息中是否曾回覆過該病患需要「回診」，
-    且訊息時間戳晚於最後一次已回診清除時間。
-    """
-    mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
-    if not os.path.isdir(mrn_dir):
-        return False
+def save_education(edu: dict):
+    """寫入衛教資料 JSON"""
+    try:
+        os.makedirs(os.path.dirname(EDUCATION_FILE), exist_ok=True)
+        with open(EDUCATION_FILE, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"[Education Save Error] {e}")
         
-    records = load_return_visit_records()
-    last_clear_str = records.get(mrn)
-    
-    last_clear_time = None
-    if last_clear_str:
-        try:
-            last_clear_time = datetime.fromisoformat(last_clear_str)
-        except Exception:
-            pass
-            
-    returnVisitTerms = ['請立即前往急診回診', '情況緊急，請立即撥打 119 或前往最近的急診室']
-
-    for filepath in glob.glob(os.path.join(mrn_dir, '*.json')):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            for msg in data.get('messages', []):
-                if msg.get('role') == 'assistant' and any(term in msg.get('content', '') for term in returnVisitTerms):
-                    ts_str = msg.get('timestamp', '')
-                    if ts_str:
-                        try:
-                            msg_time = datetime.fromisoformat(ts_str)
-                            if last_clear_time:
-                                # 統一時區進行比較
-                                if msg_time.tzinfo is not None and last_clear_time.tzinfo is None:
-                                    last_clear_time = last_clear_time.replace(tzinfo=msg_time.tzinfo)
-                                elif msg_time.tzinfo is None and last_clear_time.tzinfo is not None:
-                                    msg_time = msg_time.replace(tzinfo=last_clear_time.tzinfo)
-                                
-                                if msg_time > last_clear_time:
-                                    return True
-                            else:
-                                return True
-                        except Exception as te:
-                            print(f"[check_needs_return_visit] 解析時間失敗: {te}")
-                            if not last_clear_time:
-                                return True
-        except Exception as e:
-            print(f'[check_needs_return_visit] 讀取失敗 {os.path.basename(filepath)}: {e}')
-            
-    return False
-
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def hash_pw(pw: str) -> str:
@@ -402,17 +366,17 @@ def get_current_prompt_info():
 
 # ── routes ────────────────────────────────────────────────────────────────────
 
-@admin_bp.route('/admin')
+@admin_bp.route('/main')
 def index():
     return render_template('admin/html/admin.html')
 
 
-@admin_bp.route('/admin/css/<path:filename>')
+@admin_bp.route('/main/css/<path:filename>')
 def admin_css(filename):
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'css'), filename)
 
 
-@admin_bp.route('/admin/js/<path:filename>')
+@admin_bp.route('/main/js/<path:filename>')
 def admin_js(filename):
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'js'), filename)
 
@@ -545,7 +509,8 @@ def get_chats():
                     MIN(la.uuid) AS line_id,
                     MIN(lpp.relation) AS relation,
                     COUNT(r.record_id) AS form_count,
-                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout
+                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout,
+                    MIN(p.status) AS status
                 FROM record r
                 JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
                 JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
@@ -560,7 +525,8 @@ def get_chats():
                     MIN(la.uuid) AS line_id,
                     MIN(lpp.relation) AS relation,
                     COUNT(r.record_id) AS form_count,
-                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout
+                    MAX(strftime('%Y-%m-%d', r.checkout_date)) AS latest_checkout,
+                    MIN(p.status) AS status
                 FROM record r
                 JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
                 JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
@@ -612,7 +578,8 @@ def get_chats():
                 'latest_checkout':    row['latest_checkout'],
                 'specialty':          specialty,
                 'specialties':        specialties,
-                'needs_return_visit': check_needs_return_visit(mrn),
+                'status':             row['status'],
+                'needs_return_visit': row['status'] == '須回診',
             })
 
         conn.close()
@@ -647,7 +614,7 @@ def get_chat_detail(mrn: str):
             return jsonify({'error': '無查看權限'}), 403
 
     patient = conn.execute('''
-        SELECT p.medical_record_number, MIN(la.uuid) AS line_uuid, MIN(lpp.relation) AS relation
+        SELECT p.medical_record_number, MIN(la.uuid) AS line_uuid, MIN(lpp.relation) AS relation, MIN(p.status) AS status
         FROM patients p
         LEFT JOIN line_patient_pairs lpp ON p.patient_id = lpp.patient_id
         LEFT JOIN line_accounts la ON lpp.line_account_id = la.line_account_id
@@ -699,14 +666,13 @@ def get_chat_detail(mrn: str):
         for r in forms
     ]
 
-    # 增加：獲取回診標記
-    needs_return_visit = check_needs_return_visit(mrn)
     return jsonify({
         'patient': {
             'medical_record_num': patient['medical_record_number'],
             'line_id':            patient['line_uuid'],
             'relation':           patient['relation'] if patient['relation'] else '帳號本人',
-            'needs_return_visit': needs_return_visit
+            'status':             patient['status'],
+            'needs_return_visit': patient['status'] == '須回診'
         },
         'forms':    forms_list,
         'sessions': sessions_list,
@@ -1784,14 +1750,40 @@ def save_prompt_nickname():
 @login_required
 def clear_return_visit(mrn: str):
     mrn = mrn.strip()
-    now_str = datetime.now().isoformat()
+    data = request.get_json() or {}
+    target_status = data.get('status')
     
-    with return_visit_lock:
-        records = load_return_visit_records()
-        records[mrn] = now_str
-        save_return_visit_records(records)
+    conn = get_db()
+    try:
+        if not target_status:
+            row = conn.execute('SELECT status FROM patients WHERE medical_record_number = ?', (mrn,)).fetchone()
+            if row:
+                current_status = row['status']
+                if current_status == '須看診':
+                    target_status = '已看診'
+                elif current_status == '須回診':
+                    target_status = '已回診'
+                else:
+                    target_status = '已回診'
+            else:
+                target_status = '已回診'
+                
+        if target_status not in ('已看診', '已回診'):
+            return jsonify({'error': '無效的狀態更新'}), 400
+            
+        conn.execute('''
+            UPDATE patients
+            SET status = ?
+            WHERE medical_record_number = ?
+        ''', (target_status, mrn))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
         
-    return jsonify({'success': True, 'cleared_at': now_str})
+    return jsonify({'success': True, 'status': target_status})
 
 
 @admin_bp.route('/api/departments', methods=['GET'])
@@ -1920,3 +1912,225 @@ def delete_or_disable_department(name: str):
         deps = [d for d in deps if d['name'] != name]
         save_departments(deps)
         return jsonify({'success': True, 'action': 'deleted', 'message': '科別已成功刪除。'})
+
+# ── 衛教資料管理（醫師自行維護，僅限管理員新增/編輯/刪除）──────────────────────
+# 輔助函式
+def _sanitize_md_filename(filename: str) -> str:
+    """限制自訂檔名只能是純檔名（擋掉路徑符號），並確保副檔名是 .md。"""
+    filename = os.path.basename((filename or '').strip())
+    if not filename:
+        return ''
+    if not filename.lower().endswith('.md'):
+        filename += '.md'
+    return filename
+
+
+def _write_md_content(filename: str, content: str) -> None:
+    os.makedirs(DISCHARGE_MD_DIR, exist_ok=True)
+    with open(os.path.join(DISCHARGE_MD_DIR, filename), 'w', encoding='utf-8') as f:
+        f.write(content)
+
+
+def _read_md_content(filename: str) -> str | None:
+    path = os.path.join(DISCHARGE_MD_DIR, filename)
+    if not os.path.exists(path):
+        return None
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def _delete_md_file_if_unshared(filename: str, edu_after_delete: dict) -> None:
+    """只有在刪除後，沒有其他「部位/類別」還指向同一個檔名時，才真的刪除 .md 檔。"""
+    still_used = any(
+        isinstance(info, dict) and info.get('filename') == filename
+        for categories in edu_after_delete.values()
+        for info in categories.values()
+    )
+    if still_used:
+        return
+    path = os.path.join(DISCHARGE_MD_DIR, filename)
+    if os.path.exists(path):
+        os.remove(path)
+
+def _find_category_location(edu: dict, category: str):
+    """整份資料裡，只要任何部位底下已經有這個類別名稱，就回傳該部位名稱；否則回傳 None。"""
+    for bp, categories in edu.items():
+        if category in categories:
+            return bp
+    return None
+
+
+def _find_filename_owner(edu: dict, filename: str):
+    """回傳目前是哪個 (部位, 類別) 在用這個檔名；沒人用就回傳 None。"""
+    for bp, categories in edu.items():
+        for cat, info in categories.items():
+            if info.get('filename') == filename:
+                return (bp, cat)
+    return None
+
+
+# ── 衛教資料管理 main function ──────────────────────
+@admin_bp.route('/api/education', methods=['GET'])
+@login_required
+def list_education():
+    """回傳所有「部位/類別/檔名」，攤平成列表供顯示（不含 content，內容另外抓）。"""
+    test_file = EDUCATION_FILE
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+    result = []
+    for bodypart, categories in edu.items():
+        for category, info in categories.items():
+            result.append({
+                'bodypart': bodypart,
+                'category': category,
+                'filename': info.get('filename', '')
+            })
+    result.sort(key=lambda x: (x['bodypart'], x['category']))
+    return jsonify(result)
+
+
+@admin_bp.route('/api/education-content/<path:filename>', methods=['GET'])
+@login_required
+def get_education_content(filename: str):
+    """讀取指定 md 檔的實際內容，供編輯 Modal 帶入現有內容。"""
+    filename = _sanitize_md_filename(filename)
+    content = _read_md_content(filename)
+    if content is None:
+        return jsonify({'error': '找不到此檔案'}), 404
+    return jsonify({'filename': filename, 'content': content})
+
+
+@admin_bp.route('/api/education', methods=['POST'])
+@admin_required
+def create_education():
+    """新增衛教類別（部位 + 類別 + 自訂檔名），同步寫入對應的 md 檔"""
+    test_file = EDUCATION_FILE
+
+    data = request.get_json() or {}
+    bodypart = data.get('bodypart', '').strip()
+    category = data.get('category', '').strip()
+    content_text = data.get('content', '').strip()
+    filename = _sanitize_md_filename(data.get('filename', ''))
+
+    if not bodypart or not category or not content_text or not filename:
+        return jsonify({'error': '部位、類別名稱、衛教內容與檔名皆不可空白'}), 400
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+        existing_bodypart = _find_category_location(edu, category)
+        if existing_bodypart is not None:
+            return jsonify({'error': f'類別「{category}」已存在於「{existing_bodypart}」底下，類別名稱不可重複'}), 400
+
+        owner = _find_filename_owner(edu, filename)
+        if owner is not None:
+            owner_bp, owner_cat = owner
+            return jsonify({'error': f'檔名「{filename}」已經被「{owner_bp}／{owner_cat}」使用，請換一個檔名'}), 400
+
+        categories = edu.setdefault(bodypart, {})
+        categories[category] = {'filename': filename}
+
+        with open(test_file, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+
+        _write_md_content(filename, content_text)
+
+    return jsonify({'success': True, 'bodypart': bodypart, 'category': category, 'filename': filename})
+
+
+
+@admin_bp.route('/api/education/<bodypart>/<category>', methods=['PUT'])
+@admin_required
+def update_education(bodypart: str, category: str):
+    """編輯衛教類別（可同時修改部位、類別名稱、檔名，並同步寫入內容到 md 檔）"""
+    test_file = EDUCATION_FILE
+
+    bodypart = bodypart.strip()
+    category = category.strip()
+    data = request.get_json() or {}
+    new_bodypart = data.get('bodypart', bodypart).strip()
+    new_category = data.get('category', category).strip()
+    content_text = data.get('content', '').strip()
+    filename = _sanitize_md_filename(data.get('filename', ''))
+
+    if not new_bodypart or not new_category or not content_text or not filename:
+        return jsonify({'error': '部位、類別名稱、衛教內容與檔名皆不可空白'}), 400
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+        if bodypart not in edu or category not in edu[bodypart]:
+            return jsonify({'error': '找不到此類別'}), 404
+
+        renamed = (new_bodypart != bodypart) or (new_category != category)
+        if renamed:
+            existing_bodypart = _find_category_location(edu, new_category)
+            if existing_bodypart is not None:
+                return jsonify({'error': f'類別「{new_category}」已存在於「{existing_bodypart}」底下，類別名稱不可重複'}), 400
+
+        owner = _find_filename_owner(edu, filename)
+        if owner is not None and owner != (bodypart, category):
+            owner_bp, owner_cat = owner
+            return jsonify({'error': f'檔名「{filename}」已經被「{owner_bp}／{owner_cat}」使用，請換一個檔名'}), 400
+
+        # 從原本位置移除
+        del edu[bodypart][category]
+        if not edu[bodypart]:
+            del edu[bodypart]
+
+        # 寫入(可能是新的)部位/類別
+        edu.setdefault(new_bodypart, {})[new_category] = {'filename': filename}
+
+        with open(test_file, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+
+        _write_md_content(filename, content_text)
+
+    return jsonify({'success': True, 'bodypart': new_bodypart, 'category': new_category, 'filename': filename})
+
+
+@admin_bp.route('/api/education/<bodypart>/<category>', methods=['DELETE'])
+@admin_required
+def delete_education(bodypart: str, category: str):
+    """刪除衛教類別（若沒有其他類別共用同一個 md 檔，才一併刪除該檔案）"""
+    test_file = EDUCATION_FILE
+
+    bodypart = bodypart.strip()
+    category = category.strip()
+
+    with education_lock:
+        if os.path.exists(test_file):
+            with open(test_file, 'r', encoding='utf-8') as f:
+                edu = json.load(f)
+        else:
+            edu = {}
+
+        if bodypart not in edu or category not in edu[bodypart]:
+            return jsonify({'error': '找不到此類別'}), 404
+
+        filename = edu[bodypart][category].get('filename', '')
+        del edu[bodypart][category]
+        if not edu[bodypart]:
+            del edu[bodypart]
+
+        with open(test_file, 'w', encoding='utf-8') as f:
+            json.dump(edu, f, ensure_ascii=False, indent=4)
+
+        if filename:
+            _delete_md_file_if_unshared(filename, edu)
+
+    return jsonify({'success': True})

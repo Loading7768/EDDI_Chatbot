@@ -32,7 +32,7 @@ if __name__ == '__main__':
     print('  EDDI 醫師後台系統')
     print('=' * 48)
     print(f'  專案根目錄 : {BASE_DIR}')
-    print(f'  後台網址   : http://localhost:5001/admin')
+    print(f'  後台網址   : http://localhost:5001/main')
     print('  帳號       : admin / admin123')
     print('  停止伺服器 : Ctrl + C')
     print('=' * 48)

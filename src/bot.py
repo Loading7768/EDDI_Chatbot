@@ -167,67 +167,38 @@ def load_prompt_template(version: str) -> str:
             pass
     return "請根據以下衛教資料回答病患：\n【參考資訊】:\n{context}"
 
-# 中文主題到英文檔名的靜態映射表 (保證精確對應)
-ZH_TOPIC_TO_FILE = {
-    "腹痛衛教": "abdominal_pain.md",
-    "腸胃炎衛教，病毒性腸胃炎衛教": "acute_viral_gastroenteritis.md",
-    "燒燙傷衛教": "burn_injury.md",
-    "胸痛衛教": "chest_pain.md",
-    "便秘衛教": "constipation.md",
-    "當您的咳嗽出現以下情況時，請及時尋求醫療協助：": "cough.md",
-    "譫妄、意識混亂衛教": "delirium_confusion.md",
-    "腹瀉衛教": "diarrhea.md",
-    "頭暈衛教": "dizziness.md",
-    "水腫衛教": "edema.md",
-    "流鼻血衛教": "epistaxis_nosebleeds.md",
-    "發燒衛教": "fever.md",
-    "腰痛衛教": "flank_pain.md",
-    "虛弱衛教": "general_weakness.md",
-    "頭痛衛教": "headache.md",
-    "吐血、解黑便、解血便，胃腸道出血衛教": "hematemesis_gi_bleed.md",
-    "血尿衛教": "hematuria.md",
-    "咳血衛教": "hemoptysis.md",
-    "打嗝衛教": "hiccups.md",
-    "高血壓衛教": "hypertension_emergency.md",
-    "下背痛衛教": "low_back_pain.md",
-    "偏頭痛衛教": "migraine.md",
-    "肌肉、關節和骨骼疼痛衛教": "myalgia_arthralgia_bone_pain.md",
-    "噁心嘔吐衛教": "nausea_and_vomiting.md",
-    "心悸衛教": "palpitation.md",
-    "癲癇衛教": "seizure.md",
-    "休克衛教": "shock.md",
-    "當您的呼吸急促或呼吸困難出現以下情況時，請立即尋求醫療協助：": "shortness_of_breath_dyspnea.md",
-    "皮膚疹子(皮疹)衛教": "skin_rash.md",
-    "暈厥、暈倒衛教": "syncope.md",
-    "一般外傷、鈍挫傷、扭傷、拉傷衛教": "trauma_contusion_sprain.md",
-    "傷口處置原則，擦傷、撕裂傷，縫合傷口衛教": "trauma_suture_abrasion_wound.md",
-    "上背痛衛教": "upper_back_pain.md",
-    "尿滯留衛教": "urinary_retention.md",
-    "懷孕早期陰道出血衛教": "vaginal_bleeding_early_pregnancy.md",
-    "懷孕後期陰道出血衛教": "vaginal_bleeding_late_pregnancy.md",
-    "月經週期間陰道出血衛教": "vaginal_bleeding_between_periods.md",
-    "眩暈衛教": "vertigo.md"
-}
+def load_symptom_filename_map() -> dict[str, str]:
+    """從 assets/discharge/category.json 動態讀取衛教主題與檔名的對照表"""
+    category_file = os.path.join(BASE_DIR, 'assets', 'discharge', 'category.json')
+    mapping = {}
+    if os.path.exists(category_file):
+        try:
+            with open(category_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                for _cat, items in data.items():
+                    if isinstance(items, dict):
+                        for sym_name, info in items.items():
+                            if isinstance(info, dict) and "filename" in info:
+                                mapping[sym_name] = info["filename"]
+        except Exception as e:
+            print(f"[RAG Error] Failed to load category.json: {e}")
+    return mapping
 
 def build_rag_context(symptoms: list[str]) -> str:
     """根據病患的症狀中文名稱，讀取對應的英文 Markdown 檔案並合併"""
     if not symptoms:
         return "無對應的衛教參考資料。請根據通用醫療常識回答。"
         
+    symptom_map = load_symptom_filename_map()
+    if not symptom_map:
+        return "無對應的衛教參考資料。請根據通用醫療常識回答。"
+
     matched_files = set()
     for sym in symptoms:
-        found = False
-        for topic_zh, filename in ZH_TOPIC_TO_FILE.items():
-            if sym in topic_zh:
+        for topic_zh, filename in symptom_map.items():
+            if sym == topic_zh or sym in topic_zh or topic_zh in sym:
                 matched_files.add(filename)
-                found = True
                 break
-        if not found:
-            # 模糊比對
-            for topic_zh, filename in ZH_TOPIC_TO_FILE.items():
-                if topic_zh in sym or sym in topic_zh:
-                    matched_files.add(filename)
-                    break
                     
     if not matched_files:
         return "無對應的衛教參考資料。請根據通用醫療常識回答。"

@@ -189,6 +189,8 @@ function renderSymptomMainCol() {
     }
     mainList.appendChild(item);
   });
+
+  validateDoctorSave();
 }
 
 function renderSymptomSubCol(categoryKey) {
@@ -231,6 +233,7 @@ function renderSymptomSubCol(categoryKey) {
     };
     subList.appendChild(item);
   });
+  validateDoctorSave();
 }
 
 function renderSymptomChips() {
@@ -261,6 +264,13 @@ function renderSymptomChips() {
     };
     chipsContainer.appendChild(chip);
   });
+}
+
+function validateDoctorSave() {
+  const saveBtn = document.getElementById('btn-doctor-save');
+  if (!saveBtn) return;
+  const symptoms = state.selectedSymptoms || [];
+  saveBtn.disabled = symptoms.length < 1;
 }
 
 function deleteDoctorDraft() {
@@ -331,13 +341,13 @@ async function doSaveDoctorForm() {
       loadFormsPatientList();
     } else {
       showToast('❌ 傳送失敗：' + (res.error || '未知錯誤'), 'fail');
-      if (saveBtn) saveBtn.disabled = false;
     }
   } catch (e) {
     console.error('doSaveDoctorForm error', e);
     showToast('❌ 傳送失敗，請稍後再試', 'fail');
-    if (saveBtn) saveBtn.disabled = false;
   }
+
+  if (saveBtn) saveBtn.disabled = false;
 }
 
 
@@ -2031,9 +2041,23 @@ function validateViewEdit() {
   const confirmBtn = document.getElementById('btn-view-confirm');
   if (!confirmBtn) return;
 
+  const { f, mrn } = state.currentSelectedRecord || {};
+  if (!f) return;
+
+  // 1. Check if symptoms changed
+  const origSymptoms = f.symptoms || [];
+  const currentSymptoms = state.veSelectedSymptoms || [];
+  let symptomsChanged = false;
+  if (origSymptoms.length !== currentSymptoms.length) {
+    symptomsChanged = true;
+  } else {
+    symptomsChanged = currentSymptoms.some(s => !origSymptoms.includes(s));
+  }
+
   if (!state.isAdmin) {
-    // Non-admin: only require >= 1 symptom
-    confirmBtn.disabled = !(state.veSelectedSymptoms && state.veSelectedSymptoms.length > 0);
+    // Non-admin: valid if >= 1 symptom AND symptoms changed
+    const hasSymptoms = currentSymptoms.length > 0;
+    confirmBtn.disabled = !(hasSymptoms && symptomsChanged);
     return;
   }
 
@@ -2045,21 +2069,37 @@ function validateViewEdit() {
 
   let valid = true;
   const pairId = state.veSelectedPair.pair_id;
+  let currentRelation = state.veSelectedPair.relation;
+  let currentMrn = state.veSelectedPair.mrn;
 
   if (pairId === 'self') {
-    const val = document.getElementById('ve-self-mrn')?.value.trim() ?? '';
-    if (!val) valid = false;
+    currentRelation = '帳號本人';
+    currentMrn = document.getElementById('ve-self-mrn')?.value.trim() ?? '';
+    if (!currentMrn) valid = false;
   } else if (pairId === 'new') {
-    const relVal = document.getElementById('ve-new-relation')?.value.trim() ?? '';
-    const mrnVal = document.getElementById('ve-new-mrn')?.value.trim() ?? '';
-    if (!relVal || !mrnVal) valid = false;
+    currentRelation = document.getElementById('ve-new-relation')?.value.trim() ?? '';
+    currentMrn = document.getElementById('ve-new-mrn')?.value.trim() ?? '';
+    if (!currentRelation || !currentMrn) valid = false;
   }
 
-  if (!state.veSelectedSymptoms || state.veSelectedSymptoms.length === 0) {
+  if (currentSymptoms.length === 0) {
     valid = false;
   }
 
-  confirmBtn.disabled = !valid;
+  // 2. Check if admin info changed
+  const origLineId = f.line_account_id || '';
+  const origRelation = f.relation || '帳號本人';
+  const origMrn = mrn || '';
+  const currentLineId = state.veSelectedLine ? state.veSelectedLine.id : '';
+
+  let infoChanged = false;
+  if (currentLineId !== origLineId || currentRelation !== origRelation || currentMrn !== origMrn) {
+    infoChanged = true;
+  }
+
+  // 3. Final validity
+  const hasChanges = symptomsChanged || infoChanged;
+  confirmBtn.disabled = !(valid && hasChanges);
 }
 
 function openConfirmEditModal() {

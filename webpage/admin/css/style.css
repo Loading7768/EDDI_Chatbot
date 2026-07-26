@@ -1137,15 +1137,15 @@
     display: flex;
     flex-direction: column;
     /* justify-content: space-between; */
-    margin-top: 72px;
-    padding: 24px 28px;
+    /* margin-top: 72px; */
+    padding: 64px 28px;
     flex: 1;
     overflow-y: auto;
   }
   .nurse-fp-group {
     display: flex;
     flex-direction: column;
-    margin-top: 128px;
+    padding-top: 128px;
     min-height: 160px; /* reserve space so text fields appear below patient without shifting space-evenly layout */
   }
 

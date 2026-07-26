@@ -83,6 +83,7 @@ function showLogin() {
 
 function initApp(me) {
   state.isAdmin = me.is_admin;
+  state.account = me.account || '';
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 

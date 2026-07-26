@@ -1,9 +1,13 @@
 import json
+import sqlite3
 from db_init import get_db, hash_pw
 
 def insert_test_data():
     conn = get_db('hospital.db')
     c = conn.cursor()
+    
+    # 啟用外鍵約束
+    c.execute('PRAGMA foreign_keys = ON')
     
     # 插入測試資料
     doctors = [
@@ -32,16 +36,25 @@ def insert_test_data():
         (10, 'P2026010', 0, '出院'),
     ]
     
-    # line_patient_pairs: give 'U2e3f4g5h6' 5 different relations.
+    # line_accounts
+    line_accounts_data = [
+        (1, 'U1a2b3c4d5', '孤兒'),
+        (2, 'U2e3f4g5h6', '關係複雜'),
+        (3, 'U3i4j5k6l7', '小幫手'),
+        (4, 'U4m5n6o7p8', '趙六'),
+    ]
+    
+    # line_patient_pairs: give line_account 2 ('U2e3f4g5h6') 5 different relations.
     line_pairs_data = [
-        (1, 'U1a2b3c4d5', 1, '帳號本人'),
-        (2, 'U2e3f4g5h6', 2, '帳號本人'),
-        (3, 'U3i4j5k6l7', 3, '媽媽'),
-        (4, 'U4m5n6o7p8', 4, '丈夫'),
-        (5, 'U2e3f4g5h6', 5, '爸爸'),
-        (6, 'U2e3f4g5h6', 6, '兒子'),
-        (7, 'U2e3f4g5h6', 7, '女兒'),
-        (8, 'U2e3f4g5h6', 8, '妻子'),
+        # (line_patient_pairs_id, patient_id, line_account_id, relation)
+        (1, 1, 1, '帳號本人'),
+        (2, 2, 2, '帳號本人'),
+        (3, 3, 3, '媽媽'),
+        (4, 4, 4, '丈夫'),
+        (5, 5, 2, '爸爸'),
+        (6, 6, 2, '兒子'),
+        (7, 7, 2, '女兒'),
+        (8, 8, 2, '妻子'),
     ]
     
     # records: 
@@ -61,7 +74,6 @@ def insert_test_data():
         (7, 4, '2026-05-09 11:20:10.012', 2, json.dumps(['頭暈', '水腫'], ensure_ascii=False))
     ]
     
-    import sqlite3
     try:
         c.executemany(
             'INSERT INTO doctors (doctor_id, account_name, password_hash, doctor_name, department, is_active, is_admin) VALUES (?,?,?,?,?,?,?)',
@@ -74,7 +86,12 @@ def insert_test_data():
         )
         
         c.executemany(
-            'INSERT INTO line_patient_pairs (line_patient_pairs_id, line_uuid, patient_id, relation) VALUES (?,?,?,?)',
+            'INSERT INTO line_accounts (line_account_id, uuid, name) VALUES (?,?,?)',
+            line_accounts_data
+        )
+        
+        c.executemany(
+            'INSERT INTO line_patient_pairs (line_patient_pairs_id, patient_id, line_account_id, relation) VALUES (?,?,?,?)',
             line_pairs_data
         )
         
@@ -85,8 +102,8 @@ def insert_test_data():
         
         conn.commit()
         print('測試資料插入完成！\n')
-    except sqlite3.IntegrityError:
-        print('測試資料已存在，跳過插入步驟。\n')
+    except sqlite3.IntegrityError as e:
+        print(f'測試資料插入失敗或已存在 ({e})，跳過插入步驟。\n')
     
     print('=== EXPLAIN QUERY PLAN 測試 ===')
     
@@ -106,8 +123,8 @@ def insert_test_data():
     print('\n2. 查詢特定科別的醫師 (預期使用 idx_doctors_department):')
     verify_plan(c, 'EXPLAIN QUERY PLAN SELECT * FROM doctors WHERE department = "急診科"')
         
-    print('\n3. 查詢特定 LINE UUID (預期使用 idx_line_patient_pairs_uuid):')
-    verify_plan(c, 'EXPLAIN QUERY PLAN SELECT * FROM line_patient_pairs WHERE line_uuid = "U2e3f4g5h6"')
+    print('\n3. 查詢特定 LINE Account ID (預期使用 idx_line_patient_pairs_uuid):')
+    verify_plan(c, 'EXPLAIN QUERY PLAN SELECT * FROM line_patient_pairs WHERE line_account_id = 2')
         
     print()
     conn.close()

@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import glob
+import shutil
 
 BASE_DIR = os.getcwd()
 
@@ -26,6 +27,7 @@ def init_hospital_db():
     # 刪除舊表
     c.execute('DROP TABLE IF EXISTS record')
     c.execute('DROP TABLE IF EXISTS line_patient_pairs')
+    c.execute('DROP TABLE IF EXISTS line_accounts')
     c.execute('DROP TABLE IF EXISTS patients')
     c.execute('DROP TABLE IF EXISTS doctors')
     
@@ -53,19 +55,29 @@ def init_hospital_db():
         )
     ''')
     
-    # 3. line_patient_pairs 表格
+    # 3. line_accounts 表格
+    c.execute('''
+        CREATE TABLE line_accounts (
+	        line_account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+	        uuid            TEXT    UNIQUE NOT NULL,
+	        name            TEXT    NOT NULL
+        )
+    ''')
+    
+    # 4. line_patient_pairs 表格
     c.execute('''
         CREATE TABLE line_patient_pairs (
             line_patient_pairs_id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id            INTEGER NOT NULL,
-            line_uuid             TEXT    NOT NULL,
+            line_account_id       INTEGER NOT NULL,
             relation              TEXT,
             FOREIGN KEY (patient_id) REFERENCES patients (patient_id),
-            UNIQUE (line_uuid, patient_id)
+            FOREIGN KEY (line_account_id) REFERENCES line_accounts (line_account_id),
+            UNIQUE (line_account_id, patient_id)
         )
     ''')
     
-    # 4. record 表格
+    # 5. record 表格
     c.execute('''
         CREATE TABLE record (
             record_id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,7 +93,7 @@ def init_hospital_db():
     # 建立 Indexes
     c.execute('CREATE INDEX idx_record_lookup ON record (line_patient_pairs_id, doctor_id, checkout_date DESC)')
     c.execute('CREATE INDEX idx_doctors_department ON doctors (department)')
-    c.execute('CREATE INDEX idx_line_patient_pairs_uuid ON line_patient_pairs (line_uuid)')
+    c.execute('CREATE INDEX idx_line_patient_pairs_uuid ON line_patient_pairs (line_account_id)')
 
     
     conn.commit()
@@ -93,19 +105,35 @@ def init_hospital_db():
 def create_data_dir():
     data_dir = os.path.join(BASE_DIR, 'data')
     os.makedirs(data_dir, exist_ok=True)
-    sessions_dir = os.path.join(data_dir, 'sessions')
-    os.makedirs(sessions_dir, exist_ok=True)
     cache = os.path.join(data_dir, 'stats_cache.json')
     if not os.path.exists(cache):
         with open(cache, 'w', encoding='utf-8') as f:
             json.dump({}, f)
-    print('data/ 目錄建立完成（含 data/sessions/）')
+    print('data/ 目錄建立完成')
+
+
+# ── drafts/ ───────────────────────────────────────────────────────────────────
+def clear_drafts_dir():
+    drafts_dir = os.path.join(BASE_DIR, 'drafts')
+    if not os.path.exists(drafts_dir):
+        os.makedirs(drafts_dir, exist_ok=True)
+        return
+
+    for item in os.listdir(drafts_dir):
+        if item == 'placeholder.json':
+            continue
+        item_path = os.path.join(drafts_dir, item)
+        if os.path.isdir(item_path):
+            shutil.rmtree(item_path)
+        else:
+            os.remove(item_path)
+    print('drafts/ 目錄已清理（僅保留 placeholder.json）')
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     print('WARNING: Running this script will reset hospital.db and remove all of the exsisting data.')
-    confirm_msg = "Yes. I understand this action will wipe the database and want to proceed."
+    confirm_msg = "Yes. I understand this action will wipe the database along with caches(/data, /drafts) and want to proceed."
     user_input = input(f'Please type exactly "{confirm_msg}" to continue:\n')
     if user_input != confirm_msg:
         print('Input did not match. Terminating script.')
@@ -116,6 +144,7 @@ if __name__ == '__main__':
     print('=== EDDI 資料庫初始化 ===\n')
     init_hospital_db()
     create_data_dir()
+    clear_drafts_dir()
     print('\n初始化完成！')
-    print('\n聊天記錄 JSON 請放至：data/sessions/*.json')
+    print('\n聊天記錄 JSON 請放至：chat_logs/{mrc}/*.json')
     print('\n生成測試資料請使用 db_test.py')

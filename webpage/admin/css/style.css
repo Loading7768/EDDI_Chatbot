@@ -47,6 +47,28 @@
     border-color: var(--primary-l);
   }
 
+  .password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  
+  .btn-toggle-password {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--muted);
+    padding: 0;
+    outline: none;
+  }
+  
+  .btn-toggle-password:hover {
+    color: var(--text);
+  }
+
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px;
@@ -838,21 +860,14 @@
     overflow: hidden;
   }
 
-  /* When Sub is hidden (Nurse/Doctor), collapse to 2-col grid at 75% max-width
-     so Main stays 1/4 fw and Form stays 1/2 fw — same pixel widths as View state */
-  .forms-layout[data-state="nurse"],
-  .forms-layout[data-state="doctor"] {
-    grid-template-columns: 1fr 2fr;
-    max-width: calc(1400px * 0.75);
-  }
   .forms-layout[data-state="nurse"] .forms-sub-col,
   .forms-layout[data-state="doctor"] .forms-sub-col {
     display: none;
   }
-  /* Re-place Form onto track 2 of the 2-col grid (track 3 no longer exists) */
+  /* Expand Form to cover the hidden Sub column (span tracks 2 and 3) */
   .forms-layout[data-state="nurse"] .forms-form-col,
   .forms-layout[data-state="doctor"] .forms-form-col {
-    grid-column: 2 / 3;
+    grid-column: 2 / 4;
   }
 
   /* ── State Buttons ── */

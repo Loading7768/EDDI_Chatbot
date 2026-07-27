@@ -247,7 +247,7 @@ function renderVisits() {
     
     return `
       <div class="visit-item" id="visit-item-${index}" data-date="${esc(f.checkout_date)}" onclick="selectVisit('${esc(f.checkout_date)}', this)">
-        <div class="visit-title">${esc(f.checkout_date ? f.checkout_date.substring(0, 16) : '')}</div>
+        <div class="visit-title">${esc(f.checkout_date ? f.checkout_date.replace('T', ' ').substring(0, 16) : '')}</div>
         <div class="visit-meta">
           <span class="badge badge-blue">${esc(f.specialty)}</span>
           ${hasLogs
@@ -277,7 +277,7 @@ function selectVisit(checkoutDate, el) {
   if (el) el.classList.add('active');
   
   document.getElementById('chat-title').textContent = `${state.currentMrn}`;
-  document.getElementById('chat-sub').textContent = '就診日期：' + (checkoutDate ? checkoutDate.substring(0, 16) : '');
+  document.getElementById('chat-sub').textContent = '就診日期：' + (checkoutDate ? checkoutDate.replace('T', ' ').substring(0, 16) : '');
   
   const v_current = checkoutDate;
   const formsAsc = [...state.currentForms].sort((a, b) => a.checkout_date.localeCompare(b.checkout_date));

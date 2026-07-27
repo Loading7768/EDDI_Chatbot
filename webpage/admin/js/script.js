@@ -117,7 +117,7 @@ async function doLogin(force = false) {
     const res = await api('POST', '/api/login', { username, password, force });
     if (res.success) {
       closeModal('modal-session-conflict');
-      initApp({ doctor_name: res.doctor_name, is_admin: res.is_admin });
+      initApp({ doctor_name: res.doctor_name, is_admin: res.is_admin, account: res.account });
     } else if (res.conflict) {
       openModal('modal-session-conflict');
     } else {
@@ -132,6 +132,7 @@ async function executeLogout() {
   localStorage.removeItem('admin_active_section');
   await api('POST', '/api/logout');
   state.currentMrn = null;
+  if (typeof window.resetFormsWorkspace === 'function') window.resetFormsWorkspace();
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   showLogin();
@@ -144,6 +145,7 @@ async function doLogout() {
   localStorage.removeItem('admin_active_section');
   await api('POST', '/api/logout');
   state.currentMrn = null;
+  if (typeof window.resetFormsWorkspace === 'function') window.resetFormsWorkspace();
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   showLogin();

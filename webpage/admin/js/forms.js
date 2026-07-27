@@ -22,6 +22,61 @@ function setFormsState(stateName) {
   if (stateName === 'doctor') loadDoctorDrafts();
 }
 
+// ── Export globals if needed ──
+// window.someFunc = someFunc;
+
+window.resetFormsWorkspace = function() {
+  state.currentMrn = null;
+  state.formCurrentMrn = null;
+  state.currentSelectedRecord = null;
+  state.viewEditMode = false;
+  
+  // 1. Reset state to view mode
+  if (typeof setFormsState === 'function') {
+    setFormsState('view');
+  }
+
+  // 2. Clear Active Patients & Visit List
+  document.querySelectorAll('.patient-item.active, .nurse-patient-item.active, .visit-item.active').forEach(el => el.classList.remove('active'));
+  // const patientListBody = document.getElementById('form-patient-list-body');
+  // if (patientListBody) patientListBody.innerHTML = '';
+
+  const visitListBody = document.getElementById('form-visit-list-body');
+  if (visitListBody) visitListBody.innerHTML = '<div class="empty-state" style="padding:32px 0;"><div class="empty-icon">📋</div><p>請先選擇病患</p></div>';
+  
+  // 3. Reset Edit State
+  exitViewEditMode();
+  
+  // 4. Hide Detail, Show Placeholder
+  const formViewContainer = document.getElementById('form-view-container');
+  if (formViewContainer) formViewContainer.style.display = 'none';
+  
+  const formEditEmpty = document.getElementById('form-edit-empty');
+  if (formEditEmpty) formEditEmpty.style.display = 'flex';
+  
+  const editBtn = document.getElementById('btn-view-edit');
+  if (editBtn) editBtn.style.display = 'none';
+  
+  // 4. Reset Nurse / Doctor forms
+  resetNursePatientDropdown();
+  const nurseList = document.getElementById('nurse-patient-list');
+  if (nurseList) nurseList.innerHTML = '';
+
+  resetDoctorFormPanel();
+  const docList = document.getElementById('doctor-draft-list');
+  if (docList) docList.innerHTML = '';
+  
+  const docBadge = document.getElementById('doctor-draft-badge');
+  if (docBadge) docBadge.style.display = 'none';
+  const docHeaderCount = document.getElementById('doctor-draft-header-count');
+  if (docHeaderCount) docHeaderCount.textContent = '0';
+  
+  const formPatientCount = document.getElementById('form-patient-count');
+  if (formPatientCount) formPatientCount.textContent = '0';
+  const formVisitCount = document.getElementById('form-visit-count');
+  if (formVisitCount) formVisitCount.textContent = '0';
+};
+
 // ── doctor form ──
 async function loadDischargeCategories() {
   if (state.dischargeCategories) return;
@@ -165,7 +220,7 @@ function renderSymptomMainCol() {
   const categories = state.dischargeCategories || {};
   Object.keys(categories).forEach(key => {
     const subItems = categories[key];
-    const isEmpty = !Array.isArray(subItems) || subItems.length === 0;
+    const isEmpty = !subItems || typeof subItems !== 'object' || Object.keys(subItems).length === 0;
 
     const item = document.createElement('div');
     item.className = 'symptom-item' + (isEmpty ? ' disabled' : '');
@@ -203,13 +258,14 @@ function renderSymptomSubCol(categoryKey) {
   if (subHeader) subHeader.textContent = categoryKey;
   subList.innerHTML = '';
 
-  const items = state.dischargeCategories[categoryKey] || [];
-  if (!Array.isArray(items) || items.length === 0) {
+  const items = state.dischargeCategories[categoryKey] || {};
+  const symptomNames = Object.keys(items);
+  if (symptomNames.length === 0) {
     subList.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:12px;text-align:center;">（此類別無衛教項目）</div>';
     return;
   }
 
-  items.forEach(symptomName => {
+  symptomNames.forEach(symptomName => {
     const item = document.createElement('div');
     item.className = 'symptom-item';
     const isSelected = state.selectedSymptoms && state.selectedSymptoms.includes(symptomName);
@@ -1181,7 +1237,8 @@ async function selectFormVisit(idx, el) {
   const displayDoctor = document.getElementById('display-form-doctor');
   const currentDr = state.doctors.find(dr => dr.account_name === f.doctor_account);
   if (displayDoctor) {
-    displayDoctor.textContent = currentDr ? currentDr.doctor_name : (f.doctor_account || '—');
+    const drName = currentDr ? currentDr.doctor_name : (f.doctor_account || '—');
+    displayDoctor.textContent = drName !== '—' ? `${drName} 醫師` : drName;
   }
 }
 
@@ -1650,62 +1707,30 @@ async function enterViewEditMode() {
   const adminFields = document.getElementById('ve-admin-fields');
   const nonAdminInfo = document.getElementById('ve-nonadmin-info');
 
-  if (state.isAdmin) {
-    // ── Admin path: show LINE + patient pickers ──
-    if (adminFields) adminFields.style.display = 'contents';
-    if (nonAdminInfo) nonAdminInfo.style.display = 'none';
+  // ── Show LINE + patient pickers for all users ──
+  if (adminFields) adminFields.style.display = 'contents';
+  if (nonAdminInfo) nonAdminInfo.style.display = 'none';
 
-    // Reset dropdown selections
-    state.veSelectedLine = null;
-    state.veSelectedPair = null;
-    const lineBtnText = document.getElementById('ve-line-btn-text');
-    if (lineBtnText) lineBtnText.textContent = '請選擇 LINE 帳號';
-    const pGroup = document.getElementById('ve-patient-group');
-    if (pGroup) pGroup.style.display = 'none';
-    const draftFields = document.getElementById('ve-draft-fields');
-    if (draftFields) draftFields.style.display = 'none';
+  // Reset dropdown selections
+  state.veSelectedLine = null;
+  state.veSelectedPair = null;
+  const lineBtnText = document.getElementById('ve-line-btn-text');
+  if (lineBtnText) lineBtnText.textContent = '請選擇 LINE 帳號';
+  const pGroup = document.getElementById('ve-patient-group');
+  if (pGroup) pGroup.style.display = 'none';
+  const draftFields = document.getElementById('ve-draft-fields');
+  if (draftFields) draftFields.style.display = 'none';
 
-    // Load Categories & Render Symptoms
-    await loadDischargeCategories();
-    renderVEMainCol();
-    renderVESymptomChips();
+  // Load Categories & Render Symptoms
+  await loadDischargeCategories();
+  renderVEMainCol();
+  renderVESymptomChips();
 
-    // Load LINE Accounts and try to pre-select
-    await loadVELineAccounts();
-    if (f.line_account_id) {
-      const actName = f.line_name || '已選擇帳號';
-      await selectVELineAccount(f.line_account_id, actName);
-      if (f.relation) {
-        const pDdText = document.getElementById('ve-patient-btn-text');
-        if (pDdText) pDdText.textContent = f.relation;
-        // Find pair_id from relation
-        const relations = await api('GET', `/api/forms/get_existing_relations?line_account_id=${f.line_account_id}`);
-        if (Array.isArray(relations)) {
-          const found = relations.find(r => r.relation === f.relation);
-          if (found) {
-            state.veSelectedPair = { pair_id: found.pair_id, relation: found.relation, mrn: found.mrn };
-          } else if (f.relation === '帳號本人') {
-            state.veSelectedPair = { pair_id: 'self', relation: '帳號本人', mrn: state.currentSelectedRecord.mrn };
-          }
-        }
-      }
-    }
-  } else {
-    // ── Non-admin path: symptoms only ──
-    if (adminFields) adminFields.style.display = 'none';
-    if (nonAdminInfo) {
-      nonAdminInfo.style.display = 'flex';
-      const dr = state.doctors.find(d => d.account_name === f.doctor_account);
-      document.getElementById('ve-nonadmin-date').textContent = f.checkout_date ? f.checkout_date.replace('T', ' ').substring(0, 19) : '無紀錄';
-      document.getElementById('ve-nonadmin-doctor').textContent = dr ? dr.doctor_name : (f.doctor_account || '—');
-      document.getElementById('ve-nonadmin-relation').textContent = f.relation || '—';
-      document.getElementById('ve-nonadmin-mrn').textContent = mrn || '—';
-    }
-
-    // Load Categories & Render Symptoms (pre-filled)
-    await loadDischargeCategories();
-    renderVEMainCol();
-    renderVESymptomChips();
+  // Load LINE Accounts and try to pre-select
+  await loadVELineAccounts();
+  if (f.line_account_id) {
+    const actName = f.line_name || '已選擇帳號';
+    await selectVELineAccount(f.line_account_id, actName, f.relation);
   }
 
   validateViewEdit();
@@ -1809,7 +1834,7 @@ function buildVELineItem(account) {
   return item;
 }
 
-function selectVELineAccount(id, name) {
+function selectVELineAccount(id, name, preselectRelation = null) {
   const dd = document.getElementById('ve-line-dd');
   if (dd) dd.classList.remove('open');
   const btnText = document.getElementById('ve-line-btn-text');
@@ -1820,7 +1845,7 @@ function selectVELineAccount(id, name) {
     el.classList.toggle('selected', el.dataset.accountId === String(id));
   });
 
-  onVELineChange(id);
+  return onVELineChange(id, preselectRelation);
 }
 
 // ── VE Patient Dropdown ──
@@ -1847,7 +1872,7 @@ function resetVEPatientDropdown() {
   validateViewEdit();
 }
 
-async function onVELineChange(lineAccountId) {
+async function onVELineChange(lineAccountId, preselectRelation = null) {
   resetVEPatientDropdown();
   const pGroup = document.getElementById('ve-patient-group');
   if (pGroup) pGroup.style.display = 'flex';
@@ -1866,7 +1891,7 @@ async function onVELineChange(lineAccountId) {
 
     const hasSelf = Array.isArray(relations) && relations.some(r => r.relation === '帳號本人');
     if (!hasSelf) {
-      firstItem = { pair_id: 'self', relation: '帳號本人', mrn: '???' };
+      firstItem = { pair_id: 'self', relation: '帳號本人', mrn: state.currentSelectedRecord?.mrn || '???' };
       list.appendChild(buildVEPatientItem(firstItem));
     }
 
@@ -1886,10 +1911,27 @@ async function onVELineChange(lineAccountId) {
     newItem.onclick = () => selectVEPatient('new');
     list.appendChild(newItem);
 
-    if (firstItem) {
-      selectVEPatient(firstItem.pair_id, firstItem.relation, firstItem.mrn);
+    if (preselectRelation) {
+      let target = null;
+      if (firstItem && firstItem.relation === preselectRelation) {
+        target = firstItem;
+      } else if (Array.isArray(relations)) {
+        target = relations.find(r => r.relation === preselectRelation);
+      }
+      if (target) {
+        selectVEPatient(target.pair_id, target.relation, target.mrn);
+      } else if (preselectRelation === '帳號本人') {
+        selectVEPatient('self', '帳號本人', state.currentSelectedRecord?.mrn || '???');
+      } else {
+        if (firstItem) selectVEPatient(firstItem.pair_id, firstItem.relation, firstItem.mrn);
+        else selectVEPatient('new');
+      }
     } else {
-      selectVEPatient('new');
+      if (firstItem) {
+        selectVEPatient(firstItem.pair_id, firstItem.relation, firstItem.mrn);
+      } else {
+        selectVEPatient('new');
+      }
     }
   } catch (e) {
     console.error('onVELineChange error', e);
@@ -1974,7 +2016,7 @@ function renderVEMainCol() {
   const categories = state.dischargeCategories || {};
   Object.keys(categories).forEach(key => {
     const subItems = categories[key];
-    const isEmpty = !Array.isArray(subItems) || subItems.length === 0;
+    const isEmpty = !subItems || typeof subItems !== 'object' || Object.keys(subItems).length === 0;
 
     const item = document.createElement('div');
     item.className = 'symptom-item' + (isEmpty ? ' disabled' : '');
@@ -2010,8 +2052,9 @@ function renderVESymptomSubCol(categoryKey) {
   if (subHeader) subHeader.textContent = categoryKey;
   subList.innerHTML = '';
 
-  const items = state.dischargeCategories[categoryKey] || [];
-  items.forEach(symptomName => {
+  const items = state.dischargeCategories[categoryKey] || {};
+  const symptomNames = Object.keys(items);
+  symptomNames.forEach(symptomName => {
     const item = document.createElement('div');
     item.className = 'symptom-item';
     const isSelected = state.veSelectedSymptoms && state.veSelectedSymptoms.includes(symptomName);
@@ -2085,14 +2128,6 @@ function validateViewEdit() {
     symptomsChanged = currentSymptoms.some(s => !origSymptoms.includes(s));
   }
 
-  if (!state.isAdmin) {
-    // Non-admin: valid if >= 1 symptom AND symptoms changed
-    const hasSymptoms = currentSymptoms.length > 0;
-    confirmBtn.disabled = !(hasSymptoms && symptomsChanged);
-    return;
-  }
-
-  // Admin: full validation
   if (!state.veSelectedLine || !state.veSelectedPair) {
     confirmBtn.disabled = true;
     return;
@@ -2117,7 +2152,7 @@ function validateViewEdit() {
     valid = false;
   }
 
-  // 2. Check if admin info changed
+  // 2. Check if info changed
   const origLineId = f.line_account_id || '';
   const origRelation = f.relation || '帳號本人';
   const origMrn = mrn || '';
@@ -2135,47 +2170,35 @@ function validateViewEdit() {
 
 function openConfirmEditModal() {
   if (!state.currentSelectedRecord) return;
-  if (state.isAdmin && (!state.veSelectedLine || !state.veSelectedPair)) return;
+  if (!state.veSelectedLine || !state.veSelectedPair) return;
 
   const diffEl = document.getElementById('ve-confirm-diff');
   if (!diffEl) return;
 
   const newSymptoms = state.veSelectedSymptoms || [];
 
-  if (state.isAdmin) {
-    const lineName = state.veSelectedLine.name;
-    let newRel = state.veSelectedPair.relation;
-    let newMrn = state.veSelectedPair.mrn;
+  const lineName = state.veSelectedLine.name;
+  let newRel = state.veSelectedPair.relation;
+  let newMrn = state.veSelectedPair.mrn;
 
-    if (state.veSelectedPair.pair_id === 'self') {
-      newRel = '帳號本人';
-      newMrn = document.getElementById('ve-self-mrn').value.trim();
-    } else if (state.veSelectedPair.pair_id === 'new') {
-      newRel = document.getElementById('ve-new-relation').value.trim();
-      newMrn = document.getElementById('ve-new-mrn').value.trim();
-    }
-
-    diffEl.innerHTML = `
-      <div class="modal-alert-banner primary" style="display:flex; flex-direction:column; gap:6px; text-align:left;">
-        <div><b>LINE 帳號：</b> ${esc(lineName)}</div>
-        <div><b>關係 / 病歷號：</b> ${esc(newRel)} (${esc(newMrn)})</div>
-        <div style="margin-top:4px;"><b>衛教項目 (${newSymptoms.length} 項)：</b></div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
-          ${newSymptoms.map(s => `<span class="symptom-chip readonly">📌 ${esc(s)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-  } else {
-    // Non-admin: just show the symptom list
-    diffEl.innerHTML = `
-      <div class="modal-alert-banner primary" style="display:flex; flex-direction:column; gap:6px; text-align:left;">
-        <div><b>衛教項目 (${newSymptoms.length} 項)：</b></div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
-          ${newSymptoms.map(s => `<span class="symptom-chip readonly">📌 ${esc(s)}</span>`).join('')}
-        </div>
-      </div>
-    `;
+  if (state.veSelectedPair.pair_id === 'self') {
+    newRel = '帳號本人';
+    newMrn = document.getElementById('ve-self-mrn').value.trim();
+  } else if (state.veSelectedPair.pair_id === 'new') {
+    newRel = document.getElementById('ve-new-relation').value.trim();
+    newMrn = document.getElementById('ve-new-mrn').value.trim();
   }
+
+  diffEl.innerHTML = `
+    <div class="modal-alert-banner primary" style="display:flex; flex-direction:column; gap:6px; text-align:left;">
+      <div><b>LINE 帳號：</b> ${esc(lineName)}</div>
+      <div><b>關係 / 病歷號：</b> ${esc(newRel)} (${esc(newMrn)})</div>
+      <div style="margin-top:4px;"><b>衛教項目 (${newSymptoms.length} 項)：</b></div>
+      <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+        ${newSymptoms.map(s => `<span class="symptom-chip readonly">📌 ${esc(s)}</span>`).join('')}
+      </div>
+    </div>
+  `;
 
   openModal('modal-confirm-edit');
 }
@@ -2189,37 +2212,27 @@ async function submitViewEdit() {
 
   const { f, mrn } = state.currentSelectedRecord;
 
-  let payload;
-  if (state.isAdmin) {
-    const pairId = state.veSelectedPair.pair_id;
-    let relation = state.veSelectedPair.relation;
-    let newMrn = state.veSelectedPair.mrn;
+  const pairId = state.veSelectedPair.pair_id;
+  let relation = state.veSelectedPair.relation;
+  let newMrn = state.veSelectedPair.mrn;
 
-    if (pairId === 'self') {
-      relation = '帳號本人';
-      newMrn = document.getElementById('ve-self-mrn').value.trim();
-    } else if (pairId === 'new') {
-      relation = document.getElementById('ve-new-relation').value.trim();
-      newMrn = document.getElementById('ve-new-mrn').value.trim();
-    }
-
-    payload = {
-      mrn,
-      checkout_date: f.checkout_date,
-      line_account_id: state.veSelectedLine.id,
-      pair_id: pairId,
-      relation,
-      new_mrn: newMrn,
-      symptoms: state.veSelectedSymptoms || []
-    };
-  } else {
-    // Non-admin: only update symptoms
-    payload = {
-      mrn,
-      checkout_date: f.checkout_date,
-      symptoms: state.veSelectedSymptoms || []
-    };
+  if (pairId === 'self') {
+    relation = '帳號本人';
+    newMrn = document.getElementById('ve-self-mrn').value.trim();
+  } else if (pairId === 'new') {
+    relation = document.getElementById('ve-new-relation').value.trim();
+    newMrn = document.getElementById('ve-new-mrn').value.trim();
   }
+
+  const payload = {
+    mrn,
+    checkout_date: f.checkout_date,
+    line_account_id: state.veSelectedLine.id,
+    pair_id: pairId,
+    relation,
+    new_mrn: newMrn,
+    symptoms: state.veSelectedSymptoms || []
+  };
 
   try {
     const res = await api('PUT', '/api/forms/view_edit', payload);
@@ -2230,7 +2243,7 @@ async function submitViewEdit() {
       loadFormsPatientList();
       
       let targetMrn = mrn;
-      if (state.isAdmin && state.veSelectedPair) {
+      if (state.veSelectedPair) {
         if (state.veSelectedPair.pair_id === 'self') targetMrn = document.getElementById('ve-self-mrn').value.trim();
         else if (state.veSelectedPair.pair_id === 'new') targetMrn = document.getElementById('ve-new-mrn').value.trim();
         else targetMrn = state.veSelectedPair.mrn;

@@ -429,6 +429,7 @@ def login():
         'success':     True,
         'doctor_name': row['doctor_name'],
         'is_admin':    bool(row['is_admin']),
+        'account':     row['account_name']
     })
 
 
@@ -1198,32 +1199,7 @@ def view_edit_form():
     try:
         conn.execute('PRAGMA foreign_keys = ON')
 
-        if not is_admin:
-            # ── Non-admin: symptoms-only update, must own the record ──
-            row = conn.execute('''
-                SELECT r.record_id
-                FROM record r
-                JOIN line_patient_pairs lpp ON r.line_patient_pairs_id = lpp.line_patient_pairs_id
-                JOIN patients p ON lpp.patient_id = p.patient_id
-                JOIN doctors d ON r.doctor_id = d.doctor_id
-                WHERE p.medical_record_number = ? AND r.checkout_date = ? AND d.account_name = ?
-                LIMIT 1
-            ''', (mrn, checkout_date, account)).fetchone()
-
-            if not row:
-                conn.close()
-                return jsonify({'error': '找不到此表單紀錄或您無修改權限'}), 404
-
-            symptoms_json = json.dumps(symptoms, ensure_ascii=False)
-            conn.execute(
-                'UPDATE record SET symptoms = ? WHERE record_id = ?',
-                (symptoms_json, row['record_id'])
-            )
-            conn.commit()
-            conn.close()
-            return jsonify({'success': True})
-
-        # ── Admin: full update (LINE + patient + symptoms) ──
+        # ── Full update (LINE + patient + symptoms) for all users ──
         line_account_id = data.get('line_account_id')
         pair_id = data.get('pair_id')
         relation = (data.get('relation') or '').strip()
@@ -1332,7 +1308,7 @@ def generate_random_password(length=8) -> str:
 
 
 @admin_bp.route('/api/doctors', methods=['GET'])
-@admin_required
+@login_required
 def list_doctors():
     try:
         conn = get_db()

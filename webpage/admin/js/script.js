@@ -127,6 +127,22 @@ async function doLogin(force = false) {
   finally  { btn.innerHTML = '登入'; btn.disabled = false; }
 }
 
+function togglePasswordVisibility() {
+  const passInput = document.getElementById('login-pass');
+  const toggleBtn = document.getElementById('toggle-pass-btn');
+  if (passInput.type === 'password') {
+    passInput.type = 'text';
+    toggleBtn.textContent = '👁️';
+    toggleBtn.setAttribute('aria-label', '隱藏密碼');
+    toggleBtn.setAttribute('title', '隱藏密碼');
+  } else {
+    passInput.type = 'password';
+    toggleBtn.textContent = '🙈';
+    toggleBtn.setAttribute('aria-label', '顯示密碼');
+    toggleBtn.setAttribute('title', '顯示密碼');
+  }
+}
+
 async function executeLogout() {
   closeModal('modal-confirm-logout');
   localStorage.removeItem('admin_active_section');

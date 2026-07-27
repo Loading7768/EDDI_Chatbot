@@ -18,11 +18,16 @@
     </div>
     <div class="form-group">
       <label>帳號</label>
-      <input type="text" id="login-user" placeholder="account_name" autocomplete="username">
+      <input type="text" id="login-user" placeholder="輸入醫師帳號" autocomplete="username">
     </div>
     <div class="form-group">
       <label>密碼</label>
-      <input type="password" id="login-pass" placeholder="password" autocomplete="current-password">
+      <div class="password-wrapper">
+        <input type="password" id="login-pass" placeholder="輸入醫師密碼" autocomplete="current-password" style="padding-right: 40px;">
+        <button type="button" class="btn-toggle-password" id="toggle-pass-btn" onclick="togglePasswordVisibility()" aria-label="顯示密碼" title="顯示密碼">
+          🙈
+        </button>
+      </div>
     </div>
     <button class="btn btn-primary" id="login-btn" onclick="doLogin()">登入</button>
     <p class="error-msg" id="login-error"></p>

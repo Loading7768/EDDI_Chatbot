@@ -7,6 +7,7 @@ import re
 import glob
 from datetime import datetime
 from functools import wraps
+from bot import get_pinned, remove_from_pinned
 
 admin_bp = Blueprint('admin_bp', __name__)
 
@@ -685,33 +686,18 @@ def get_chat_detail(mrn: str):
 @admin_bp.route('/api/forms/get_line_accounts', methods=['GET'])
 @login_required
 def get_line_accounts():
-    account = session['account']
     conn = get_db()
     try:
-        doctor_row = conn.execute(
-            'SELECT doctor_id FROM doctors WHERE account_name = ? LIMIT 1', (account,)
-        ).fetchone()
-        doctor_id = doctor_row['doctor_id'] if doctor_row else 0
-
-        # Read recent line accounts cache if exists
-        recent_ids = []
-        if doctor_id:
-            cache_path = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}', '.recent_line_accounts.json')
-            if os.path.exists(cache_path):
-                try:
-                    with open(cache_path, 'r', encoding='utf-8') as f:
-                        recent_ids = json.load(f)
-                except Exception:
-                    recent_ids = []
-
         rows = conn.execute(
             'SELECT line_account_id, name FROM line_accounts ORDER BY name'
         ).fetchall()
         accounts = [{'id': r['line_account_id'], 'name': r['name']} for r in rows]
+        pinned_ids = get_pinned()
 
         return jsonify({
             'accounts': accounts,
-            'recent_ids': recent_ids if isinstance(recent_ids, list) else []
+            'pinned': pinned_ids,
+            'pinned_ids': pinned_ids
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -736,7 +722,7 @@ def get_doctor_drafts():
         drafts = []
         if os.path.exists(draft_dir):
             for filename in sorted(os.listdir(draft_dir), reverse=True):
-                if not filename.endswith('.json') or filename in ('.recent_line_accounts.json', 'placeholder.json'):
+                if not filename.endswith('.json') or filename in ('placeholder.json',):
                     continue
                 name_part = filename[:-5]
                 parts = name_part.split('_')
@@ -1014,25 +1000,11 @@ def nurse_create():
             conn.rollback()
             return jsonify({'error': f'草稿檔案儲存失敗：{file_err}'}), 500
 
-        # Update recent line accounts stack (max=4, no duplicates) in drafts/D{doctor_id:07d}/.recent_line_accounts.json
+        # Remove line_account_id from pinned queue if present
         try:
-            cache_path = os.path.join(draft_dir, '.recent_line_accounts.json')
-            recent_ids = []
-            if os.path.exists(cache_path):
-                try:
-                    with open(cache_path, 'r', encoding='utf-8') as f:
-                        recent_ids = json.load(f)
-                    if not isinstance(recent_ids, list):
-                        recent_ids = []
-                except Exception:
-                    recent_ids = []
-            # Push line_account_id to top, remove dupes, max 4
-            recent_ids = [line_account_id] + [x for x in recent_ids if x != line_account_id]
-            recent_ids = recent_ids[:4]
-            with open(cache_path, 'w', encoding='utf-8') as f:
-                json.dump(recent_ids, f, ensure_ascii=False, indent=2)
-        except Exception as cache_err:
-            print(f"[Recent LINE Accounts Cache Error] {cache_err}")
+            remove_from_pinned(int(line_account_id))
+        except Exception as pe:
+            print(f"[Pinned Remove Error] {pe}")
 
         conn.commit()
         return jsonify({'success': True, 'lpp_id': lpp_id, 'draft_path': draft_path})

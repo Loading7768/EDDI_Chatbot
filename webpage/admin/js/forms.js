@@ -423,7 +423,7 @@ async function loadNurseLineAccounts() {
   try {
     const res = await api('GET', '/api/forms/get_line_accounts');
     state.nurseLineAccounts = (res && Array.isArray(res.accounts)) ? res.accounts : (Array.isArray(res) ? res : []);
-    state.nurseRecentLineIds = (res && Array.isArray(res.recent_ids)) ? res.recent_ids : [];
+    state.nursePinnedLineIds = (res && Array.isArray(res.pinned)) ? res.pinned : (res && Array.isArray(res.pinned_ids) ? res.pinned_ids : []);
     filterNurseLineAccounts('');
   } catch (e) {
     console.error('loadNurseLineAccounts error', e);
@@ -468,17 +468,17 @@ function filterNurseLineAccounts(query) {
   } else {
     if (subEl) subEl.style.display = 'none';
 
-    // Show recent group if exists
-    const recentIds = state.nurseRecentLineIds || [];
-    const recentAccounts = recentIds.map(id => all.find(a => a.id === id)).filter(Boolean);
+    // Show pinned group if exists
+    const pinnedIds = state.nursePinnedLineIds || [];
+    const pinnedAccounts = pinnedIds.map(id => all.find(a => a.id === id)).filter(Boolean);
 
-    if (recentAccounts.length > 0) {
-      const rHeader = document.createElement('div');
-      rHeader.className = 'nurse-dd-header';
-      rHeader.textContent = '最近選擇';
-      container.appendChild(rHeader);
+    if (pinnedAccounts.length > 0) {
+      const pHeader = document.createElement('div');
+      pHeader.className = 'nurse-dd-header';
+      pHeader.textContent = '置頂';
+      container.appendChild(pHeader);
 
-      recentAccounts.forEach(a => container.appendChild(buildNurseLineItem(a)));
+      pinnedAccounts.forEach(a => container.appendChild(buildNurseLineItem(a)));
 
       const aHeader = document.createElement('div');
       aHeader.className = 'nurse-dd-header';
@@ -1674,7 +1674,7 @@ if (editMrnInputEl) {
 
 // ── View Form Edit Mode ──
 state.veLineAccounts = [];
-state.veRecentLineIds = [];
+state.vePinnedLineIds = [];
 state.veSelectedLine = null;     // { id, name }
 state.veSelectedPair = null;     // { pair_id, relation, mrn }
 state.veSelectedSymptoms = [];
@@ -1765,7 +1765,7 @@ async function loadVELineAccounts() {
   try {
     const res = await api('GET', '/api/forms/get_line_accounts');
     state.veLineAccounts = (res && Array.isArray(res.accounts)) ? res.accounts : [];
-    state.veRecentLineIds = (res && Array.isArray(res.recent_ids)) ? res.recent_ids : [];
+    state.vePinnedLineIds = (res && Array.isArray(res.pinned)) ? res.pinned : (res && Array.isArray(res.pinned_ids) ? res.pinned_ids : []);
     filterVELineAccounts('');
   } catch (e) {
     console.error('loadVELineAccounts error', e);
@@ -1806,15 +1806,15 @@ function filterVELineAccounts(query) {
     filtered.forEach(a => container.appendChild(buildVELineItem(a)));
   } else {
     if (subEl) subEl.style.display = 'none';
-    const recentIds = state.veRecentLineIds || [];
-    const recentAccounts = recentIds.map(id => all.find(a => a.id === id)).filter(Boolean);
+    const pinnedIds = state.vePinnedLineIds || [];
+    const pinnedAccounts = pinnedIds.map(id => all.find(a => a.id === id)).filter(Boolean);
 
-    if (recentAccounts.length > 0) {
-      const rHeader = document.createElement('div');
-      rHeader.className = 'nurse-dd-header';
-      rHeader.textContent = '最近選擇';
-      container.appendChild(rHeader);
-      recentAccounts.forEach(a => container.appendChild(buildVELineItem(a)));
+    if (pinnedAccounts.length > 0) {
+      const pHeader = document.createElement('div');
+      pHeader.className = 'nurse-dd-header';
+      pHeader.textContent = '置頂';
+      container.appendChild(pHeader);
+      pinnedAccounts.forEach(a => container.appendChild(buildVELineItem(a)));
 
       const aHeader = document.createElement('div');
       aHeader.className = 'nurse-dd-header';

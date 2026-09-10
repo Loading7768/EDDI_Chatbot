@@ -99,29 +99,69 @@ import chat_logs
 configuration = None
 
 # ── Pinned LINE Accounts (Reverse Queue, MAX_PINNED = 10) ────────────────────
+PINNED_FILE = os.path.join(BASE_DIR, 'data', 'pinned_line_accounts.json')
 MAX_PINNED = 10
 pinned = []
 pinned_lock = threading.Lock()
+
+def _load_pinned_from_file() -> list:
+    """從 JSON 檔案載入 pinned 清單"""
+    if os.path.exists(PINNED_FILE):
+        try:
+            with open(PINNED_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return [int(x) for x in data if isinstance(x, (int, str)) and str(x).isdigit()]
+        except Exception as e:
+            print(f"[Pinned Load Error] {e}")
+    return []
+
+def _save_pinned_to_file(pinned_list: list):
+    """將 pinned 清單寫入 JSON 檔案"""
+    try:
+        os.makedirs(os.path.dirname(PINNED_FILE), exist_ok=True)
+        temp_file = f"{PINNED_FILE}.tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(pinned_list, f, ensure_ascii=False, indent=2)
+        os.replace(temp_file, PINNED_FILE)
+    except Exception as e:
+        print(f"[Pinned Save Error] {e}")
 
 def add_to_pinned(line_account_id: int):
     """將 line_account_id 加入置頂隊列 (反向隊列，最新在最前，上限 10)。若已在置頂中則不變動。"""
     global pinned
     with pinned_lock:
-        if line_account_id not in pinned:
-            pinned.insert(0, line_account_id)
-            if len(pinned) > MAX_PINNED:
-                pinned.pop()
+        current_pinned = _load_pinned_from_file()
+        try:
+            acc_id = int(line_account_id)
+        except (ValueError, TypeError):
+            return
+        if acc_id not in current_pinned:
+            current_pinned.insert(0, acc_id)
+            if len(current_pinned) > MAX_PINNED:
+                current_pinned = current_pinned[:MAX_PINNED]
+            _save_pinned_to_file(current_pinned)
+        pinned = current_pinned
 
 def remove_from_pinned(line_account_id: int):
     """若 line_account_id 在置頂清單中，則將其移除。"""
     global pinned
     with pinned_lock:
-        if line_account_id in pinned:
-            pinned.remove(line_account_id)
+        current_pinned = _load_pinned_from_file()
+        try:
+            acc_id = int(line_account_id)
+        except (ValueError, TypeError):
+            return
+        if acc_id in current_pinned:
+            current_pinned.remove(acc_id)
+            _save_pinned_to_file(current_pinned)
+        pinned = current_pinned
 
 def get_pinned() -> list:
     """取得當前置頂清單副本。"""
+    global pinned
     with pinned_lock:
+        pinned = _load_pinned_from_file()
         return list(pinned)
 
 # ── 1. 狀態管理 (Session State Management) ───────────────────────────────────────

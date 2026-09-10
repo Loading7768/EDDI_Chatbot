@@ -441,6 +441,14 @@ function toggleNurseLineDropdown() {
     if (isOpen) {
       const searchInput = document.getElementById('nurse-line-search');
       if (searchInput) searchInput.focus();
+      // Silently refresh accounts so latest pinned items appear immediately
+      api('GET', '/api/forms/get_line_accounts').then(res => {
+        if (res && Array.isArray(res.accounts)) {
+          state.nurseLineAccounts = res.accounts;
+          state.nursePinnedLineIds = Array.isArray(res.pinned) ? res.pinned : (Array.isArray(res.pinned_ids) ? res.pinned_ids : []);
+          filterNurseLineAccounts(searchInput ? searchInput.value : '');
+        }
+      }).catch(() => {});
     }
   }
 }
@@ -470,7 +478,7 @@ function filterNurseLineAccounts(query) {
 
     // Show pinned group if exists
     const pinnedIds = state.nursePinnedLineIds || [];
-    const pinnedAccounts = pinnedIds.map(id => all.find(a => a.id === id)).filter(Boolean);
+    const pinnedAccounts = pinnedIds.map(id => all.find(a => Number(a.id) === Number(id))).filter(Boolean);
 
     if (pinnedAccounts.length > 0) {
       const pHeader = document.createElement('div');
@@ -1781,6 +1789,14 @@ function toggleVELineDropdown() {
     if (isOpen) {
       const searchInput = document.getElementById('ve-line-search');
       if (searchInput) searchInput.focus();
+      // Silently refresh accounts so latest pinned items appear immediately
+      api('GET', '/api/forms/get_line_accounts').then(res => {
+        if (res && Array.isArray(res.accounts)) {
+          state.veLineAccounts = res.accounts;
+          state.vePinnedLineIds = Array.isArray(res.pinned) ? res.pinned : (Array.isArray(res.pinned_ids) ? res.pinned_ids : []);
+          filterVELineAccounts(searchInput ? searchInput.value : '');
+        }
+      }).catch(() => {});
     }
   }
 }
@@ -1807,7 +1823,7 @@ function filterVELineAccounts(query) {
   } else {
     if (subEl) subEl.style.display = 'none';
     const pinnedIds = state.vePinnedLineIds || [];
-    const pinnedAccounts = pinnedIds.map(id => all.find(a => a.id === id)).filter(Boolean);
+    const pinnedAccounts = pinnedIds.map(id => all.find(a => Number(a.id) === Number(id))).filter(Boolean);
 
     if (pinnedAccounts.length > 0) {
       const pHeader = document.createElement('div');

@@ -1,3 +1,16 @@
+<!--
+    parts/review.html — 步驟 3「最終確認送出」卡片內容
+
+    對應 state.js 中 key === 'review' 的步驟，也是整個表單流程的最後一步。
+    本片段沒有「已完成收合摘要」的 <template x-if="step.completed ..."> 區塊——
+    因為送出成功後會直接導頁離開（見 app.js 的 submitForm()），
+    不會有機會停留在「review 已完成但畫面上還顯示別的步驟」的狀態。
+
+    畫面本身只有醒目的提醒文字（提交後必須至後台修改）與一顆「確認送出」按鈕，
+    實際要送出的資料（病歷號、關係）皆從 pair 步驟（steps[1].selectedRelation）
+    讀取，本片段不需要額外的輸入欄位。
+-->
+
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
     <div class="flex flex-col h-full">
@@ -9,18 +22,25 @@
         <div class="px-4 pb-2">
 
             <!-- Disclaimer -->
+            <!-- 強調一旦送出即無法在此表單前端修改，僅能透過後台管理介面調整，提醒醫師確認無誤才送出 -->
             <div class="flex flex-col items-center my-12 text-red-400">
                 <span class="animate-pulse material-symbols-rounded text-6xl mb-2">info</span>
                 <p class="font-medium">提交後必須至後台修改</p>
             </div>
 
             <!-- Date row -->
+            <!--
+                以下日期顯示區塊目前被整段註解停用（保留在原始碼中，
+                未實際渲染），是開發過程中曾嘗試加入的「顯示今天日期」功能，
+                本次僅新增說明性註解，不啟用或刪除這段既有的註解程式碼。
+            -->
             <!-- <div class="flex justify-center items-center gap-3 text-xl text-slate-400 font-medium my-4">
                 <span class="material-symbols-rounded text-blue-400">calendar_today</span>
                 <p x-text="new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')"></p>
             </div> -->
 
             <!-- Error msg -->
+            <!-- submitForm() 若送出失敗（例如後端驗證錯誤），錯誤訊息會顯示於此 -->
             <div x-show="step.error" x-transition
                 class="mt-3 flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-600">
                 <span class="material-symbols-rounded text-[18px] shrink-0">error</span>

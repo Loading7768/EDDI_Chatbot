@@ -1,8 +1,32 @@
+/* ============================================================================
+   style.css — webpage/form 共用樣式表
+
+   由 form.html 以 <link rel="stylesheet" href="form/css/style.css"> 引入，
+   為整份表單（跨越所有 parts/*.html 步驟）提供 Tailwind 無法直接表達的
+   自訂動畫與人體構造圖互動介面樣式。intro.html / complete.html 兩個獨立的
+   靜態頁面則各自在自己的 <style> 區塊內定義動畫，不依賴本檔案。
+
+   內容分為兩大區塊：
+     1. 按鈕動畫（.ease-spring / .animate-spring）
+        — 供 parts/macros.html 的 footer_button 巨集使用
+     2. 人體部位症狀選擇介面（步驟 2 symptoms，parts/symptoms.html 專用）
+        — 熱點、彈出選單（popover）、已選症狀 chip 標籤等樣式
+   ============================================================================ */
+
 /* ========== Button Animation ========== */
+
+/* 自訂緩動曲線：帶有輕微回彈感的「彈簧」曲線，供各種 transition-timing-function
+   使用，是整份表單「micro-interaction」風格的核心緩動曲線。
+   flip.js 的 flipAnimate() 預設緩動值即直接寫死同一組 cubic-bezier 參數，
+   確保 CSS 過渡效果與 JS 驅動的 FLIP 動畫在視覺節奏上一致。 */
 .ease-spring {
     transition-timing-function: cubic-bezier(0.34,1.56,0.64,1) !important;
 }
 
+/* 按鈕 loading 狀態的圖示動畫：模擬指針分三段（每段 120°）轉動，
+   每段先超轉 15°再回彈定位、短暫停頓，如此循環三次剛好轉滿一圈，
+   比單純線性旋轉更有「機械感」的節奏變化。用於 footer_button 巨集中
+   currentStatus === STATUS.LOADING 時顯示的 data_usage 圖示。 */
 @keyframes spin-quarter-bounce {
     /* --- STEP 1 (0° to 120°) --- */
     0% { transform: rotate(0deg); }
@@ -24,11 +48,15 @@
 
 
 /* Card 3 human body / organ interface styles */
+/* 註：註解中所稱的「Card 3」是指開發過程中的卡片編號慣稱，
+   對應目前程式碼中的步驟索引 2（symptoms，人體部位症狀選擇）。 */
 .image-section {
     margin-top: 15px;
     text-align: center;
 }
 
+/* 人體圖與右側按鈕欄的最外層容器，也是 parts/symptoms.html 中
+   popover 絕對定位計算時的座標參考基準（id="image-wrapper"）。 */
 .image-wrapper {
     position: relative;
     display: block;
@@ -49,6 +77,7 @@
     border-radius: 8px;
 }
 
+/* 左欄（人體圖）與右欄（皮膚/精神/其他按鈕）並排的 flex 容器 */
 .interactive-layout {
     display: flex;
     justify-content: space-between;
@@ -67,6 +96,9 @@
     position: relative;
 }
 
+/* popover-column：目前 HTML 中未見對應的 class 使用（popover 定位改由
+   JS 直接以 inline style 計算 top/left，見 app.js 的 showPopover()），
+   此規則保留為既有程式碼，未被實際套用，本次不予刪除或修改。 */
 .popover-column {
     position: absolute;
     top: 0;
@@ -85,6 +117,8 @@
     position: relative;
 }
 
+/* 基礎熱點樣式：套用在人體圖上的圓形熱點，以及右欄的長條按鈕
+   （長條按鈕額外疊加 .bottom-btn 覆寫形狀）。 */
 .hotspot {
     position: absolute;
     border: 2px solid #10b981;
@@ -97,6 +131,7 @@
     z-index: 5;
 }
 
+/* 滑鼠移入或目前展開中（.active，對應 activeRegion 相符的部位）時的強調樣式 */
 .hotspot:hover,
 .hotspot.active {
     background-color: rgba(16, 185, 129, 0.4);
@@ -105,6 +140,8 @@
     z-index: 10;
 }
 
+/* 停用樣式：對應 topicMapping 中該部位無可選症狀的情況（見 symptoms.html
+   的 :class 綁定），改為灰色（slate-600）並停用互動視覺回饋。 */
 .hotspot.disabled {
     border-color: #475569 !important;
     /* slate-600 */
@@ -120,6 +157,7 @@
     background-color: rgba(71, 85, 105, 0.1) !important;
 }
 
+/* 右欄三顆長條按鈕（皮膚/精神/其他）共用的基礎形狀，覆寫 .hotspot 的圓形樣式 */
 .bottom-btn {
     position: absolute !important;
     width: 100% !important;
@@ -140,6 +178,8 @@
     transition: background-color 0.2s, color 0.2s, transform 0.2s;
 }
 
+/* 停用狀態下 hover 時仍要維持垂直居中的 translateY(-50%)，避免因
+   .hotspot:hover 的 scale 效果被覆寫後版面跳動 */
 .bottom-btn.disabled:hover {
     transform: translateY(-50%) !important;
     background-color: rgba(71, 85, 105, 0.1) !important;
@@ -147,6 +187,7 @@
     border-color: #475569 !important;
 }
 
+/* 三顆長條按鈕依序固定在右欄的 25% / 50% / 75% 垂直位置 */
 .btn-skin {
     top: 25% !important;
     left: 0 !important;
@@ -165,6 +206,8 @@
     transform: translateY(-50%) !important;
 }
 
+/* 三顆按鈕的 hover / active 共用樣式：填滿實心背景並放大，
+   與人體圖熱點的強調效果風格一致，但保留 translateY(-50%) 以維持垂直定位 */
 .btn-skin:hover,
 .btn-skin.active,
 .btn-mental:hover,
@@ -178,6 +221,8 @@
     transform: translateY(-50%) scale(1.05) !important;
 }
 
+/* 彈出的症狀選單本體容器。實際 top/left 由 JS 以 inline style 動態賦值
+   （見 app.js showPopover()），此處只定義固定寬度與其他非位置樣式。 */
 #popover {
     position: absolute;
     left: 0;
@@ -200,6 +245,11 @@
     overflow: hidden;
 }
 
+/* 註：以下 #popover h4 相關規則對應的是舊版（純 HTML/CSS，非 Alpine 版本）
+   選單標頭結構，目前 parts/symptoms.html 中的標頭實際上是用
+   <div class="flex justify-between ..."> 搭配 <span>/<button> 實作，
+   並未使用 <h4> 標籤，因此這兩條規則在目前版面中不會被觸發，
+   屬於既有程式碼保留，本次不予刪除。 */
 #popover h4 {
     margin: 0;
     padding: 14px 16px 10px 16px;
@@ -237,6 +287,10 @@
     gap: 8px;
 }
 
+/* popover 的方向指示箭頭（偽元素小方塊旋轉 45 度形成三角形尖角），
+   具體 left/right 與旋轉角度由 .arrow-left / .arrow-right 兩個修飾類別決定，
+   對應 JS 依熱點在畫面左右側計算出的 step.popoverArrowClass。
+   --arrow-top 是由 JS 動態設定的 CSS 變數，決定箭頭垂直位置與熱點對齊。 */
 #popover::before {
     content: '';
     position: absolute;
@@ -248,18 +302,22 @@
     border-top: 1.5px solid #10b981;
 }
 
+/* 箭頭朝左（popover 位於熱點右側時使用） */
 #popover.arrow-left::before {
     left: -7px;
     top: calc(var(--arrow-top, 18px) - 8.5px);
     transform: rotate(-45deg);
 }
 
+/* 箭頭朝右（popover 位於熱點左側時使用） */
 #popover.arrow-right::before {
     right: -7px;
     top: calc(var(--arrow-top, 18px) - 8.5px);
     transform: rotate(135deg);
 }
 
+/* 尚未展開任何 popover、且該部位有可選症狀時的持續發光提示動畫，
+   用來引導使用者注意「這裡可以點擊」（見 symptoms.html 的 pulse-glow class 綁定條件）。 */
 @keyframes custom-glow {
 
     0%,
@@ -280,6 +338,7 @@
     animation: custom-glow 2s infinite ease-in-out;
 }
 
+/* popover 選單內的單一症狀勾選項目 */
 .pop-checkbox-item {
     display: flex;
     align-items: center;
@@ -298,6 +357,7 @@
     color: #f1f5f9;
 }
 
+/* 已勾選的症狀項目樣式（對應 step.selectedSymptoms.includes(topic)） */
 .pop-checkbox-item.selected {
     background: rgba(16, 185, 129, 0.15);
     /* emerald-500/15 */
@@ -309,12 +369,14 @@
 }
 
 /* Chips styling for selected symptoms list at the bottom */
+/* 症狀步驟底部「已選症狀」彙總清單容器，逐個 chip 以 flex-wrap 排列 */
 .chip-list {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
+/* 單一已選症狀的藥丸狀標籤，點擊可呼叫 toggleSymptom() 取消勾選 */
 .chip {
     display: inline-flex;
     align-items: center;

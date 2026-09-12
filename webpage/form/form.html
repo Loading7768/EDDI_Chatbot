@@ -1,3 +1,37 @@
+<!--
+    form.html — 病患衛教表單主頁面（醫師操作介面）
+
+    這是 form_handler.py 的 form_page() 路由（/form）所渲染的主要模板，
+    醫師登入後實際用來「代替病患」操作填寫衛教表單的畫面。
+
+    整體結構：
+        - 使用 Alpine.js（x-data="formApp()"，邏輯定義在 js/app.js）驅動一個
+          4 步驟精靈（wizard）：auth → pair → symptoms → review，
+          對應步驟鍵值定義於下方 step_keys。
+        - 每個步驟在畫面上以「節點（node）」呈現：目前展開中的步驟顯示為大卡片，
+          已完成的步驟收合為一行摘要，尚未到達的步驟顯示為小圓點佔位。
+        - 各步驟的實際內容（登入表單、配對介面、症狀圖、確認頁）並未寫在此檔案內，
+          而是透過 Jinja2 的 {% include %} 動態載入 parts/<key>.html，
+          因為四個步驟的畫面差異很大、各自獨立維護較清楚。
+        - 節點之間以一條垂直線（node link）相連，象徵步驟間的先後順序，
+          顏色會隨已完成與否變化。
+        - 所有帶 data-flip 屬性的元素（節點外框、節點連接線）在步驟切換時，
+          會被 js/flip.js 的 FLIP 動畫技術套用平滑的位移/縮放過場，
+          取代 Alpine 重新渲染時預設的瞬間跳格。
+
+    Flask → 前端資料注入：
+        - 若醫師目前已登入（session 中有紀錄），form_page() 會把 doctor_info
+          物件透過下方的 <script> 區塊注入為 window.doctorInfo；
+        - 若 LINE 帳號已完成配對（session 中有紀錄，可能還包含已選病患、
+          已填症狀的中途進度），則注入為 window.pairingInfo。
+          兩者皆由 js/app.js 的 init() 方法讀取，用來還原畫面到中斷前的進度，
+          讓使用者重新整理頁面或跳轉後不會遺失資料。
+
+    Script 載入順序很重要：flip.js 必須先定義 window.flipAnimate，
+    state.js 接著定義 initSteps/STATUS，最後才是依賴前兩者的 app.js；
+    Alpine.js 本身則加上 defer，確保在上述三個檔案都執行完、
+    Alpine.data('formApp', ...) 已註冊完成後，才開始掃描頁面上的 x-data。
+-->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -23,7 +57,13 @@
         {% from 'form/parts/macros.html' import card_header, footer_button, text_input %}
         {% set step_keys = ['auth', 'pair', 'symptoms', 'review'] %}
         {% for key in step_keys %}
-        <div class="contents" 
+        <!--
+            每個步驟迴圈產生一組「節點 + 節點連接線」。
+            內層 x-data 建立區域變數 i（此步驟的索引）與 getter step
+            （對應 this.steps[i]），讓下方樣板可以簡潔地寫 step.xxx
+            而不必每次都寫 steps[{{ loop.index0 }}].xxx。
+        -->
+        <div class="contents"
              x-data="{ i: {{ loop.index0 }}, get step() { return this.steps[this.i] }}">
 
             <div class="flex items-stretch gap-1 shrink-0">
@@ -38,11 +78,23 @@
                     <!-- Current: expanded card. or Completed: summary.
                             Each is in their own respected /parts/file, because the
                             implementation varies wildly -->
+                    <!--
+                        動態 include：依目前迴圈的 key（'auth'/'pair'/'symptoms'/'review'）
+                        載入對應的 parts/<key>.html 片段。每個片段內部都用
+                        x-if="i === currentStep" 與 x-if="step.completed && i !== currentStep"
+                        分別定義「展開中」與「已完成摘要」兩種畫面。
+                    -->
                     {% include "form/parts/" ~ key ~ ".html" %}
 
                 </div>
 
                 <!-- Sibling button: for some completed nodes -->
+                <!--
+                    已完成步驟收合時，右側會多出一顆按鈕：
+                    - 若是 auth 步驟（key === 'auth'）→ 顯示「登出」圖示，點擊後跳回登入/登出確認畫面
+                    - 其他步驟 → 顯示「編輯」圖示，點擊後可跳回該步驟重新選擇/修改
+                    點擊時會設定區域變數 edit=true 並呼叫 jumpTo(i) 觸發 FLIP 動畫跳轉。
+                -->
                 <button x-show="step.completed && i !== currentStep"
                         x-data="{ edit: false }"
                         @click="edit = true; jumpTo(i);"
@@ -60,6 +112,12 @@
             </div>
 
             <!-- Node links -->
+            <!--
+                步驟間的垂直連接線。最後一個步驟（review，索引 3）後面不再顯示連接線
+                （x-show="i < steps.length - 1"）。連接線的顏色反映該步驟是否已完成，
+                高度則依目前是否停留在最後一步（currentStep === 3）做微調，
+                讓整體版面在展開最後一張大卡片時不會被過長的連接線推擠變形。
+            -->
             <div data-flip
                  x-show="i < steps.length - 1" class="w-1 ml-[38px]"
                  :class="{
@@ -75,6 +133,13 @@
     </div>
 
     <!-- Session data injected from Flask -->
+    <!--
+        由 form_handler.py 的 form_page() 傳入的 doctor_info / pairing_info
+        （皆為 dict 或 None），透過 Jinja2 的 tojson 過濾器序列化成 JS 物件常值，
+        寫死在 window 全域變數上，供 js/app.js 的 init() 讀取還原畫面進度。
+        若對應資料不存在則明確輸出字面 'null'（而非省略），確保 window.doctorInfo /
+        window.pairingInfo 永遠有定義、init() 可以安全地用 if (doctor) 判斷。
+    -->
     <script>
         window.doctorInfo = {{ doctor_info | tojson | safe if doctor_info  else 'null' }};
         window.pairingInfo = {{ pairing_info | tojson | safe if pairing_info else 'null' }};

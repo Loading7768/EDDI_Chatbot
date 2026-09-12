@@ -1,26 +1,170 @@
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  檔案總覽：統計儀表板分頁（section-stats）
+  ════════════════════════════════════════════════════════════════════════
+  【這個檔案在整體系統中的角色】
+  這是「急診出院衛教 LINE Bot + 醫護後台管理系統」中，醫護後台管理介面（webpage/admin）
+  的其中一個分頁（section）。此分頁負責「顯示系統整體使用數據的總覽儀表板」，
+  讓已登入的醫護人員（不限管理員角色，任何通過 @login_required 驗證的醫師皆可查看）
+  一目了然地看到系統的整體使用狀況，例如：LINE 好友總數、病患總數、表單總數、
+  LINE Bot 使用率、回診人數估計等指標。
+
+  此區塊（<section id="section-stats">）由後台主頁的分頁切換機制（通常是側邊選單
+  或 tab 按鈕）控制顯示/隱藏，使用 CSS class "section active" 來決定目前是否為
+  可見的分頁；若切換到其他分頁，這個 <section> 會被移除 "active" class 而隱藏。
+
+  真正負責「向後端拉資料、把資料塞進下面這些 DOM 元素」的邏輯全部寫在同目錄的
+  webpage/admin/js/stats.js 裡的 loadStats() 函式，此函式會呼叫後端 API：
+      GET /api/stats
+  （定義在 src/admin_server.py 的 get_stats 函式，並套用 @login_required 裝飾器，
+  代表只要是已登入的醫師帳號都能查看這份統計資料，不需要額外的管理員權限）。
+
+  【/api/stats 回傳的統計指標與計算方式（供對照本頁面各 DOM 元素用途）】
+    - total_friends：LINE 好友總數。
+        計算方式 = line_accounts 資料表的資料筆數（包含尚未建立病歷、還沒有
+        對應病患資料的 LINE 帳號，也就是單純加了 LINE Bot 好友但還沒被醫護
+        人員建檔的人也算在內）。
+    - total_patients：病患總數。
+        計算方式 = patients 資料表中 medical_record_number（病歷號碼）的筆數，
+        代表「已在系統中建立過病歷/就診紀錄」的獨特病患人數。
+    - total_forms：表單（看診紀錄）總數。
+        計算方式 = record 資料表的資料筆數，代表系統中累積建立過的出院衛教
+        表單/看診紀錄總筆數（同一位病患可能有多筆表單，例如多次回診）。
+    - patients_chatted：曾經透過 LINE Bot 對話過的病患數。
+        計算方式 = patients 資料表中 has_chatted = 1 的筆數，代表「曾經與
+        LINE Bot 產生過對話紀錄（chat_logs）」的病患人數。
+    - bot_usage_rate：LINE Bot 使用率（百分比）。
+        計算方式 = patients_chatted / total_patients * 100，四捨五入到小數點
+        第 1 位；若 total_patients 為 0（系統中尚無病患），則此值固定回傳 0.0，
+        避免除以零錯誤。
+    - return_visits：回診人數估計值。
+        計算方式 = max(0, total_forms - total_patients)。
+        意義：因為每位病患至少會有一筆表單（首次就診），若表單總數超過病患
+        總數，代表超出的部分「很可能」是同一位病患多次看診所產生的額外表單
+        （也就是回診紀錄），因此以「表單總數 - 病患總數」來估計回診人次，
+        並用 max(0, ...) 避免在極端情況下（理論上不應發生）出現負數。
+    - last_updated：統計資料「最後一次實際變化」的時間字串（格式：
+        'YYYY-MM-DD HH:MM:SS'）。
+        【重要語意，請務必理解】：後端每次收到 GET /api/stats 請求時，都會
+        「重新即時查詢資料庫」算出上述所有數字（不是直接讀快取回傳），但接著
+        會把這次剛算出來的結果，拿去跟 data/stats_cache.json 檔案中存放的
+        「上一次計算結果」逐項比較：
+          → 如果這次算出來的數字與快取中的數字完全相同（代表系統資料沒有
+            變動），則 last_updated 會沿用快取檔案裡舊的時間戳，不會更新成
+            現在時間；
+          → 如果這次算出來的數字與快取不同（代表期間有新病患、新表單、新
+            對話紀錄等資料變動），則 last_updated 會更新為「現在」的時間，
+            並把這次的新結果整份寫回 data/stats_cache.json，成為下次比較的
+            基準。
+        因此，前端畫面上顯示的「最後更新：xxx」時間，其真正意義是「這些統計
+        數字最後一次真正發生變化的時間點」，而不是「使用者最後一次打開這個
+        分頁 / 觸發查詢的時間」。即使使用者反覆重新整理頁面、多次觸發查詢，
+        只要資料庫內容沒變，這個時間戳就會維持不動。
+
+  【本頁面目前實際使用到的統計卡片】
+  下方 .stats-grid 容器內目前只放了兩張卡片（病患總數、LINE Bot 使用率），
+  對應到 stats.js 裡 s-patients、s-usage 兩個元素 id；stats.js 中同時也準備了
+  s-friends（LINE 好友總數）與 s-return（回診人數）兩個元素 id 的更新邏輯，
+  但目前這兩個 id 對應的 DOM 元素「尚未」出現在本檔案的 HTML 結構中 —— stats.js
+  在寫入前會先用 document.getElementById(...) 搭配 null 檢查（if (el) el.textContent
+  = ...），所以即使找不到對應元素也不會噴錯，只是畫面上暫時不會顯示這兩個數據
+  （日後若要顯示 LINE 好友總數 / 回診人數，只需要在 .stats-grid 內新增對應 id
+  為 s-friends / s-return 的 .stat-card 區塊即可，不需要修改 JS 邏輯）。
+  ════════════════════════════════════════════════════════════════════════
+-->
 <!-- 統計數據 -->
+<!-- section-stats：統計儀表板分頁本體。class "active" 代表目前為顯示中的分頁，
+     由後台的分頁切換機制（切換 tab 時增減 class）控制此區塊的顯示/隱藏。 -->
 <section id="section-stats" class="section active">
+  <!-- 標題列：左側為分頁標題「統計數據」，右側放置「下載 CSV」匯出按鈕。
+       兩者用 flex 排版左右對齊（justify-content: space-between）。 -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
     <div class="section-title" style="margin-bottom: 0;">統計數據</div>
+    <!--
+      「下載 CSV」按鈕：
+      - 點擊事件透過行內 onclick="exportStatsCSV()" 直接綁定，呼叫 stats.js 中的
+        全域函式 exportStatsCSV()。
+      - exportStatsCSV() 會優先使用「目前記憶體中已快取的統計資料」
+        （全域變數 currentStatsData，通常由前面 loadStats() 呼叫 GET /api/stats
+        後寫入），若尚未有資料則會再多打一次 GET /api/stats 取得最新資料，
+        接著把 total_patients / bot_usage_rate / total_friends /
+        patients_chatted / total_forms / return_visits / last_updated 這幾項
+        指標整理成表格列，組成一份 CSV 文字內容，並透過建立暫時的
+        <a download> 連結元素觸發瀏覽器下載，檔名格式為
+        「EDDI_統計數據報表_YYYY-MM-DD.csv」。
+      - 按鈕本身不會觸發 GET /api/stats 以外的任何後端 API，純粹是前端組字串
+        產生 CSV 檔案，不會有伺服器端的匯出端點。
+    -->
     <button class="btn btn-blue btn-sm" onclick="exportStatsCSV()" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; cursor: pointer;">
+      <!-- 下載圖示（SVG 箭頭指向資料夾/文件的下載符號），純裝飾用，不含互動邏輯 -->
       <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
       </svg>
       <span>下載 CSV</span>
     </button>
   </div>
+  <!--
+    統計卡片容器（.stats-grid）：以 CSS grid/flex 排列多張「統計卡片」
+    （.stat-card），每張卡片代表一項統計指標，結構固定為：
+      .stat-icon  → 表情符號圖示，純裝飾
+      .stat-value → 實際數字，初始顯示為「—」（表示尚未載入資料的預設值），
+                    由 stats.js 的 loadStats() 在拿到 /api/stats 回應後，
+                    透過 document.getElementById(對應 id).textContent = 數值
+                    的方式動態填入真實數字，沒有任何動畫效果，純粹是文字內容
+                    的直接替換。
+      .stat-label → 指標中文名稱標籤
+    每張卡片上的 data-definition 屬性存放該指標的白話文字說明，通常由 CSS/JS
+    做成 tooltip（滑鼠移上去時顯示的說明文字），協助醫護人員理解數字含義，
+    本身不影響資料抓取或渲染流程。
+  -->
   <div class="stats-grid">
+    <!--
+      卡片一：病患總數
+      - DOM 元素 id="s-patients"，對應後端 /api/stats 回應中的 total_patients。
+      - total_patients 的計算方式（後端 src/admin_server.py get_stats()）：
+        patients 資料表中 medical_record_number（病歷號）的筆數，
+        即「已在系統中建立過病歷/就診紀錄」的獨特病患總數。
+      - stats.js 會用 d.total_patients ?? '—' 填入本元素，若後端未回傳此欄位
+        （例如發生例外或欄位缺失）則保留預設的 '—' 佔位符號。
+    -->
     <div class="stat-card green" data-definition="已在系統中建立就診紀錄（病歷表單）的獨特病患病歷號碼總數。">
       <div class="stat-icon">🧑‍⚕️</div>
       <div class="stat-value" id="s-patients">—</div>
       <div class="stat-label">病患總數</div>
     </div>
+    <!--
+      卡片二：LINE Bot 使用率
+      - DOM 元素 id="s-usage"，對應後端 /api/stats 回應中的 bot_usage_rate。
+      - bot_usage_rate 的計算方式：patients_chatted（has_chatted=1 的病患數）
+        除以 total_patients，乘以 100 後四捨五入到小數點第 1 位；若
+        total_patients 為 0 則固定回傳 0.0，避免除以零。
+      - stats.js 會用 (d.bot_usage_rate ?? '—') + '%' 填入本元素，也就是無論
+        後端回傳的是否為數字，前端一律在後面補上百分號「%」顯示；若欄位缺失
+        則顯示「—%」。
+    -->
     <div class="stat-card orange" data-definition="已開始對話聊天（有 chat_logs 聊天記錄檔）的病患數，佔 LINE 帳號好友總數的百分比。">
       <div class="stat-icon">📱</div>
       <div class="stat-value" id="s-usage">—</div>
       <div class="stat-label">LINE Bot 使用率</div>
     </div>
   </div>
+  <!--
+    最後更新時間顯示區：id="s-updated"。
+    由 stats.js loadStats() 填入文字「最後更新：<d.last_updated>」，若後端未
+    回傳 last_updated（例如發生錯誤）則顯示空字串（清空此區塊）。
+    請注意此處的時間語意是「統計數字最後一次真正發生變化的時間」，並非本次
+    使用者查詢/整理頁面的當下時間（詳見本檔案最上方的檔案總覽說明）。
+  -->
   <div class="last-updated" id="s-updated"></div>
+  <!--
+    錯誤訊息顯示區：id="s-error"，預設為空字串（不顯示任何內容）。
+    當 loadStats() 呼叫 GET /api/stats 時：
+      - 若後端回應中帶有 error 欄位（例如未登入、伺服器內部錯誤等），會將該
+        錯誤訊息文字直接顯示於此處。
+      - 若 fetch 呼叫本身發生例外（例如網路中斷、伺服器無回應），則顯示固定
+        文字「無法載入統計資料」。
+    每次重新呼叫 loadStats() 時，會先清空此區塊的文字（見 stats.js 開頭），
+    避免舊的錯誤訊息殘留畫面上。
+  -->
   <p style="color:var(--danger);font-size:13px;margin-top:8px;" id="s-error"></p>
 </section>

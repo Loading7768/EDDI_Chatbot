@@ -1,12 +1,127 @@
-<!-- 出院單管理 -->
+<!--
+  ══════════════════════════════════════════════════════════════════════
+  檔案總覽：forms.html — 出院表單 / 病歷建立與編輯（管理後台「出院單管理」分頁）
+  ══════════════════════════════════════════════════════════════════════
+
+  【這份 HTML 在整體系統中的角色】
+    這是急診出院衛教 LINE Bot + 醫護後台管理系統中，管理後台單一頁面應用
+    （SPA 風格，由 admin.html 主頁作為容器，透過切換 <section> 顯示不同
+    分頁）的「出院單管理」分頁片段。所有互動邏輯定義在同目錄的
+    webpage/admin/js/forms.js（包含事件綁定、渲染邏輯、對後端
+    src/admin_server.py 底下 /api/forms/* 系列 API 的呼叫），本檔案僅
+    負責提供 DOM 結構與 CSS class／id 掛勾點，本身不含任何 JS 邏輯
+    （除了少量 inline onclick 屬性直接呼叫 forms.js 中定義的全域函式）。
+
+  【三個工作模式（透過 data-state 屬性切換）】
+    #forms-layout 的 data-state 屬性值為 'nurse' / 'doctor' / 'view' 之一，
+    由 forms.js 的 setFormsState() 控制，對應下方三個按鈕：
+      1. 護理師填單（nurse）：#btn-state-nurse + #content-state-nurse
+         —— 負責「建檔」：選擇 LINE 帳號、指定病患關係、填病歷號，
+         呼叫後端 nurse_create 建立一份出院單「草稿」（此時症狀尚未填寫）。
+      2. 醫師填單（doctor）：#btn-state-doctor + #content-state-doctor
+         —— 負責「完成填單」：列出目前登入醫師自己尚未完成的草稿，
+         點開後在三欄式選單勾選症狀，呼叫 doctor_submit 正式寫入病歷
+         （record 資料表）並刪除草稿檔。#doctor-draft-badge 顯示未完成
+         草稿數量的角標。
+      3. 出院單紀錄（view，預設分頁）：#btn-state-view + #content-state-view
+         —— 負責「查詢與事後修改」：列出所有病患與其歷次出院單紀錄，
+         可檢視細節，或進入編輯模式修改 LINE 帳號歸屬／關係／病歷號／
+         症狀清單。
+
+  【草稿（draft）→ 正式紀錄（record）的完整流程，與 pinned 置頂佇列】
+    詳細的流程圖與資料模型說明請見 webpage/admin/js/forms.js 檔案最上方
+    的「檔案總覽」註解區塊——那裡有完整的文字流程圖，此處僅摘要重點：
+    護理站先用「護理師填單」建立草稿（草稿存於伺服器檔案系統的 JSON 檔，
+    不在資料庫中），醫師再用「醫師填單」補上症狀並正式送出成為資料庫
+    record。LINE 使用者傳送 "Bind" 訊息完成帳號綁定後，會被推入
+    「pinned 置頂佇列」（最新在最前，最多 10 筆），本頁的 LINE 帳號
+    下拉選單（護理師填單分頁 / 出院單紀錄分頁的編輯模式）會把這些
+    「已綁定但尚未建立任何草稿」的帳號優先置頂顯示，方便護理站第一時間
+    注意到需要處理的新病患；一旦成功建立草稿，該帳號就會自動從置頂
+    佇列移除。
+
+  【三欄式版面（Column 1 / 2 / 3）】
+    #forms-layout 底下依 CSS 排列成三欄（各欄實際顯示內容依 data-state
+    而不同）：
+      Column 1（#forms-main-col）：主列表欄。view 模式顯示所有病患清單
+        （#form-patient-list-body）；nurse 模式顯示護理師填單的三個
+        狀態按鈕（本身即位於這一欄）；doctor 模式顯示未完成草稿清單
+        （#doctor-draft-list）。
+      Column 2（#forms-sub-col）：僅在 view 模式下有意義，顯示選中病患
+        的歷次就診（出院單）紀錄清單（#form-visit-list-body）。
+      Column 3（#forms-form-col）：表單詳情/填寫欄，內含三個彼此獨立、
+        依 data-state 切換顯示的子面板：
+          - #nurse-form-panel（護理師填單表單）
+          - #doctor-form-panel（醫師填單表單，含三欄式症狀選擇器）
+          - 一般表單內容（查看/修改表單，含 #form-view-container 唯讀
+            檢視與 #form-edit-container 編輯模式兩種畫面）
+
+  【三欄式症狀選擇器（部位/類別 → 衛教項目 → 已選擇），重複出現兩份】
+    本頁用同一種 UI 模式呈現症狀勾選：欄1列出症狀分類（部位/類別），
+    點擊展開欄2列出該分類下的具體衛教項目，勾選後同步顯示在欄3
+    「已選擇項目」的標籤列（可直接點擊標籤移除）。這組元件出現兩次：
+      - 醫師填單分頁：#symptom-main-list / #symptom-sub-list /
+        #symptom-chips-container（見 forms.js 的 renderSymptomMainCol 等）。
+      - 出院單紀錄分頁的編輯模式：#ve-symptom-main-list /
+        #ve-symptom-sub-list / #ve-symptom-chips-container（id 前綴
+        "ve-" = View Edit，見 forms.js 的 renderVEMainCol 等），兩者
+        使用獨立的 DOM 與 JS 狀態，互不干擾。
+
+  【LINE 帳號 / 病患關係 自製下拉選單（重複出現三份）】
+    因為需要支援「搜尋框」「pinned 置頂分組」「自訂排版（關係文字+病歷號
+    並排）」等原生 <select> 做不到的效果，本頁的 LINE 帳號與病患關係
+    選擇器都是用 <div>/<button> 手刻的自製下拉選單（class="nurse-custom-dd"），
+    共出現三組，前綴分別對應三個不同的使用情境：
+      - "nurse-" 前綴：護理師填單表單（#nurse-line-dd / #nurse-patient-dd）。
+      - "ve-" 前綴：出院單紀錄分頁的編輯模式（#ve-line-dd / #ve-patient-dd）。
+      - 醫師填單分頁本身不需要這組選單，因為 LINE 帳號與病患關係在
+        護理師填單階段已經確定，醫師只需要處理症狀。
+    每組下拉選單結構固定為：外層 .nurse-custom-dd → 觸發按鈕
+    .nurse-custom-dd-btn（顯示目前選擇文字 + 下拉箭頭圖示）→ 選項清單
+    .nurse-custom-dd-list（含搜尋框 + 動態產生的選項容器）。
+
+  【pair_id 三種模式對應的動態輸入欄位】
+    選擇病患關係時，依 forms.js 中 pair_id 的三種模式（'self' 本人 /
+    'new' 新增 / 既有整數配對），會動態顯示不同的文字輸入欄（皆預設
+    style="display:none"，由 JS 依選擇結果切換顯示）：
+      - self：只顯示「病歷號（帳號本人）」欄位（因為關係已固定為帳號本人）。
+      - new：同時顯示「關係」與「病歷號（新增）」兩個欄位。
+      - 既有整數：不顯示任何額外欄位（沿用資料庫既有的關係與病歷號）。
+    這組欄位在護理師填單表單中前綴為 "nurse-draft-"，在編輯模式中前綴
+    為 "ve-"（例如 #ve-self-mrn-row / #ve-new-relation-row / #ve-new-mrn-row）。
+
+  【三個確認 Modal】
+    本頁末尾定義三個共用的確認對話框（modal-backdrop），皆由 forms.js
+    中的 openModal()/closeModal() 控制顯示/隱藏：
+      - #modal-confirm-delete-draft：刪除草稿前的二次確認。
+      - #modal-confirm-save-draft：醫師傳送出院單前，預覽已選症狀清單
+        的確認畫面。
+      - #modal-confirm-edit：編輯模式儲存前，預覽變更摘要（新 LINE 帳號、
+        新關係/病歷號、新症狀清單）的確認畫面。
+-->
 <section id="section-forms" class="section">
   <div class="section-title">出院單管理</div>
+  <!--
+    #forms-layout：整個分頁的最外層版面容器。
+    data-state 屬性（初始值 "view"）由 forms.js 的 setFormsState() 動態
+    修改，CSS 依此屬性決定 Column 1 要顯示哪一組內容（護理師填單按鈕組 /
+    醫師填單草稿列表 / 病患總列表），是驅動整頁模式切換的核心屬性。
+  -->
   <div class="forms-layout" id="forms-layout" data-state="view">
 
-    <!-- ═══ Column 1: Main ═══ -->
+    <!-- ═══ Column 1: Main（主列表欄，內容依 data-state 切換） ═══ -->
     <div class="forms-main-col" id="forms-main-col">
 
-      <!-- Button: 護理師填單 (Nurse) -->
+      <!--
+        Button: 護理師填單 (Nurse)
+        點擊觸發 forms.js 的 setFormsState('nurse')：
+          切換 #forms-layout 的 data-state 為 'nurse'，並呼叫
+          loadNurseLineAccounts() 重新載入 LINE 帳號下拉選單資料
+          （對應 GET /api/forms/get_line_accounts）。
+        本按鈕與下方 #content-state-nurse 只是視覺上的「分頁按鈕 + 佔位
+        說明卡片」，真正的護理師填單表單其實是位於 Column 3 的
+        #nurse-form-panel（因為表單需要跨欄顯示，故不放在這個按鈕底下）。
+      -->
       <button class="forms-state-btn" id="btn-state-nurse" onclick="setFormsState('nurse')">
         🩺 護理師填單
       </button>
@@ -17,22 +132,41 @@
         </div>
       </div>
 
-      <!-- Button: 醫師填單 (Doctor) -->
+      <!--
+        Button: 醫師填單 (Doctor)
+        點擊觸發 setFormsState('doctor')：切換 data-state 為 'doctor'，
+        並呼叫 loadDoctorDrafts()（對應 GET /api/forms/doctor_drafts）
+        載入目前登入醫師自己尚未完成的草稿列表。
+        #doctor-draft-badge：未完成草稿數量角標，初始隱藏
+        （style="display:none"），由 loadDoctorDrafts() 依草稿數量動態
+        顯示/更新數字，讓醫師一眼看到有幾份草稿待處理。
+      -->
       <button class="forms-state-btn" id="btn-state-doctor" onclick="setFormsState('doctor')">
         <span>👨‍⚕️ 醫師填單</span>
         <span class="draft-count-badge" id="doctor-draft-badge" style="display:none;">0</span>
       </button>
       <div class="forms-state-content" id="content-state-doctor">
+        <!-- #doctor-draft-header-count：與上方角標同步顯示未完成草稿總數 -->
         <div class="plist-header" style="justify-content: space-between; align-items: center; display: flex;">
           <div style="display: flex; align-items: center; gap: 8px;">
             未完成出院單
             <span class="badge badge-gray" id="doctor-draft-header-count">0</span>
           </div>
         </div>
+        <!--
+          #doctor-draft-list：草稿清單容器，由 loadDoctorDrafts() 動態
+          填入每筆草稿的 .patient-item（顯示病歷號+就診日期），點擊呼叫
+          selectDoctorDraft() 載入該草稿到 Column 3 的醫師填單面板。
+        -->
         <div class="patient-list-body" id="doctor-draft-list" style="flex:1; overflow-y:auto;"></div>
       </div>
 
-      <!-- Button: 查看出院單紀錄 (View) — default active -->
+      <!--
+        Button: 查看出院單紀錄 (View) — 預設啟用分頁（class="active"）
+        點擊觸發 setFormsState('view')：切換 data-state 為 'view'
+        （此模式不會主動重新載入資料，因為病患列表的載入時機是由外部
+        呼叫 loadFormsPatientList()，例如切換到本分頁時的路由邏輯）。
+      -->
       <button class="forms-state-btn active" id="btn-state-view" onclick="setFormsState('view')">
         📋 出院單紀錄
       </button>
@@ -40,8 +174,16 @@
         <div class="plist-header" style="justify-content: space-between; align-items: center; display: flex;">
           <div style="display: flex; align-items: center; gap: 8px;">
             病患列表
+            <!-- #form-patient-count：病患總數，由 renderFormPatientList() 更新 -->
             <span class="badge badge-gray" id="form-patient-count">0</span>
           </div>
+          <!--
+            排序方式下拉選單（原生 <select>，此處不需要自製下拉選單的
+            搜尋/置頂功能，故直接用原生元件）。
+            onchange 觸發 forms.js 的 sortAndRenderFormPatients(this.value)，
+            對前端已快取的 state.allFormPatients 做純前端排序後重新渲染，
+            不會重新呼叫後端 API。
+          -->
           <select id="form-patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderFormPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
             <option value="checkout_desc">就診日期 ⬇</option>
             <option value="checkout_asc">就診日期 ⬆</option>
@@ -49,6 +191,14 @@
             <option value="mrn_asc">病歷號 ⬆</option>
           </select>
         </div>
+        <!--
+          #form-patient-list-body：病患總列表容器。初始顯示「載入中…」
+          空狀態，由 loadFormsPatientList() → GET /api/chats 取得資料後，
+          交由 renderFormPatientList() 覆寫成實際的病患卡片列表
+          （每張卡片顯示病歷號、關係/看診狀態徽章、科別、出院單筆數、
+          最新就診日期），點擊卡片觸發 loadFormDetail(mrn, this) 載入
+          Column 2 的就診紀錄清單。
+        -->
         <div id="form-patient-list-body">
           <div class="empty-state" style="padding:32px 0;">
             <div class="empty-icon">👤</div><p>載入中…</p>
@@ -58,12 +208,25 @@
 
     </div>
 
-    <!-- ═══ Column 2: Sub (visible in View state only) ═══ -->
+    <!--
+      ═══ Column 2: Sub — 就診紀錄欄，僅在 view 模式下有實際意義 ═══
+      （nurse/doctor 模式下此欄位仍存在於 DOM 中，但版面上會被 CSS
+      依 data-state 隱藏；因為 Column 3 才是 nurse/doctor 模式的主要
+      互動區域。）
+    -->
     <div class="forms-sub-col" id="forms-sub-col">
       <div class="plist-header">
         就診紀錄
+        <!-- #form-visit-count：目前選中病患的就診次數，renderFormVisits() 更新 -->
         <span class="badge badge-gray" id="form-visit-count">0</span>
       </div>
+      <!--
+        #form-visit-list-body：就診紀錄清單容器。初始顯示「請先選擇病患」
+        空狀態；由 loadFormDetail() → GET /api/chats/<mrn> 取得該病患的
+        state.currentForms 後，交由 renderFormVisits() 渲染成依日期
+        排序（新到舊）的 .visit-item 清單，點擊某一筆呼叫
+        selectFormVisit(idx, this) 載入 Column 3 的表單詳情。
+      -->
       <div id="form-visit-list-body" class="visit-list-body">
         <div class="empty-state" style="padding:32px 0;">
           <div class="empty-icon">📋</div><p>請先選擇病患</p>
@@ -71,45 +234,100 @@
       </div>
     </div>
 
-    <!-- ═══ Column 3: Form (always present) ═══ -->
+    <!--
+      ═══ Column 3: Form — 表單詳情/填寫欄（永遠存在於 DOM，內部三個
+      子面板依 data-state 切換顯示/隱藏，而非各自獨立的 <section>）═══
+    -->
     <div class="forms-form-col" id="forms-form-col">
 
-      <!-- Nurse form panel (visible only in nurse state) -->
+      <!--
+        Nurse form panel（僅在 nurse 模式下由 CSS 顯示）
+        這是護理師填單的實際表單，對應 forms.js 中「nurse form」區塊的
+        一整套函式（loadNurseLineAccounts / onNurseLineChange /
+        onNursePatientChange / validateNurseForm / saveNurseForm）。
+        表單的最終目的：收集 line_account_id + pair_id('self'/'new'/
+        既有整數) + relation + mrn，呼叫 POST /api/forms/nurse_create
+        建立一份出院單草稿。
+      -->
       <div class="nurse-form-panel" id="nurse-form-panel">
 
-        <!-- Header: title + save button -->
+        <!--
+          Header: 標題 + 儲存按鈕
+          #btn-nurse-save 初始為 disabled，由 validateNurseForm() 依
+          目前表單輸入是否合法動態切換可用狀態；點擊觸發
+          saveNurseForm()，最終呼叫 nurse_create API。
+        -->
         <div class="nurse-fp-header">
           <div>
             <div class="chat-panel-title">建立新出院單</div>
+            <!--
+              #nurse-fp-sub：狀態提示文字，由 validateNurseForm() 動態
+              更新為「請選擇 LINE 帳號與病患」「請填寫病歷號」等提示，
+              或驗證通過時顯示「確認資料無誤就可建立」。
+            -->
             <div class="chat-panel-sub" id="nurse-fp-sub">請選擇 LINE 帳號與病患</div>
           </div>
           <button class="btn btn-accent" id="btn-nurse-save" disabled onclick="saveNurseForm()">&#128190; 儲存</button>
         </div>
 
-        <!-- Form body: scrollable content -->
+        <!-- Form body: 可捲動的表單內容區 -->
         <div class="nurse-fp-body">
 
-          <!-- Group 1: LINE select (custom dropdown with search at top) -->
+          <!--
+            Group 1：LINE 帳號選擇（自製下拉選單，含頂部搜尋框）
+            #nurse-form-panel 本身會被 forms.js 用來存放
+            dataset.lineAccountId（目前選中的帳號 id）、
+            dataset.selPairId/selRelation/selMrn（目前選中的病患關係），
+            這些 dataset 屬性即是整份表單「目前狀態」的真相來源。
+          -->
           <div class="nurse-fp-row" id="nurse-fp-line-row">
             <label class="nurse-fp-label">LINE 帳號</label>
+            <!--
+              #nurse-line-dd：LINE 帳號下拉選單根容器。
+              #nurse-line-btn 點擊觸發 toggleNurseLineDropdown()
+              （開啟/關閉選單，開啟時會靜默重新呼叫
+              GET /api/forms/get_line_accounts 刷新置頂清單）。
+              #nurse-line-btn-text：按鈕顯示文字，選定帳號後由
+              selectNurseLineAccount() 更新為帳號名稱。
+            -->
             <div class="nurse-custom-dd" id="nurse-line-dd">
               <button class="nurse-custom-dd-btn" id="nurse-line-btn" onclick="toggleNurseLineDropdown()">
                 <span id="nurse-line-btn-text">請選擇 LINE 帳號</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="nurse-custom-dd-list" id="nurse-line-list">
+                <!--
+                  搜尋框：oninput 觸發 filterNurseLineAccounts(this.value)
+                  即時篩選下方選項容器的內容；#nurse-line-search-sub 顯示
+                  篩選結果筆數提示（僅在有輸入關鍵字時顯示）。
+                -->
                 <div style="padding: 10px 12px 6px 12px; border-bottom: 1px solid var(--border); background: var(--card); position: sticky; top: 0; z-index: 10;">
                   <input type="text" id="nurse-line-search" class="nurse-draft-input" placeholder="🔍 搜尋 LINE 帳號…" oninput="filterNurseLineAccounts(this.value)" style="padding: 6px 10px; font-size: 13px;" />
                   <div id="nurse-line-search-sub" style="font-size: 11px; color: var(--muted); margin-top: 4px; display: none;"></div>
                 </div>
+                <!--
+                  #nurse-line-items-container：由 filterNurseLineAccounts()
+                  動態填入帳號選項（含「置頂」分組標題 + 置頂帳號 +
+                  「所有帳號」分組標題 + 全部帳號的完整清單）。
+                -->
                 <div id="nurse-line-items-container"></div>
               </div>
             </div>
           </div>
 
-          <!-- Group 2: Patient dropdown + draft text fields (hidden until LINE account selected) -->
+          <!--
+            Group 2：病患下拉選單 + 草稿文字欄位
+            初始 style="display:none"，選定 LINE 帳號後由
+            onNurseLineChange() 改為 display:flex 顯示。
+          -->
           <div class="nurse-fp-group" id="nurse-fp-patient-group" style="display:none;">
-            <!-- Custom patient dropdown -->
+            <!--
+              自製病患下拉選單：列出該 LINE 帳號既有的關係配對
+              （GET /api/forms/get_existing_relations 的結果）+ 虛擬的
+              「帳號本人」選項（若尚不存在）+ 「＋ 新增」選項。
+              #nurse-patient-btn 初始 disabled，選定 LINE 帳號後由
+              onNurseLineChange() 啟用。
+            -->
             <div class="nurse-fp-row" id="nurse-fp-patient-row">
               <label class="nurse-fp-label">病患</label>
               <div class="nurse-custom-dd" id="nurse-patient-dd">
@@ -117,23 +335,31 @@
                   <span id="nurse-patient-btn-text">請選擇病患</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
+                <!-- #nurse-patient-list：由 onNurseLineChange() 動態填入選項 -->
                 <div class="nurse-custom-dd-list" id="nurse-patient-list"></div>
               </div>
             </div>
 
-            <!-- Draft text fields (shown conditionally by JS) -->
+            <!--
+              草稿文字輸入欄（由 JS 依 pair_id 三種模式決定顯示哪些）：
+              對應 forms.js「pair_id 三種模式」的設計——'self' 只需病歷號，
+              'new' 需要關係+病歷號，既有整數配對則完全不顯示任何欄位
+              （因為關係與病歷號都已存在資料庫中）。
+              三個欄位的 oninput 皆觸發 validateNurseForm() 即時驗證
+              （不可為空、不可與既有值重複）。
+            -->
             <div id="nurse-draft-fields" style="display:none; flex-direction:column; gap:16px; margin-top:16px;">
-              <!-- self: MRC input (when 帳號本人 has no MRC) -->
+              <!-- self 模式：僅顯示病歷號輸入欄（關係固定為「帳號本人」） -->
               <div class="nurse-fp-row" id="nurse-draft-self-mrn-row" style="display:none;">
                 <label class="nurse-fp-label">病歷號（帳號本人）</label>
                 <input type="text" id="nurse-draft-self-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateNurseForm()" />
               </div>
-              <!-- new: relation input -->
+              <!-- new 模式：關係輸入欄 -->
               <div class="nurse-fp-row" id="nurse-draft-new-relation-row" style="display:none;">
                 <label class="nurse-fp-label">關係</label>
                 <input type="text" id="nurse-draft-new-relation" class="nurse-draft-input" placeholder="請輸入關係（如：子女）" oninput="validateNurseForm()" />
               </div>
-              <!-- new: MRC input -->
+              <!-- new 模式：病歷號輸入欄 -->
               <div class="nurse-fp-row" id="nurse-draft-new-mrn-row" style="display:none;">
                 <label class="nurse-fp-label">病歷號（新增）</label>
                 <input type="text" id="nurse-draft-new-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateNurseForm()" />
@@ -145,45 +371,77 @@
 
       </div>
 
-      <!-- Doctor form panel (visible only in doctor state) -->
+      <!--
+        Doctor form panel（僅在 doctor 模式下由 JS 設為顯示；初始
+        style="display:none"）
+        對應 forms.js「doctor form」區塊：loadDoctorDrafts() 載入草稿
+        列表 → selectDoctorDraft() 載入單筆草稿內容並渲染此面板 →
+        使用者勾選症狀 → saveDoctorForm()/doSaveDoctorForm() 呼叫
+        POST /api/forms/doctor_submit 正式送出成為 record。
+      -->
       <div class="doctor-form-panel" id="doctor-form-panel" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
 
-        <!-- Header: title + sub + action buttons -->
+        <!--
+          Header：標題 + 副標題 + 動作按鈕
+          #doctor-fp-title / #doctor-fp-sub：初始顯示「請選擇未完成出院單」
+          提示，選中草稿後由 selectDoctorDraft() 更新為「請選擇衛教資料」
+          等操作提示文字。
+          #doctor-fp-btns：初始隱藏，選中草稿後顯示「刪除」與
+          「傳送出院單」兩個動作按鈕。
+        -->
         <div class="doctor-fp-header" id="doctor-fp-header">
           <div>
             <div class="chat-panel-title" id="doctor-fp-title">請選擇未完成出院單</div>
             <div class="chat-panel-sub" id="doctor-fp-sub">點擊未完成出院單來填寫</div>
           </div>
           <div id="doctor-fp-btns" style="display:none; gap:8px; align-items:center;">
+            <!-- 點擊先開啟確認 Modal（見 #modal-confirm-delete-draft），非直接刪除 -->
             <button class="btn btn-danger" id="btn-doctor-delete" onclick="deleteDoctorDraft()">🗑 刪除</button>
+            <!-- 點擊先開啟確認 Modal（見 #modal-confirm-save-draft）預覽症狀清單，非直接送出 -->
             <button class="btn btn-accent" id="btn-doctor-save" onclick="saveDoctorForm()">💾 傳送出院單</button>
           </div>
         </div>
 
-        <!-- Body: scrollable content -->
+        <!-- Body: 可捲動內容區 -->
         <div class="doctor-fp-body" id="doctor-fp-body">
 
-          <!-- Default placeholder when no draft selected -->
+          <!-- 尚未選擇任何草稿時的預設佔位畫面 -->
           <div id="doctor-fp-placeholder" class="forms-state-placeholder" style="opacity: 0.5;">
             <div style="font-size: 56px; margin-bottom: 8px;">📋</div>
             <div class="forms-state-placeholder-title">請先選擇出院單來完成填寫</div>
           </div>
 
-          <!-- Active draft content (hidden by default) -->
+          <!--
+            實際草稿內容區（初始 style="display:none"，selectDoctorDraft()
+            載入成功後改為 display:flex）
+          -->
           <div id="doctor-fp-content" style="display:none; flex-direction:column; justify-content:space-evenly; flex:1; gap:20px; padding:20px 24px;">
 
-            <!-- Display / Meta Box: 3 rows with dividers -->
+            <!--
+              Meta Box：唯讀展示草稿的身分/看診資訊（3 行，中間用分隔線）。
+              這些欄位皆由 selectDoctorDraft() 從
+              GET /api/forms/doctor_draft/<filename> 回傳的 data 填入，
+              醫師這個階段不可修改這些資訊（身分/病歷號已由護理站在
+              nurse_create 階段確定），只能勾選下方的症狀。
+            -->
             <div class="doctor-meta-box">
+              <!-- 就診日期：草稿的 checkout_date，截取前 10 字元只顯示日期部分 -->
               <div class="doctor-meta-row">
                 <div class="doctor-meta-label">📅 就診日期</div>
                 <div class="doctor-meta-val" id="doctor-meta-date">-</div>
               </div>
               <div class="doctor-meta-divider"></div>
+              <!-- 負責醫師：草稿的 doctor_name（即目前登入的醫師本人） -->
               <div class="doctor-meta-row">
                 <div class="doctor-meta-label">👨‍⚕️ 負責醫師</div>
                 <div class="doctor-meta-val" id="doctor-meta-doctor">-</div>
               </div>
               <div class="doctor-meta-divider"></div>
+              <!--
+                LINE 帳號名稱（左）↔ 關係 / 病歷號（右）：
+                草稿的 line_name、relation（預設「帳號本人」）、
+                mrc（病歷號，若草稿無此值則 fallback 顯示外部傳入的 mrn）。
+              -->
               <div class="doctor-meta-row">
                 <div class="doctor-meta-label" style="display:flex; align-items:center; gap:6px;">
                   <img src="/assets/svgs/line_icon.svg" width="18" height="18" alt="LINE" />
@@ -197,21 +455,40 @@
               </div>
             </div>
 
-            <!-- Symptom selection: 3 equal-width columns -->
+            <!--
+              三欄式症狀選擇器（醫師填單版，對應 forms.js 的
+              renderSymptomMainCol / renderSymptomSubCol /
+              renderSymptomChips）。症狀分類資料來源：
+              GET /assets/discharge/category.json（前端靜態資源，
+              非後端 admin API）。目前選取結果存在 state.selectedSymptoms，
+              最終會塞入 doctor_submit 請求的 symptoms 欄位。
+            -->
             <div class="symptom-selection-container">
-              <!-- Main Column (Categories) -->
+              <!--
+                欄1：部位/類別。列出所有分類 key；點擊展開欄2；
+                若該分類底下無任何衛教項目，項目會被標記 .disabled
+                且不可點擊。
+              -->
               <div class="symptom-col" id="symptom-main-col">
                 <div class="symptom-col-header">部位 / 類別</div>
                 <div class="symptom-col-body" id="symptom-main-list"></div>
               </div>
 
-              <!-- Sub Column (Items under category) -->
+              <!--
+                欄2：衛教項目（僅在展開某分類時顯示，初始
+                style="display:none"）。列出該分類下的所有症狀，點擊
+                切換勾選/取消勾選狀態（toggle 邏輯）。
+              -->
               <div class="symptom-col" id="symptom-sub-col" style="display:none;">
                 <div class="symptom-col-header" id="symptom-sub-header">衛教項目</div>
                 <div class="symptom-col-body" id="symptom-sub-list"></div>
               </div>
 
-              <!-- Selected Column (Chips) -->
+              <!--
+                欄3：已選擇項目（僅在有已選症狀時顯示，初始
+                style="display:none"）。不分類別平鋪顯示所有已選症狀的
+                標籤，點擊標籤即可移除該症狀。
+              -->
               <div class="symptom-col" id="symptom-selected-col" style="display:none;">
                 <div class="symptom-col-header">已選擇項目</div>
                 <div class="symptom-col-body" id="symptom-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; padding:10px;"></div>
@@ -224,33 +501,91 @@
 
       </div><!-- /doctor-form-panel -->
 
-      <!-- Regular form content (hidden in nurse/doctor state) -->
+      <!--
+        一般表單內容區的 Header（僅在 view 模式的頁面上可見；nurse/doctor
+        模式下會被 CSS 依 data-state 隱藏）
+        對應「出院單紀錄」分頁 Column 3 的標題列，包含查看/編輯模式的
+        切換按鈕。三個按鈕互斥顯示（同一時間只會顯示其中一組）：
+          - 唯讀檢視模式（預設）：只顯示「✏️ 修改」按鈕（若有權限）。
+          - 編輯模式：顯示「✕ 取消」與「💾 儲存」按鈕。
+        對應 forms.js 的 selectFormVisit()（唯讀模式的按鈕顯示規則）、
+        enterViewEditMode() / exitViewEditMode()（切換這三個按鈕的顯示）。
+      -->
       <div class="doctor-fp-header chat-panel-header">
         <div>
+          <!--
+            #form-edit-title / #form-edit-sub：初始提示文字，選中某筆
+            就診紀錄後由 selectFormVisit() 更新為「查看或修改表單」+
+            該筆紀錄的就診日期。
+          -->
           <div class="chat-panel-title" id="form-edit-title">查看或修改表單</div>
           <div class="chat-panel-sub"   id="form-edit-sub">點擊就診紀錄載入出院單進行修改</div>
         </div>
         <!-- Header action buttons -->
         <div style="display:flex; gap:6px; align-items:center;">
-          <!-- Edit button (shown in view mode when record loaded) -->
+          <!--
+            「修改」按鈕：唯讀檢視模式下，若使用者具編輯權限（管理員
+            或本筆紀錄的負責醫師本人）才顯示（見 selectFormVisit() 的
+            canEdit 判斷）。點擊呼叫 enterViewEditMode() 切換到編輯模式。
+          -->
           <button class="btn btn-blue" id="btn-view-edit" title="編輯" style="display:none;" onclick="enterViewEditMode()">✏️ 修改</button>
-          <!-- Cancel button (shown in edit mode) -->
+          <!--
+            「取消」按鈕：僅編輯模式下顯示。點擊呼叫
+            exitViewEditMode(true)（true 代表顯示「已取消修改」提示 toast，
+            且不會送出任何後端請求，任何未儲存的編輯內容直接捨棄）。
+          -->
           <button class="btn btn-gray" id="btn-view-cancel" title="取消" style="display:none;" onclick="exitViewEditMode(true)">✕ 取消</button>
-          <!-- Confirm button (shown in edit mode, disabled until valid) -->
+          <!--
+            「儲存」按鈕：僅編輯模式下顯示，且初始 disabled——由
+            forms.js 的 validateViewEdit() 依「輸入合法 且 確實有變更」
+            兩個條件動態切換是否可點擊。點擊呼叫 openConfirmEditModal()
+            開啟確認 Modal（#modal-confirm-edit）預覽變更摘要，而非直接
+            送出，真正送出動作在 Modal 中確認後才觸發 submitViewEdit()。
+          -->
           <button class="btn btn-accent" id="btn-view-confirm" title="確認修改" style="display:none;" disabled onclick="openConfirmEditModal()">💾 儲存</button>
         </div>
       </div>
 
+      <!--
+        #form-edit-body：Column 3「查看/修改表單」內容主體，內含三種
+        互斥顯示的畫面：空狀態（未選擇紀錄）、唯讀檢視、編輯模式。
+      -->
       <div class="form-view-body" id="form-edit-body">
-        <!-- Empty state before select -->
+        <!-- 尚未選擇任何就診紀錄時的空狀態（預設顯示） -->
         <div class="empty-state" id="form-edit-empty">
           <div class="empty-icon">📋</div>
           <p>請先選擇就診紀錄以修改出院單</p>
         </div>
 
-        <!-- ── View mode: meta-box (hidden in edit mode) ── -->
+        <!--
+          ── 唯讀檢視模式容器（初始 style="display:none"，
+          selectFormVisit() 選中某筆就診紀錄後改為顯示；
+          enterViewEditMode()/exitViewEditMode() 負責與下方
+          #form-edit-container 的顯示互斥切換）──
+        -->
         <div id="form-view-container" style="display:none; padding:20px 24px; flex-direction:column; gap:20px;">
-          <!-- Hidden compat inputs -->
+          <!--
+            以下這些隱藏欄位（Hidden compat inputs）是舊版「卡片內編輯」
+            互動流程（toggleCardEditMode / saveFormEdit，定義於
+            forms.js，經檢查目前沒有任何可見按鈕會觸發它們）所使用的
+            相容性欄位，保留於 DOM 中純粹是為了不破壞既有程式碼行為，
+            實際的正式編輯流程走的是下方的 #form-edit-container
+            （enterViewEditMode 觸發），並非這裡的隱藏欄位。
+              - #edit-form-mrn / #edit-form-orig-date：記錄目前選中紀錄
+                的病歷號與原始就診日期（複合鍵），供 selectFormVisit()
+                寫入、saveFormEdit() 讀取。
+              - #edit-form-relation-input / #edit-form-mrn-input /
+                #edit-form-date-input：卡片內編輯模式的文字輸入欄
+                （toggleCardEditMode 讀寫）。
+              - #edit-form-doctor-select：卡片內編輯模式的醫師下拉選單
+                （目前為空，無任何 <option>，因為沒有對應初始化程式碼
+                去填充選項）。
+              - #edit-form-mrn-warning：病歷號重複時的警告文字。
+              - #card-view-mode / #card-edit-mode / #edit-form-admin-fields /
+                #edit-form-doctor-group / #btn-edit-card：卡片內編輯模式
+                切換顯示用的容器與按鈕佔位，皆為空 <div>，沒有任何內容
+                或子元素。
+          -->
           <input type="hidden" id="edit-form-mrn">
           <input type="hidden" id="edit-form-orig-date">
           <input type="hidden" id="edit-form-relation-input">
@@ -264,18 +599,32 @@
           <div id="edit-form-doctor-group" style="display:none;"></div>
           <div id="btn-edit-card" style="display:none;"></div>
 
-          <!-- Meta Box -->
+          <!--
+            Meta Box：唯讀展示這筆正式紀錄（record）的完整資訊。
+            所有欄位由 forms.js 的 selectFormVisit() 依
+            state.currentForms[idx] 與 state.allFormPatients 中找到的
+            對應病患資料填入。
+          -->
           <div class="doctor-meta-box">
+            <!-- 就診日期：該筆紀錄的 checkout_date（截取日期部分顯示） -->
             <div class="doctor-meta-row">
               <div class="doctor-meta-label">📅 就診日期</div>
               <div class="doctor-meta-val" id="display-form-date">-</div>
             </div>
             <div class="doctor-meta-divider"></div>
+            <!-- 負責醫師：由 f.doctor_account 對照 state.doctors 取得中文姓名 -->
             <div class="doctor-meta-row">
               <div class="doctor-meta-label">👨‍⚕️ 負責醫師</div>
               <div class="doctor-meta-val" id="display-form-doctor">-</div>
             </div>
             <div class="doctor-meta-divider"></div>
+            <!--
+              病患：關係文字（左，預設「帳號本人」）+ 需回診徽章（依
+              patientObj.status 動態顯示/隱藏與變色，見 forms.js 中
+              selectFormVisit 的徽章著色邏輯：須看診/已看診/須回診/
+              已回診四種狀態各自有不同底色/字色）+ 病歷號（右下角，
+              monospace 字型方便辨識）。
+            -->
             <div class="doctor-meta-row">
               <div class="doctor-meta-label">🏥 病患</div>
               <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
@@ -287,6 +636,10 @@
               </div>
             </div>
             <div class="doctor-meta-divider"></div>
+            <!--
+              衛教資料：把該筆紀錄的 symptoms 陣列渲染成一排唯讀
+              symptom-chip 標籤；若無症狀資料顯示「—」佔位符號。
+            -->
             <div class="doctor-meta-row">
               <div class="doctor-meta-label">📋 衛教資料</div>
               <div id="view-form-symptoms" style="display:flex; flex-wrap:wrap; gap:5px; justify-content:center; align-items:center; max-width:65%;">
@@ -295,13 +648,33 @@
             </div>
           </div>
 
+          <!--
+            #form-edit-error：錯誤訊息顯示區，selectFormVisit() 進入時
+            清空；saveFormEdit()（legacy 流程）失敗時會寫入錯誤文字。
+          -->
           <p class="error-msg" id="form-edit-error" style="text-align:left; color:var(--danger);"></p>
         </div><!-- /form-view-container -->
 
-        <!-- ── Edit mode layout (hidden by default) ── -->
+        <!--
+          ── 編輯模式版面（View Edit Mode，前綴 "ve-"，初始
+          style="display:none"，enterViewEditMode() 觸發時改為
+          display:flex；與上方 #form-view-container 互斥顯示）──
+          這是目前實際運作中的「修改出院單」介面，對應 forms.js 中
+          enterViewEditMode/exitViewEditMode/onVELineChange/
+          selectVEPatient/validateViewEdit/submitViewEdit 等函式，
+          最終送出走 PUT /api/forms/view_edit。
+        -->
         <div id="form-edit-container" class="view-edit-body" style="display:none;">
 
-          <!-- Non-admin read-only info -->
+          <!--
+            非管理員唯讀資訊區塊（初始 style="display:none"）：
+            依 forms.js 目前的 enterViewEditMode() 實作，這個區塊目前
+            恆為隱藏狀態（程式碼一律顯示 #ve-admin-fields 並隱藏本區塊，
+            不論是否為管理員），保留於 DOM 中是為了不更動既有結構；
+            其原始設計用意應是：若使用者不具編輯 LINE 帳號/病患關係的
+            權限，改顯示這裡的唯讀日期/醫師/病患資訊，而非下方可互動
+            的下拉選單。
+          -->
           <div id="ve-nonadmin-info" class="doctor-meta-box" style="display:none;">
             <div class="doctor-meta-row">
               <div class="doctor-meta-label">📅 就診日期</div>
@@ -324,9 +697,21 @@
             </div>
           </div>
 
-          <!-- Admin-only fields: LINE + patient dropdowns (hidden for non-admin) -->
+          <!--
+            LINE 帳號 + 病患下拉選單區塊（id 命名為 "ve-admin-fields"
+            雖含 "admin" 字樣，但依目前程式碼實際上對所有使用者一律
+            顯示，並非僅限管理員；display:contents 代表這個容器本身
+            不參與版面佈局計算，內部的 .view-edit-row 直接視為父層
+            flex/grid 容器的子項）
+          -->
           <div id="ve-admin-fields" style="display:contents;">
-            <!-- LINE dropdown -->
+            <!--
+              LINE 帳號下拉選單：結構與護理師填單分頁的 #nurse-line-dd
+              完全對應（自製下拉選單 + 頂部搜尋框 + 置頂分組），差異僅在
+              id 前綴為 "ve-"。點擊 #ve-line-btn 觸發
+              toggleVELineDropdown()，搜尋框 oninput 觸發
+              filterVELineAccounts()，選項點擊觸發 selectVELineAccount()。
+            -->
             <div class="view-edit-row">
               <label class="view-edit-label">LINE 帳號</label>
               <div class="nurse-custom-dd" id="ve-line-dd">
@@ -339,12 +724,20 @@
                     <input type="text" id="ve-line-search" class="nurse-draft-input" placeholder="🔍 搜尋 LINE 帳號…" oninput="filterVELineAccounts(this.value)" style="padding:6px 10px; font-size:13px;" />
                     <div id="ve-line-search-sub" style="font-size:11px; color:var(--muted); margin-top:4px; display:none;"></div>
                   </div>
+                  <!-- 由 filterVELineAccounts() 動態填入帳號選項 -->
                   <div id="ve-line-items-container"></div>
                 </div>
               </div>
             </div>
 
-            <!-- Patient dropdown (shown after LINE selected) -->
+            <!--
+              病患關係下拉選單（初始 style="display:none"，選定 LINE
+              帳號後由 onVELineChange() 改為 display:flex 並填入選項）。
+              與護理師填單分頁的差異：進入編輯模式時（enterViewEditMode）
+              會依原始紀錄的 relation 自動預選對應的關係選項，而非固定
+              預選「第一個」，讓使用者一進入編輯畫面就看到這筆紀錄原本
+              歸屬於誰。
+            -->
             <div class="view-edit-row" id="ve-patient-group" style="display:none;">
               <label class="view-edit-label">病患</label>
               <div class="nurse-custom-dd" id="ve-patient-dd">
@@ -356,19 +749,24 @@
               </div>
             </div>
 
-            <!-- Text inputs: relation + MRN (shown conditionally) -->
+            <!--
+              草稿式文字輸入欄（pair_id 為 'self' 或 'new' 時才顯示，
+              邏輯與護理師填單表單的 #nurse-draft-fields 完全對應），
+              oninput 皆觸發 validateViewEdit()（除了合法性驗證，還會
+              檢查是否「相對原始紀錄確實有變更」，決定儲存按鈕可用性）。
+            -->
             <div id="ve-draft-fields" style="display:none; flex-direction:column; gap:16px;">
-              <!-- self: MRN only -->
+              <!-- self 模式：僅病歷號輸入欄 -->
               <div class="view-edit-row" id="ve-self-mrn-row" style="display:none;">
                 <label class="view-edit-label">病歷號（帳號本人）</label>
                 <input type="text" id="ve-self-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateViewEdit()">
               </div>
-              <!-- new: relation input -->
+              <!-- new 模式：關係輸入欄 -->
               <div class="view-edit-row" id="ve-new-relation-row" style="display:none;">
                 <label class="view-edit-label">關係</label>
                 <input type="text" id="ve-new-relation" class="nurse-draft-input" placeholder="請輸入關係（如：子女）" oninput="validateViewEdit()">
               </div>
-              <!-- new: MRC input -->
+              <!-- new 模式：病歷號輸入欄 -->
               <div class="view-edit-row" id="ve-new-mrn-row" style="display:none;">
                 <label class="view-edit-label">病歷號（新增）</label>
                 <input type="text" id="ve-new-mrn" class="nurse-draft-input" placeholder="請輸入病歷號" oninput="validateViewEdit()">
@@ -377,19 +775,28 @@
           </div><!-- /ve-admin-fields -->
 
 
-          <!-- Symptom selection columns (cloned with ve- prefix) -->
+          <!--
+            三欄式症狀選擇器（編輯模式版，"ve-" 前綴，對應 forms.js 的
+            renderVEMainCol / renderVESymptomSubCol / renderVESymptomChips），
+            結構與醫師填單分頁的 #symptom-selection-container 完全相同，
+            差異僅在使用獨立的 DOM id 與獨立的 state
+            （state.veSelectedSymptoms / state.veActiveCategory），
+            確保兩個分頁的症狀選取狀態不會互相污染。
+            進入編輯模式時，欄3會先依原始紀錄的 symptoms 陣列預先渲染
+            已選標籤（見 enterViewEditMode 中複製 f.symptoms 的邏輯）。
+          -->
           <div class="symptom-selection-container" id="ve-symptom-selection">
-            <!-- Main column -->
+            <!-- 欄1：部位/類別 -->
             <div class="symptom-col" id="ve-symptom-main-col">
               <div class="symptom-col-header">部位 / 類別</div>
               <div class="symptom-col-body" id="ve-symptom-main-list"></div>
             </div>
-            <!-- Sub column -->
+            <!-- 欄2：衛教項目（展開某分類時顯示） -->
             <div class="symptom-col" id="ve-symptom-sub-col" style="display:none;">
               <div class="symptom-col-header" id="ve-symptom-sub-header">衛教項目</div>
               <div class="symptom-col-body" id="ve-symptom-sub-list"></div>
             </div>
-            <!-- Selected chips column -->
+            <!-- 欄3：已選擇項目（有已選症狀時顯示） -->
             <div class="symptom-col" id="ve-symptom-selected-col" style="display:none;">
               <div class="symptom-col-header">已選擇項目</div>
               <div class="symptom-col-body" id="ve-symptom-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; padding:10px;"></div>
@@ -402,7 +809,34 @@
     </div><!-- /forms-form-col -->
   </div><!-- /forms-layout -->
 
+<!--
+  ════════════════════════════════════════════════════════════════
+  以下三個 Modal 皆為「二次確認」用途的彈出視窗，平時以
+  .modal-backdrop 預設的 display:none 隱藏，由 JS 呼叫全域的
+  openModal(id) / closeModal(id)（定義於 script.js）切換顯示。
+  三者的 z-index 皆設為 600，高於一般內容，確保蓋在最上層。
+  ════════════════════════════════════════════════════════════════
+-->
+
 <!-- ── Modal：確認刪除草稿 ── -->
+<!--
+  用途：醫師分頁（doctor）點擊草稿工具列上的「刪除草稿」按鈕
+  （對應 deleteDoctorDraft()，見上方 809 行前的按鈕註解）時，
+  先彈出本 Modal 讓醫師二次確認，避免誤刪尚未送出的草稿。
+
+  互動流程：
+    1. deleteDoctorDraft() 被觸發 → 檢查目前是否已選取草稿
+       （state.selectedDoctorDraft）→ 若有，呼叫 openModal(
+       'modal-confirm-delete-draft') 顯示本視窗。
+    2. 使用者點擊「取消」→ closeModal('modal-confirm-delete-draft')
+       直接關閉，不做任何動作。
+    3. 使用者點擊「確定刪除」→ 呼叫 doDeleteDoctorDraft()，
+       此函式才會真正發送 DELETE /api/forms/doctor_draft/<filename>
+       請求給後端，成功後從草稿列表移除該筆、清空右側表單面板，
+       並關閉本 Modal、顯示成功 toast。
+  本 Modal 本身不含任何動態內容（純靜態警示文字），故不需要
+  額外的渲染函式配合。
+-->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-delete-draft" style="z-index: 600;">
   <div class="modal-alert">
     <div class="modal-alert-icon-wrap danger">
@@ -415,13 +849,44 @@
       <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">確定要刪除這份未完成出院單草稿嗎？此動作無法復原。</div>
     </div>
     <div class="modal-alert-actions">
+      <!-- 取消：僅關閉 Modal，不呼叫任何後端 API -->
       <button class="btn btn-outline" onclick="closeModal('modal-confirm-delete-draft')">取消</button>
+      <!-- 確定刪除：呼叫 doDeleteDoctorDraft()，內部會發送
+           DELETE /api/forms/doctor_draft/<filename>，刪除伺服器上
+           drafts/D{doctor_id}/{mrn}_{date}.json 草稿檔案 -->
       <button class="btn btn-danger" onclick="doDeleteDoctorDraft()">確定刪除</button>
     </div>
   </div>
 </div>
 
 <!-- ── Modal：確認傳送出院單 ── -->
+<!--
+  用途：醫師分頁點擊「傳送出院單」/「儲存」按鈕（對應
+  saveDoctorForm()，見上方 doctor-form-panel 內的按鈕）時，
+  先在本 Modal 中列出目前已勾選的所有衛教項目（症狀）供醫師
+  最後確認，避免漏勾或誤送。這是草稿轉為正式 record 前的
+  最後一道關卡。
+
+  互動流程：
+    1. saveDoctorForm() 先呼叫 validateDoctorSave() 做基本檢查
+       （是否已選草稿、是否至少勾選一項症狀等），若通過，
+       將 state.selectedSymptoms 中已選的症狀名稱以「chip」
+       （藥丸狀標籤）樣式渲染進 #modal-save-chips-container，
+       再呼叫 openModal('modal-confirm-save-draft') 顯示本視窗，
+       讓醫師以視覺化方式再次確認清單內容。
+    2. 使用者點擊「返回修改」→ closeModal(...)，回到症狀勾選畫面
+       自行調整。
+    3. 使用者點擊「確認傳送」→ 呼叫 doSaveDoctorForm()，此函式
+       才會真正發送 POST /api/forms/doctor_submit，
+       body 為 {filename, symptoms, line_patient_pair_id?,
+       checkout_date?}；後端成功後會將該筆資料正式寫入 record
+       資料表，並刪除對應的草稿 JSON 檔案。送出成功後關閉本
+       Modal、重新整理草稿列表、顯示成功 toast。
+  #modal-save-chips-container：由 JS 動態插入 <span> chip 元素，
+  每個 chip 對應一個已勾選的衛教項目名稱，純供閱讀確認、不可互動。
+  #btn-modal-confirm-save：確認送出按鈕，其 disabled 狀態可能由
+  JS 依「是否正在送出中」動態切換，避免重複點擊造成重複建立紀錄。
+-->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-save-draft" style="z-index: 600;">
   <div class="modal-alert" style="max-width: 440px;">
     <div class="modal-alert-icon-wrap primary">
@@ -431,15 +896,52 @@
     </div>
     <div class="modal-alert-title">確認傳送出院單</div>
     <div class="modal-alert-subtitle">請確認所選擇的衛教項目：</div>
+    <!-- 已選症狀 chip 清單容器：由 saveDoctorForm() 在開啟本 Modal 前
+         動態填入，內容來自 state.selectedSymptoms -->
     <div id="modal-save-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; justify-content:center; max-height:130px; overflow-y:auto; padding:4px;"></div>
     <div class="modal-alert-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-confirm-save-draft')">返回修改</button>
+      <!-- 確認傳送：呼叫 doSaveDoctorForm()，真正送出
+           POST /api/forms/doctor_submit，草稿 → 正式 record -->
       <button class="btn btn-accent" id="btn-modal-confirm-save" onclick="doSaveDoctorForm()">確認傳送</button>
     </div>
   </div>
 </div>
 
 <!-- ── Modal：確認修改表單 ── -->
+<!--
+  用途：「編輯模式」（View Edit Mode，#form-edit-container）中，
+  管理者（或本人）點擊「確認送出修改」按鈕（對應
+  openConfirmEditModal()）時，先在本 Modal 中列出「修改前 →
+  修改後」的差異摘要（例如新的 LINE 帳號、病人配對、關係、
+  病歷號、症狀清單等），讓使用者在真正送出前，能清楚看到
+  這次編輯會改變哪些欄位，避免誤操作（尤其病歷號變更屬於
+  admin 專屬且影響重大）。
+
+  互動流程：
+    1. 使用者在 #form-edit-container 內調整 LINE 帳號 / 病人
+       配對 / 症狀等欄位後，點擊送出 → 呼叫
+       openConfirmEditModal()，此函式會比對「原始資料」與
+       「目前 state.ve* 系列欄位」的差異，將差異項目逐條組成
+       HTML 字串塞入 #ve-confirm-diff，再呼叫
+       openModal('modal-confirm-edit') 顯示本視窗。
+    2. 使用者點擊「返回修改」→ closeModal(...)，回到編輯畫面
+       繼續調整。
+    3. 使用者點擊「確認修改」→ 呼叫 submitViewEdit()，此函式
+       才會真正發送對應的後端 API：
+         - 若僅修改症狀 / 關係（未變更配對）：
+           PUT /api/forms/<mrn>/<checkout_date>，
+           body {medical_record_num?, relation?, symptoms?}
+         - 若變更了 LINE 帳號 / 病人配對（pair_id 三種模式）：
+           PUT /api/forms/view_edit，
+           body {mrn, checkout_date, symptoms, line_account_id,
+           pair_id, relation?, new_mrn?}
+       送出成功後關閉本 Modal、退出編輯模式（exitViewEditMode()）、
+       重新載入該筆表單詳情以顯示最新內容、顯示成功 toast。
+  #ve-confirm-diff：由 openConfirmEditModal() 動態產生的差異摘要
+  容器，每個差異欄位通常以「欄位名稱：舊值 → 新值」的形式呈現。
+  #btn-modal-confirm-edit：確認修改按鈕，對應呼叫 submitViewEdit()。
+-->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-edit" style="z-index: 600;">
   <div class="modal-alert" style="max-width: 480px;">
     <div class="modal-alert-icon-wrap primary">
@@ -449,12 +951,16 @@
     </div>
     <div class="modal-alert-title">確認修改出院單</div>
     <div class="modal-alert-subtitle">請確認以下修改內容：</div>
+    <!-- 修改差異摘要容器：由 openConfirmEditModal() 動態填入 -->
     <div id="ve-confirm-diff" style="margin:12px 0; font-size:13px; display:flex; flex-direction:column; gap:8px;"></div>
     <div class="modal-alert-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-confirm-edit')">返回修改</button>
+      <!-- 確認修改：呼叫 submitViewEdit()，依是否變更配對決定呼叫
+           PUT /api/forms/<mrn>/<checkout_date> 或
+           PUT /api/forms/view_edit -->
       <button class="btn btn-accent" id="btn-modal-confirm-edit" onclick="submitViewEdit()">確認修改</button>
     </div>
 </div>
 </div>
-</section>
+</section><!-- /section-forms：出院衛教單管理分頁結束 -->
 

@@ -1,32 +1,88 @@
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  檔案總覽（doctors.html）
+  ════════════════════════════════════════════════════════════════════════
+  【角色定位】
+    本檔案是後台管理系統中「醫師帳號管理」分頁的 DOM 結構片段，會被主
+    版面（layout / index 頁面）以 include/樣板方式嵌入 <main> 區域中，
+    對應的 <section id="section-doctors"> 只有在使用者是管理員
+    （is_admin === 1，由 GET /api/me 判斷）時才會被側邊選單顯示連結。
+    本頁面本身沒有做「隱藏非管理員」的額外檢查（例如沒有另外用
+    JS 隱藏整個 section），實際的存取控制主要交由：
+      1) 側邊選單只在管理員身分下才提供進入此分頁的連結／切頁按鈕；
+      2) 後端所有寫入類 API（新增/刪除/編輯醫師、科別管理）皆套用
+         `@admin_required` 裝飾器，非管理員呼叫一律回 403。
+    因此即使有人手動修改前端繞過選單直接切到這個分頁，實際操作仍會被
+    後端擋下，不會造成資料被竄改。
+  【對應的 JS 邏輯】webpage/admin/js/doctors.js（所有 onclick 事件、
+    表單送出、Modal 開關與資料渲染邏輯皆定義於該檔案，本檔案僅描述
+    靜態 DOM 骨架與各元素的 id/onclick 綁定點）。
+  【主要區塊】
+    1. <section id="section-doctors"> — 醫師列表主畫面 + 頁首操作按鈕
+       （科別管理／新增醫師帳號）。
+    2. #modal-rename-department — 修改單一科別名稱的小型 Modal。
+    3. #modal-confirm-dept-action — 共用的「停用/啟用/刪除科別」二次
+       確認彈窗（依 JS 動態填入文字與樣式，同一個 DOM 結構重複使用於
+       三種不同操作）。
+    4. #modal-departments — 科別管理主 Modal（新增科別表單 + 科別清單
+       表格）。
+    5. #modal-doctor — 修改醫師資料 Modal。
+    6. #modal-add-doctor — 新增醫師帳號 Modal（內部又切換兩個子畫面：
+       表單填寫畫面 / 建立成功後顯示隨機密碼畫面）。
+  ════════════════════════════════════════════════════════════════════════
+-->
+
+<!-- ════════════════════════════════════════════════════════════════════
+     區塊 1：醫師帳號管理主畫面
+     ════════════════════════════════════════════════════════════════════
+     這是進入「醫師帳號管理」分頁後看到的主要畫面：一張列出所有醫師帳號
+     的表格，以及右上角兩個操作入口（科別管理 / 新增醫師帳號）。 -->
 <!-- 醫師帳號管理（管理員）-->
 <section id="section-doctors" class="section">
   <div class="section-title">
     醫師帳號管理
+    <!-- 純裝飾性標籤，提示使用者「此分頁功能僅限管理員」，並非權限控制
+         的實際機制（真正的控制點在後端 @admin_required 與側邊選單）。 -->
     <span class="role-tag role-admin" style="margin-left:8px;vertical-align:middle;">管理員</span>
   </div>
   <p style="font-size:13px;color:var(--muted);margin-top:6px;">
     可修改醫師姓名、啟用狀態，以及幫醫師重設密碼。
   </p>
+  <!-- 頁首操作按鈕列：靠右對齊排列，內含「科別管理」與「新增醫師帳號」
+       兩個入口，皆以行內 onclick 直接呼叫 doctors.js 中定義的函式，
+       不透過額外的事件監聽器綁定（本專案採用行內 onclick 風格）。 -->
   <div style="margin-top: 14px; margin-bottom: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+    <!-- 點擊後呼叫 openDepartmentModal()：開啟 #modal-departments，
+         並自動載入（GET /api/departments）目前所有科別清單。 -->
     <button class="btn btn-blue btn-sm" onclick="openDepartmentModal()">
       🏥 科別管理
     </button>
+    <!-- 點擊後呼叫 openAddDoctorModal()：開啟 #modal-add-doctor，
+         重置表單為空白狀態並載入科別下拉選單。 -->
     <button class="btn btn-accent btn-sm" onclick="openAddDoctorModal()">
       ➕ 新增醫師帳號
     </button>
   </div>
+  <!-- 醫師列表表格容器（doctor-table-wrap 可能負責提供水平/垂直
+       overflow 的樣式，讓表格在小螢幕上可捲動）。
+       表格本體的每一列 <tr> 完全由 JS（loadDoctors() in doctors.js）
+       動態產生並寫入 #doctor-tbody，這裡的 HTML 只定義欄位標題與初始
+       的「載入中…」佔位列，方便使用者在資料回來前就能看到骨架畫面。 -->
   <div class="doctor-table-wrap">
     <table id="doctor-table">
       <thead>
         <tr>
-          <th>帳號</th>
-          <th>姓名</th>
-          <th>科別</th>
-          <th>狀態</th>
-          <th>角色</th>
-          <th>操作</th>
+          <th>帳號</th>      <!-- 對應資料庫 account_name，登入用帳號，唯一值，建立後不可修改 -->
+          <th>姓名</th>      <!-- 對應資料庫 doctor_name -->
+          <th>科別</th>      <!-- 對應資料庫 department（前端欄位名為 specialty） -->
+          <th>狀態</th>      <!-- 對應資料庫 is_active，啟用/停用 -->
+          <th>角色</th>      <!-- 對應資料庫 is_admin，醫師/管理員 -->
+          <th>操作</th>      <!-- 「修改」「刪除」兩個動作按鈕 -->
         </tr>
       </thead>
+      <!-- 資料來源：GET /api/doctors（見 doctors.js: loadDoctors）。
+           每次載入分頁、新增/編輯/刪除醫師成功、或科別改名成功後，
+           都會重新呼叫該函式刷新此 tbody 的內容。 -->
       <tbody id="doctor-tbody">
         <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">載入中…</td></tr>
       </tbody>
@@ -34,62 +90,135 @@
   </div>
 </section>
 
+<!-- ════════════════════════════════════════════════════════════════════
+     區塊 2：修改科別名稱 Modal
+     ════════════════════════════════════════════════════════════════════
+     用途：讓管理員修改某個既有科別的名稱（改名會連動更新所有目前使用
+     該科別的醫師記錄）。此 Modal 是從「科別管理」Modal（#modal-departments）
+     內表格的「✏️ 修改」按鈕觸發開啟的，屬於巢狀（Modal 疊在 Modal 上）
+     的情境，因此以較高的 z-index:600 確保顯示在科別管理 Modal 之上。
+     開啟：openRenameDeptModal(oldName)（doctors.js）填入初始值後呼叫
+           openModal('modal-rename-department')。
+     關閉：右下「取消」按鈕直接呼叫 closeModal()；「儲存」按鈕則呼叫
+           executeRenameDepartment() 送出 API 請求，成功後才會關閉。 -->
 <!-- ── Modal：修改科別名稱 ── -->
 <div class="modal-backdrop" id="modal-rename-department" style="z-index: 600;">
   <div class="modal" style="max-width: 450px; width: 90%;">
     <div class="modal-title">✏️ 修改科別名稱</div>
+    <!-- 隱藏欄位：儲存「原本的科別名稱」字串，供 executeRenameDepartment()
+         讀取以組成 API 路徑 PUT /api/departments/<old_name>；使用者
+         看不到、也無法編輯這個欄位。 -->
     <input type="hidden" id="rename-dept-old-name">
     <div class="form-group">
       <label>原科別名稱</label>
+      <!-- 唯讀顯示欄，純粹讓使用者確認「現在正在改名的是哪一個科別」，
+           disabled 樣式呈現為灰底不可編輯。 -->
       <input type="text" id="rename-dept-old-name-show" disabled style="background:#f3f4f6;color:var(--muted)">
     </div>
     <div class="form-group">
       <label>新科別名稱</label>
+      <!-- 使用者實際輸入新名稱的欄位，openRenameDeptModal() 會預填成
+           與原名稱相同的值，方便使用者做小幅修改而非整段重打。 -->
       <input type="text" id="rename-dept-new-name" placeholder="輸入新名稱，如：小兒科">
     </div>
+    <!-- 錯誤訊息顯示區：executeRenameDepartment() 若收到後端 error（例如
+         新名稱重複），會把訊息寫入這裡。 -->
     <p class="error-msg" id="rename-dept-error" style="text-align:left"></p>
     <div class="modal-actions">
       <button class="btn btn-gray btn-sm" onclick="closeModal('modal-rename-department')">取消</button>
+      <!-- 送出改名請求：呼叫 executeRenameDepartment()，對應
+           PUT /api/departments/<old_name>，body { name: 新名稱 }。 -->
       <button class="btn btn-accent btn-sm" onclick="executeRenameDepartment()">💾 儲存</button>
     </div>
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════
+     區塊 3：共用「確認停用/啟用/刪除科別」彈窗
+     ════════════════════════════════════════════════════════════════════
+     這是一個「可重複使用」的通用確認彈窗：同一份 DOM 結構被三種不同的
+     科別操作（停用 disable／啟用 enable／刪除 delete）共用，所有文字
+     內容（標題、警示 banner 文字、副標、確認按鈕文字與顏色 class）都
+     不是寫死在 HTML 裡，而是由 JS 的 confirmDeptAction(name, action, isUsed)
+     在開啟前動態寫入對應的 DOM 節點，開啟後才呼叫 openModal()。
+     這裡的 id 前綴 "dept-action-" 即代表這些節點會被 JS 依 action 類型
+     覆寫內容，不能只看 HTML 的初始文字（例如目前寫死的 SVG 警示圖示、
+     "確認操作" 這種預設文字都只是初始佔位，實際顯示時幾乎都會被換掉）。
+     使用者點擊「確認」按鈕時呼叫 executeDeptAction()：讀取
+     confirmDeptAction() 之前存入的模組變數 pendingDeptName /
+     pendingDeptAction，決定要打哪一個後端 API
+     （DELETE /api/departments/<name> 或
+      PUT /api/departments/<name> { is_active: true/false }）。 -->
 <!-- ── Modal：確認停用或刪除科別 ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-dept-action">
   <div class="modal-alert">
+    <!-- 警示圖示外框：class 會被 JS 動態換成 danger/warning/success，
+         對應三種不同操作的色彩語意（刪除=危險紅、停用=警告黃、
+         啟用=成功綠）。目前 HTML 上的初始 class 為 warning，只是預設
+         狀態，實際顯示前一定會被 confirmDeptAction() 重新設定一次。 -->
     <div class="modal-alert-icon-wrap warning" id="dept-action-icon-wrap">
       <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
       </svg>
     </div>
+    <!-- 彈窗標題：JS 依 action 動態填入「確認刪除科別」/「確認停用科別」/
+         「確認啟用科別」。 -->
     <div class="modal-alert-title" id="dept-action-title">確認操作</div>
+    <!-- 醒目警示 banner：說明這個操作實際會造成什麼結果（例如刪除會
+         徹底移除；停用會說明「因為仍有醫師使用此科別，無法刪除，僅能
+         停用」，讓使用者理解限制的原因）。 -->
     <div class="modal-alert-banner warning" id="dept-action-banner">
       <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
       </svg>
       <div id="dept-action-banner-text" style="font-weight: 600; font-size: 14px; line-height: 1.45;">-</div>
     </div>
+    <!-- 次要說明文字：以問句形式再次確認，例如「確定要刪除『XX』科別嗎？
+         此操作不可逆！」。 -->
     <div class="modal-alert-subtitle" id="dept-action-subtitle">確定要執行此操作嗎？</div>
     <div class="modal-alert-actions">
+      <!-- 取消：單純關閉彈窗，不會清除 pendingDeptName/pendingDeptAction
+           （下次任何操作開始前 confirmDeptAction() 都會重新賦值，所以
+           殘留的舊值不會造成問題）。 -->
       <button class="btn btn-outline" onclick="closeModal('modal-confirm-dept-action')">取消</button>
+      <!-- 確認：呼叫 executeDeptAction() 真正送出 API 請求。按鈕文字與
+           class（btn-danger/btn-warn/btn-accent）同樣由
+           confirmDeptAction() 依 action 動態覆寫。 -->
       <button class="btn btn-danger" id="btn-dept-action-confirm" onclick="executeDeptAction()">確認</button>
     </div>
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════
+     區塊 4：科別管理主 Modal
+     ════════════════════════════════════════════════════════════════════
+     用途：獨立於「新增/編輯醫師」表單之外，讓管理員可以集中管理所有
+     科別資料（新增、改名、啟用/停用、刪除）。此 Modal 是進入本分頁後
+     點擊「🏥 科別管理」按鈕開啟（openDepartmentModal()），內部又會
+     觸發前面兩個子 Modal（修改科別名稱 / 確認停用啟用刪除）。
+     資料來源：GET /api/departments，由 loadDepartmentsList() 負責抓取
+     並渲染成下方表格；新增/改名/切換啟用/刪除完成後都會重新呼叫該函式
+     刷新表格內容。 -->
 <!-- ── Modal：科別管理 ── -->
 <div class="modal-backdrop" id="modal-departments">
   <div class="modal" style="max-width: 600px; width: 90%;">
     <div class="modal-title">🏥 科別管理</div>
-    
-    <!-- 新增科別表單 -->
+
+    <!-- 新增科別表單：單一輸入框 + 按鈕，點擊「新增科別」呼叫
+         addDepartment()，對應 POST /api/departments { name }。
+         若輸入的名稱剛好是已存在但被停用的科別，後端會直接重新啟用
+         它，而不是報「已存在」的錯誤。 -->
     <div style="background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
       <input type="text" id="new-department-name" placeholder="輸入新科別名稱，如：急診科" style="padding: 8px 12px; font-size: 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; flex: 1; background: var(--bg, #fff); color: var(--text, #333);">
       <button class="btn btn-accent btn-sm" onclick="addDepartment()" style="padding: 8px 16px; white-space: nowrap;">新增科別</button>
     </div>
-    
-    <!-- 科別列表 -->
+
+    <!-- 科別列表：捲動容器（超過 300px 高度即出現垂直滾軸），內含一張
+         表格，欄位分別為「科別名稱」「狀態（啟用中/已停用）」「操作」。
+         #department-tbody 的內容完全由 loadDepartmentsList() 動態產生，
+         每一列的第二個操作按鈕文字/顏色/行為（停用/啟用/刪除）皆依
+         該科別目前的 is_used 與 is_active 組合而不同，詳見
+         doctors.js 中 loadDepartmentsList() 的註解說明。 -->
     <div style="max-height: 300px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 8px;">
       <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
         <thead>
@@ -101,46 +230,93 @@
         </thead>
         <tbody id="department-tbody" style="color: var(--text);">
           <!-- Dynamically populated -->
+          <!-- 由 doctors.js 的 loadDepartmentsList() 依 GET /api/departments
+               回傳結果動態產生 <tr>，初次開啟 Modal 時會先顯示 spinner
+               載入中效果，資料回來後才替換成實際列表。 -->
         </tbody>
       </table>
     </div>
-    
+
+    <!-- 錯誤訊息顯示區：新增科別失敗、載入清單失敗等錯誤皆顯示於此。 -->
     <p class="error-msg" id="department-modal-error" style="text-align:left; margin-top: 10px;"></p>
     <div class="modal-actions" style="margin-top: 16px;">
+      <!-- 關閉整個科別管理 Modal，回到醫師列表主畫面；不會觸發任何
+           API 呼叫或重新整理醫師列表（除非之前已經有改名/停用等操作
+           各自觸發過對應的刷新邏輯）。 -->
       <button class="btn btn-gray btn-sm" onclick="closeDepartmentModal()">關閉</button>
     </div>
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════
+     區塊 5：修改醫師資料 Modal
+     ════════════════════════════════════════════════════════════════════
+     用途：管理員點擊醫師列表某一列的「✏️ 修改」按鈕後開啟，可修改
+     姓名、科別、帳號啟用狀態、角色（醫師/管理員），以及選填重設密碼。
+     開啟：loadDoctors() 產生的按鈕 onclick 呼叫
+           openDoctorEditModal(account, name, isActive, isAdmin, specialty)，
+           該函式會把目前資料填入下方各欄位後才呼叫 openModal()。
+     送出：點擊「💾 儲存」呼叫 saveDoctorEdit()，對應
+           PUT /api/doctors/<account>，body 依實際填寫組成
+           { doctor_name, specialty, is_active, is_admin, new_password? }。
+     重要限制（後端把關，前端僅顯示錯誤訊息）：若目前登入者正在修改
+     「自己」，且把角色從管理員改成醫師，而系統中沒有其他管理員帳號，
+     後端會拒絕此次修改，避免系統從此沒有人能再操作管理功能。 -->
 <!-- ── Modal：修改醫師 ── -->
 <div class="modal-backdrop" id="modal-doctor">
   <div class="modal">
     <div class="modal-title">✏️ 修改醫師資料</div>
+    <!-- 隱藏欄位：儲存目前正在編輯的醫師帳號（account_name），供
+         saveDoctorEdit() 組成 API 路徑 PUT /api/doctors/<account>；
+         此值不會顯示給使用者看，僅供 JS 內部使用。 -->
     <input type="hidden" id="edit-doctor-account">
     <div class="form-group">
       <label>帳號（不可修改）</label>
+      <!-- 唯讀顯示帳號名稱：帳號在建立後即無法更動（對應資料庫
+           account_name 為 UNIQUE 且無提供改帳號的 API），因此這裡
+           用 disabled 呈現，僅供辨識目前在編輯哪一位醫師。 -->
       <input type="text" id="edit-doctor-account-show" disabled style="background:#f3f4f6;color:var(--muted)">
     </div>
     <div class="form-group">
       <label>姓名</label>
+      <!-- 對應送出 payload 的 doctor_name；saveDoctorEdit() 會檢查此欄
+           不可為空白字串。 -->
       <input type="text" id="edit-doctor-name" placeholder="醫師姓名">
     </div>
     <div class="form-group">
       <label>科別</label>
+      <!-- 科別下拉選單：選項由 doctors.js 的 populateSpecialtySelect()
+           以 GET /api/departments 動態產生（<!-- Will be loaded
+           dynamically --> 僅為佔位註解，實際內容在開啟 Modal 時才會
+           被 JS 填入）。使用者選擇不同選項時觸發 onchange，呼叫
+           handleSpecialtySelectChange(this, 自訂欄位容器id, 實際input id)，
+           決定要不要切換到下方的「自訂科別名稱」輸入框。 -->
       <select id="edit-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'edit-doctor-specialty-custom-group', 'edit-doctor-specialty')">
         <!-- Will be loaded dynamically -->
       </select>
     </div>
+    <!-- 自訂科別名稱輸入框：預設隱藏（display:none），只有在使用者於
+         上方下拉選單選擇「➕ 新增其他科別」，或目前科別不在啟用中清單
+         裡時，才會被 JS 切換為顯示。這個 input 的值才是真正會被
+         saveDoctorEdit() 讀取並送出的 specialty 值（下拉選單本身只是
+         輔助使用者選擇，不會被直接讀取）。 -->
     <div class="form-group" id="edit-doctor-specialty-custom-group" style="display: none;">
       <label>自訂科別名稱</label>
       <input type="text" id="edit-doctor-specialty" placeholder="例如: 骨科">
     </div>
     <div class="form-group">
       <label>新密碼（留空則不修改）</label>
+      <!-- 密碼欄位永遠是空的初始值（openDoctorEditModal() 每次開啟都
+           會重置為空字串）。留空代表這次不重設密碼；只有填入內容時，
+           saveDoctorEdit() 才會把它加進 payload 的 new_password 欄位
+           一併送出。系統不會、也無法顯示醫師目前的密碼（僅以 sha256
+           雜湊儲存），因此這裡永遠是「設定新密碼」而非「顯示舊密碼」。 -->
       <input type="password" id="edit-doctor-pw" placeholder="輸入新密碼">
     </div>
     <div class="form-group">
       <label>帳號狀態</label>
+      <!-- 對應送出 payload 的 is_active：1=啟用（可登入使用系統），
+           0=停用（帳號被凍結，無法登入）。 -->
       <select id="edit-doctor-active">
         <option value="1">啟用</option>
         <option value="0">停用</option>
@@ -148,44 +324,92 @@
     </div>
     <div class="form-group">
       <label>角色</label>
+      <!-- 對應送出 payload 的 is_admin：1=管理員（可存取本分頁及所有
+           管理功能），0=一般醫師。若目前登入者正在把「自己」的角色
+           從管理員改為醫師，後端會檢查系統是否還有其他管理員存在，
+           沒有的話會拒絕此次修改（回傳 400），避免系統陷入無人可管理
+           的狀態；前端不重複驗證，只在收到錯誤時把訊息顯示出來。 -->
       <select id="edit-doctor-admin">
         <option value="0">醫師</option>
         <option value="1">管理員</option>
       </select>
     </div>
+    <!-- 錯誤訊息顯示區：儲存失敗時（前端必填檢查或後端回傳的 error）
+         顯示於此，不會關閉 Modal。 -->
     <p class="error-msg" id="doctor-modal-error" style="text-align:left"></p>
     <div class="modal-actions">
       <button class="btn btn-gray btn-sm" onclick="closeModal('modal-doctor')">取消</button>
+      <!-- 送出修改：呼叫 saveDoctorEdit()，成功後會關閉本 Modal 並重新
+           呼叫 loadDoctors() 刷新醫師列表。 -->
       <button class="btn btn-accent btn-sm" onclick="saveDoctorEdit()">💾 儲存</button>
     </div>
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════
+     區塊 6：新增醫師帳號 Modal
+     ════════════════════════════════════════════════════════════════════
+     用途：管理員點擊主畫面「➕ 新增醫師帳號」按鈕後開啟，用來建立一個
+     全新的醫師登入帳號。此 Modal 內部包含「兩個互斥顯示」的子容器，
+     依當前流程階段切換：
+       1. #add-doctor-form-container   — 填寫表單畫面（初始狀態顯示）。
+       2. #add-doctor-success-container — 建立成功後顯示帳號與系統自動
+          產生的隨機密碼（初始狀態隱藏，submitAddDoctor() 成功後才會
+          切換顯示）。
+     開啟：openAddDoctorModal()（重置表單為空白 + 載入科別選單 + 確保
+           顯示表單容器/隱藏成功容器）。
+     送出：submitAddDoctor()，對應 POST /api/doctors，body
+           { account_name, doctor_name, specialty, is_active, is_admin }。
+           成功時後端回傳 { success:true, password:'隨機8碼明文密碼' }
+           ——這是整個系統唯一會回傳明文密碼的時刻，之後永遠無法再次
+           取得，因此前端必須把它顯示出來並提醒使用者立刻複製轉交。 -->
 <!-- ── Modal：新增醫師 ── -->
 <div class="modal-backdrop" id="modal-add-doctor">
   <div class="modal">
+    <!-- 子容器 1：新增醫師表單本體。openAddDoctorModal() 開啟時會強制
+         display:block；submitAddDoctor() 成功建立帳號後會被切換為
+         display:none，讓畫面轉換到下方的成功／密碼顯示容器。 -->
     <div id="add-doctor-form-container">
       <div class="modal-title">➕ 新增醫師帳號</div>
       <div class="form-group">
         <label>帳號名稱（僅限英文、數字、底線，新增後無法修改）</label>
+        <!-- 對應送出 payload 的 account_name。實際的字元格式驗證（僅限
+             英數字+底線）由後端負責，前端只用 placeholder 提示格式，
+             若格式不符會由後端回傳 error 顯示於下方錯誤區。此帳號一旦
+             建立即為唯一值（UNIQUE），且系統沒有提供「改帳號名稱」的
+             功能，因此標籤特別強調「新增後無法修改」。 -->
         <input type="text" id="add-doctor-account" placeholder="例如: dr_wang">
       </div>
       <div class="form-group">
         <label>姓名</label>
+        <!-- 對應送出 payload 的 doctor_name；submitAddDoctor() 會檢查
+             帳號與姓名皆不可為空白。 -->
         <input type="text" id="add-doctor-name" placeholder="例如: 王大明">
       </div>
       <div class="form-group">
         <label>科別</label>
+        <!-- 科別下拉選單：與修改醫師 Modal 共用同一套
+             populateSpecialtySelect() / handleSpecialtySelectChange()
+             邏輯，選項由 GET /api/departments 動態載入。新增情境下
+             selectedValue 傳入空字串，因此預設會選中目前啟用中科別的
+             第一筆，若目前沒有任何啟用中的科別，則自動切換為「自訂
+             輸入」模式。 -->
         <select id="add-doctor-specialty-select" onchange="handleSpecialtySelectChange(this, 'add-doctor-specialty-custom-group', 'add-doctor-specialty')">
           <!-- Will be loaded dynamically -->
         </select>
       </div>
+      <!-- 自訂科別名稱輸入框：預設隱藏，選單選到「➕ 新增其他科別」時
+           才會顯示。這裡輸入的值若是全新科別名稱，後端會在建立醫師
+           成功的同時，自動把這個新科別名稱同步寫入
+           data/departments.json，不需要另外跑去「科別管理」Modal 新增。 -->
       <div class="form-group" id="add-doctor-specialty-custom-group" style="display: none;">
         <label>自訂科別名稱</label>
         <input type="text" id="add-doctor-specialty" placeholder="例如: 骨科">
       </div>
       <div class="form-group">
         <label>狀態</label>
+        <!-- 對應送出 payload 的 is_active，預設值 1（啟用），代表新建立
+             的帳號可以立刻登入使用。 -->
         <select id="add-doctor-active">
           <option value="1">啟用</option>
           <option value="0">停用</option>
@@ -193,37 +417,63 @@
       </div>
       <div class="form-group">
         <label>角色</label>
+        <!-- 對應送出 payload 的 is_admin，預設值 0（一般醫師），刻意
+             把「管理員」設為非預設選項，降低誤新增出額外管理員帳號的
+             風險，管理員權限應是明確、刻意的選擇。 -->
         <select id="add-doctor-admin">
           <option value="0">醫師</option>
           <option value="1">管理員</option>
         </select>
       </div>
+      <!-- 錯誤訊息顯示區：前端必填檢查失敗、或後端回傳的 error（例如
+           帳號重複、格式不符）皆顯示於此，不會關閉 Modal 也不會清空
+           已輸入的欄位。 -->
       <p class="error-msg" id="add-doctor-modal-error" style="text-align:left"></p>
       <div class="modal-actions">
         <button class="btn btn-gray btn-sm" onclick="closeAddDoctorModal()">取消</button>
+        <!-- 送出新增：呼叫 submitAddDoctor()，成功時會切換到下方的密碼
+             顯示容器，不會立即關閉 Modal（要讓管理員先看到並複製密碼）。 -->
         <button class="btn btn-accent btn-sm" onclick="submitAddDoctor()">建立帳號</button>
       </div>
     </div>
-    
+
+    <!-- 子容器 2：建立成功後顯示的密碼資訊面板。
+         初始 display:none，submitAddDoctor() 成功取得
+         { success:true, password } 後才會被切換為顯示，並隱藏上方的
+         表單容器。此面板顯示的帳號/密碼文字由 JS 直接寫入
+         #success-doctor-account / #success-doctor-password。 -->
     <!-- 建立成功後顯示的密碼資訊面板 -->
     <div id="add-doctor-success-container" style="display: none; text-align: center;">
       <div class="modal-title" style="color: var(--accent);">🎉 帳號建立成功</div>
       <p style="font-size: 14px; margin-bottom: 16px;">帳號已成功建立，系統已自動為此醫師生成隨機密碼：</p>
-      
+
       <div style="background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
         <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">登入帳號</div>
+        <!-- 由 submitAddDoctor() 填入剛建立的 account_name（原樣顯示，
+             因為這是使用者自己剛輸入的值，非需要額外 escape 的動態
+             HTML 拼接情境）。 -->
         <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 14px;" id="success-doctor-account">—</div>
         <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">自動生成密碼</div>
+        <!-- 由 submitAddDoctor() 填入後端回傳的明文隨機密碼（res.password）。
+             這是系統中唯一一處會顯示明文密碼的地方；資料庫僅保存
+             sha256 雜湊值，一旦這個畫面被關閉，此密碼將永久無法再被
+             系統任何介面顯示出來，只能由管理員自行透過「重設密碼」
+             （修改醫師 Modal 中的「新密碼」欄位）產生新的密碼。 -->
         <div style="font-size: 20px; font-weight: 800; color: var(--primary); font-family: monospace; letter-spacing: 1px;" id="success-doctor-password">—</div>
       </div>
-      
+
       <p style="font-size: 12px; color: var(--danger); font-weight: 600; margin-bottom: 20px;">
         ⚠️ 請複製此密碼並轉交給該醫師。<br>
         此密碼僅顯示這一次，關閉視窗後將無法再次檢視！
       </p>
-      
+
       <div class="modal-actions" style="justify-content: center; gap: 12px;">
+          <!-- 呼叫 copyGeneratedPassword()：讀取上方顯示的密碼文字，
+               寫入系統剪貼簿，純前端操作，不呼叫任何後端 API。 -->
           <button class="btn btn-primary btn-sm" onclick="copyGeneratedPassword()">📋 複製密碼</button>
+          <!-- 呼叫 closeAddDoctorModal(true)：關閉 Modal 並帶入
+               shouldReload=true，觸發重新呼叫 loadDoctors() 讓新建立的
+               醫師出現在主畫面列表中。 -->
           <button class="btn btn-gray btn-sm" onclick="closeAddDoctorModal(true)" style="min-width: 60px; line-height: 1.4;">關閉<br>視窗</button>
       </div>
     </div>

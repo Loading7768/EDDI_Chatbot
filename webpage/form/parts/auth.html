@@ -1,7 +1,23 @@
+<!--
+    parts/auth.html — 步驟 0「醫師登入」卡片內容
+
+    由 form.html 的 {% include %} 動態載入，對應 state.js 中 key === 'auth' 的步驟。
+    本片段含三種畫面狀態，各自用獨立的 <template x-if> 區塊控制顯示：
+        1. 展開中 + 未登入（step.authed === false）→ 登入表單
+        2. 展開中 + 已登入（step.authed === true）→ 登出確認畫面
+        3. 已完成且非目前展開步驟（step.completed && i !== currentStep）→ 一行摘要
+-->
+
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
     <div class="flex flex-col h-full">
 
+        <!--
+            登入表單：僅在尚未登入時顯示。
+            帳號/密碼輸入使用 macros.html 的 text_input 巨集，
+            對應資料綁定在 step.draft.account / step.draft.password。
+            按鈕（登入）在帳號或密碼任一為空時停用（disableCond）。
+        -->
         <template x-if="!step.authed">
             <div class="login-wrapper">
 
@@ -19,7 +35,7 @@
                             inputType='text',
                             label='帳號'
                         ) }}
-    
+
                         {{ text_input(
                             inputId='password',
                             inputType='password',
@@ -43,6 +59,12 @@
             </div>
         </template>
 
+        <!--
+            登出確認畫面：僅在已登入時顯示（取代整張卡片變成「你要登出嗎？」的提示）。
+            右上角有一個取消（cancel 圖示）按鈕呼叫 cancelLogout()，
+            會直接跳回按下登出前所在的步驟（app.js 的 prevStep）而不清除任何狀態；
+            底部的「登出」按鈕才會真正呼叫 confirmLogout() 清除 session 並重置整個表單。
+        -->
         <template x-if="step.authed">
             <div class="logout-wrapper">
 
@@ -83,6 +105,10 @@
 </template>
 
 <!-- Completed: compact summary -->
+<!--
+    收合摘要：僅顯示「您好！<醫師姓名> 醫師」的問候語，
+    doctorName 由 confirmLogin() 成功時或 app.js init() 從 window.doctorInfo 還原設定。
+-->
 <template x-if="step.completed && i !== currentStep">
     <div class="flex items-center gap-4">
         <span class="material-symbols-rounded text-blue-400">stethoscope</span>

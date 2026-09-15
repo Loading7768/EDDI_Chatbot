@@ -1,13 +1,94 @@
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  檔案總覽 (File Overview)
+  ════════════════════════════════════════════════════════════════════════
+  檔名：webpage/admin/html/admin.html
+
+  【系統角色】
+    這是「急診出院衛教 LINE Bot 醫護後台管理系統」的主框架 (Shell)頁面，
+    也是整個後台系統唯一的實體 HTML 進入點。
+
+    對應後端路由：Flask 端由 src/admin_server.py 中的 admin_bp Blueprint
+    註冊：
+      - GET /main            → render_template('admin/html/admin.html')
+                                （即本檔案，由 Jinja2 模板引擎渲染後回傳）
+      - GET /main/css/<file> → 對應 webpage/admin/css/ 下的靜態檔案
+      - GET /main/js/<file>  → 對應 webpage/admin/js/ 下的靜態檔案
+    此檔案本身雖是 .html，但實際上是以 Jinja2 模板方式被 Flask 渲染
+    （見下方 {% include ... %} 語法），並非單純靜態檔。
+
+  【本檔案在架構中的定位：外殼 / 主框架 (Shell)】
+    本檔案本身「不」含有任何分頁 (chats / doctors / education / forms /
+    prompt / stats) 的實際內容 HTML，而是透過 Jinja2 的
+    {% include 'admin/html/xxx.html' %} 語法，在伺服器端渲染時把六個分頁
+    各自的 HTML 片段「原封不動地貼進來」，全部一次性輸出成同一份完整
+    HTML 文件。也就是說：
+      - 六個分頁的 DOM 節點「同時存在」於最終頁面中（不是 iframe、也不是
+        用 innerHTML 動態替換），彼此以 class="section" 標記，並各自有
+        獨立的 id="section-<name>"（例如 section-stats、section-chats…）。
+      - 切換分頁時（見 webpage/admin/js/script.js 的 showSection()）
+        只是幫「目前要顯示的那個 .section」加上 .active class，
+        其餘全部移除 .active；CSS 端負責讓沒有 .active 的區塊隱藏。
+        因此切分頁「不會」重新發送 HTML 請求，只是 CSS 顯示/隱藏的切換，
+        搭配對應分頁 JS 檔案（stats.js / chats.js / forms.js / doctors.js /
+        prompt.js / education.js）在切換時觸發各自的資料載入函式
+        （loadStats() / loadChats() / loadFormsPatientList() / loadPrompt()
+        / loadDoctors() 等）。
+      - 六個分頁各自的 <script> 於本檔案結尾統一依序載入（見檔案最下方），
+        彼此共用同一個全域 JavaScript 執行環境（無模組化 import/export、
+        無 Shadow DOM 隔離），彼此透過共用的全域 state 物件、esc()/api()/
+        showToast() 等工具函式互相協作。
+      - 六個分頁各自的內容與邏輯（HTML 結構 + 對應 .js 檔）由其他協作者
+        平行維護，本檔案只需維持「掛載點」正確（即
+        {% include %} 呼叫與最下方 <script src> 清單），不深入修改。
+
+  【本檔案負責的共用功能（皆由 webpage/admin/js/script.js 驅動）】
+    1. 登入畫面 (#login-screen)：帳號密碼輸入、顯示/隱藏密碼、送出登入。
+    2. 應用程式主體外框 (#app)：頂部導覽列 header、側邊選單 sidebar（含
+       手機版漢堡選單開關）、以及六個分頁內容的容器 <main>。
+    3. 側邊選單導覽項目 (.nav-item)：點擊切換分頁 (showSection())，並依
+       登入者是否為管理員 (is_admin) 決定「醫師帳號管理」「Prompt 修改」
+       兩個項目是否顯示（class="admin-only"）。
+    4. 共用彈出視窗 (Modal)：
+         - modal-session-conflict：偵測到同帳號已在他處登入時，讓使用者
+           選擇「保留原登入」或「強制在此登入（踢掉另一邊）」。
+         - modal-kicked-out：本連線被他處登入擠掉時的告知視窗。
+         - modal-confirm-logout：點擊「登出」按鈕後的二次確認視窗。
+         - modal-alert-error：泛用錯誤提示視窗（例如新增/修改資料時發生
+           病歷號重複等後端驗證錯誤，由各分頁 JS 呼叫共用開啟）。
+    5. 全域 loading 覆蓋層 (#loading) 與 toast 訊息 (#toast)：所有分頁共用
+       的「載入中」動畫與訊息提示元件，由 script.js 的 loading()/
+       showToast() 控制。
+
+  【依賴關係】
+    - 依賴 /main/css/style.css 提供版面樣式（含 .section/.active、
+      .modal-backdrop/.open、.sidebar/.open 等狀態 class 的視覺效果）。
+    - 依賴 /main/js/script.js（本專案配對檔案）提供上述所有共用邏輯的
+      JavaScript 實作；其餘 6 支分頁 JS 依賴 script.js 先定義好的
+      state、api()、showToast()、esc() 等共用工具，才能正常運作。
+    - 被 src/admin_server.py 的 GET /main 路由渲染回傳；使用者瀏覽器
+      直接載入本頁作為整個管理後台的單頁應用 (SPA-like) 入口。
+  ════════════════════════════════════════════════════════════════════════
+-->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>中醫大急診「出院」衛教系統管理平台</title>
+  <!-- 對應 GET /main/css/style.css（src/admin_server.py 靜態檔路由），提供整份後台的版面與元件樣式 -->
   <link rel="stylesheet" href="/main/css/style.css">
 </head>
 <body>
 
+<!--
+  ════ LOGIN 登入畫面 ════
+  說明：使用者首次載入頁面時，JS 端 checkAuth()（於 DOMContentLoaded 時
+  自動呼叫）會先呼叫 GET /api/me 確認 session 是否已登入。
+  尚未登入（或已登出、被踢出）時，會顯示此區塊、隱藏 #app 主體。
+  此區塊與 #app 為互斥顯示（一次只會顯示其中一個，透過 inline style
+  display 屬性切換，非 class 切換）。
+-->
 <!-- ════ LOGIN ════ -->
 <div id="login-screen">
   <div class="login-card">
@@ -16,10 +97,18 @@
       <h1>中醫大急診<br>「出院」衛教系統管理平台</h1>
       <p>急診衛教聊天機器人管理平台</p>
     </div>
+    <!-- 帳號輸入框：對應 doctors 表的 account_name。id="login-user" 由 doLogin() 讀取其 .value -->
     <div class="form-group">
       <label>帳號</label>
       <input type="text" id="login-user" placeholder="輸入醫師帳號" autocomplete="username">
     </div>
+    <!--
+      密碼輸入框：id="login-pass"，其 .value 由 doLogin() 讀取（明文，
+      實際的雜湊比對在後端 POST /api/login 進行，前端不做加密處理，
+      僅靠 HTTPS 傳輸層保護）。
+      右側的「顯示/隱藏密碼」眼睛按鈕呼叫 togglePasswordVisibility()，
+      純粹切換 input[type] 在 'password' 與 'text' 之間，不影響送出的值。
+    -->
     <div class="form-group">
       <label>密碼</label>
       <div class="password-wrapper">
@@ -29,19 +118,44 @@
         </button>
       </div>
     </div>
+    <!-- 登入按鈕：觸發 doLogin()（POST /api/login），登入中會顯示 spinner 並停用按鈕避免重複送出 -->
     <button class="btn btn-primary" id="login-btn" onclick="doLogin()">登入</button>
+    <!-- 登入錯誤訊息顯示區：doLogin() 失敗時把後端 error 字串寫入這裡的 textContent -->
     <p class="error-msg" id="login-error"></p>
   </div>
 </div>
 
+<!--
+  ════ APP 應用程式主體外框 ════
+  說明：登入成功後（initApp() 執行），此區塊會被改為 display:flex 顯示，
+  取代登入畫面。內部由三大塊構成：
+    1. <header>：頂部導覽列（漢堡選單、系統標題、使用者資訊、登出按鈕）
+    2. <nav class="sidebar">：側邊抽屜式選單（六個分頁的導覽入口）
+    3. <div class="layout"><main>：實際承載六個分頁內容的容器，六個
+       分頁 HTML 皆透過 Jinja2 {% include %} 在伺服器端渲染時插入於此。
+-->
 <!-- ════ APP ════ -->
 <div id="app" style="display:none; flex-direction:column; height:100vh;">
 
   <header>
+    <!--
+      漢堡選單按鈕：僅在小螢幕（手機版 RWD）需要用來展開/收合側邊選單，
+      呼叫 toggleSidebar()，會依目前 #sidebar 是否已有 .open class
+      決定要「開啟」還是「關閉」（互斥切換，避免重複疊加動畫）。
+    -->
     <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="選單">
       <span></span><span></span><span></span>
     </button>
     <span class="header-logo">🏥 中醫大急診「出院」衛教系統管理平台</span>
+    <!--
+      使用者資訊區：登入成功後由 initApp() 動態填入。
+        - #header-name：顯示登入醫師姓名 (me.doctor_name)
+        - #header-role：顯示身分標籤（「醫師」或「醫師 (管理員)」），
+          並依 is_admin 加上 role-admin / role-doctor 這兩個不同外觀的
+          class，讓管理員與一般醫師在視覺上有區別（例如不同顏色底色）。
+        - 「登出」按鈕：不直接登出，而是先開啟二次確認 Modal
+          (modal-confirm-logout)，避免使用者誤觸導致工作階段中斷。
+    -->
     <div class="header-user">
       <span class="user-badge" id="header-name">—</span>
       <span class="role-tag"   id="header-role">—</span>
@@ -49,15 +163,39 @@
     </div>
   </header>
 
-  <!-- sidebar overlay -->
+  <!-- sidebar overlay：側邊選單展開時鋪在主內容上方的半透明遮罩，點擊遮罩本身（非選單）即呼叫 closeSidebar() 收合選單，屬常見的「點外部關閉」UX 模式 -->
   <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
-  <!-- sidebar drawer -->
+  <!--
+    sidebar drawer：側邊抽屜式導覽選單。桌面版可能常駐顯示、手機版預設
+    收合，透過 .open class（由 toggleSidebar()/closeSidebar() 控制）
+    切換滑入/滑出動畫（CSS 負責視覺效果，此處只負責 DOM 結構與事件）。
+  -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <span>🏥 功能選單</span>
+      <!-- 選單內建的關閉按鈕（手機版常見於抽屜選單右上角的 ✕），效果等同點擊遮罩 -->
       <button class="sidebar-close" onclick="closeSidebar()">✕</button>
     </div>
+    <!--
+      導覽項目清單：每個 .nav-item 對應一個分頁區塊，data-sec 屬性即
+      該分頁在 #app 內容區的 id 後綴（例如 data-sec="stats" 對應
+      id="section-stats"）。點擊會呼叫 showSection(name)：
+        1. 把該名稱寫入 localStorage（key: admin_active_section），
+           讓下次重新整理頁面時記得使用者最後停留的分頁。
+        2. 移除所有 .section / .nav-item 的 .active class，只給
+           目前選中的那組加上 .active（CSS 靠這個 class 決定顯示/隱藏、
+           以及側邊選單目前項目的高亮樣式）。
+        3. 依名稱呼叫對應分頁 JS 的資料載入函式（見 script.js 的
+           showSection() 實作），確保每次切換分頁都拿到最新資料。
+        4. 呼叫 closeSidebar()，在手機版切換分頁後自動收合選單。
+
+      「醫師帳號管理」與「Prompt 修改」兩個項目加了 admin-only class，
+      預設 inline style="display:none" 隱藏；只有登入者 is_admin === true
+      時，initApp() 才會把所有 .admin-only 元素的 display 改回可見，
+      避免一般醫師看到/誤觸管理員限定功能（後端 API 仍會再做一次權限
+      檢查，前端隱藏僅是 UX 層級的防呆，非安全邊界）。
+    -->
     <div class="nav-items">
       <div class="nav-item active" data-sec="stats"   onclick="showSection('stats')">
         <span class="nav-icon">📊</span> 統計數據
@@ -79,31 +217,47 @@
     </div>
   </nav>
 
+  <!--
+    主內容容器：六個分頁的 HTML 皆由 Jinja2 於「伺服器端渲染時」
+    透過 {% include %} 插入，最終瀏覽器收到的是「六份分頁內容全部都在」
+    的單一 HTML（並非前端動態 fetch 局部 HTML 片段、也不是 iframe）。
+    每個被 include 進來的檔案內部應各自定義一個 <section id="section-xxx"
+    class="section">，並由 showSection() 控制其中一個帶有 .active。
+    此檔案不修改各分頁內部內容，僅負責掛載順序（同時也隱含了在
+    DOM 中的先後順序，可能影響預設無 JS 時的顯示順序，但實務上皆由
+    CSS/JS 控制顯示，此順序本身不影響功能）。
+  -->
   <div class="layout">
     <main>
 
-      <!-- 統計數據 -->
+      <!-- 統計數據：好友數/病患數/表單數/Bot 使用率等儀表板，內容與邏輯由 stats.html + stats.js 負責 -->
       {% include 'admin/html/stats.html' %}
 
-      <!-- 聊天紀錄 -->
+      <!-- 聊天紀錄：病患對話紀錄列表與詳情（含 LINE 對話 session 與出院單），內容與邏輯由 chats.html + chats.js 負責 -->
       {% include 'admin/html/chats.html' %}
 
-      <!-- 修改表單 -->
+      <!-- 修改表單（出院單管理）：護理站建立草稿出院單、醫師確認送出，內容與邏輯由 forms.html + forms.js 負責 -->
       {% include 'admin/html/forms.html' %}
 
-      <!-- 醫師帳號管理（管理員）-->
+      <!-- 醫師帳號管理（管理員限定）：新增/停用醫師帳號等，內容與邏輯由 doctors.html + doctors.js 負責 -->
       {% include 'admin/html/doctors.html' %}
 
-      <!-- Prompt 修改 -->
+      <!-- Prompt 修改（管理員限定）：LLM system prompt 版本管理，內容與邏輯由 prompt.html + prompt.js 負責 -->
       {% include 'admin/html/prompt.html' %}
 
-      <!-- 衛教資料管理 -->
+      <!-- 衛教資料管理：部位/類別/md 檔管理，內容與邏輯由 education.html + education.js 負責 -->
       {% include 'admin/html/education.html' %}
-      
+
     </main>
   </div>
 </div>
 
+<!--
+  loading：全域載入中覆蓋層。由 script.js 的 loading(true/false) 控制
+  是否加上 .active class（顯示/隱藏）。任何分頁在發送需要等待的 API
+  請求（例如載入清單、送出表單）時，皆可共用此元件顯示等待動畫，
+  避免使用者在等待期間重複點擊觸發重複請求。
+-->
 <!-- loading -->
 <div class="loading-overlay" id="loading">
   <div class="loading-box">
@@ -112,6 +266,18 @@
   </div>
 </div>
 
+<!--
+  ── Modal：重複登入衝突 ──
+  觸發時機：呼叫 POST /api/login 時，若後端偵測到「此帳號已在其他地方
+  登入」，會回傳 { success:false, conflict:true }（非直接視為登入失敗），
+  此時 doLogin() 會開啟本 Modal，讓使用者二選一：
+    - 「保留原本登入（不在此登入）」：關閉 Modal，維持現狀，不送出強制登入
+    - 「在此處登入（強制登出另一邊）」：呼叫 doLogin(true)，帶入 force=true
+      重新送出 POST /api/login { username, password, force:true }，
+      後端收到 force=true 時會讓「這一邊」登入成功、並讓原本已登入的
+      那一邊 session 失效（下次原本那邊發出 API 請求時會收到 401 並顯示
+      modal-kicked-out）。
+-->
 <!-- ── Modal：重複登入衝突 ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-session-conflict">
   <div class="modal-alert">
@@ -135,6 +301,18 @@
   </div>
 </div>
 
+<!--
+  ── Modal：重複登入被迫登出 ──
+  觸發時機（兩種來源）：
+    1. checkAuth()（頁面載入時呼叫 GET /api/me）發現 me.kicked_out 為
+       true，代表 session 已存在但被標記為「已被他處強制登出」。
+    2. api() 這個共用的 fetch 包裝函式在收到任何 API 回應
+       status === 401，且錯誤訊息字串精確等於
+       '您的帳號已在其他地方登入，此連線已被登出。' 時，代表使用者操作
+       過程中被踢出，此時立即開啟本 Modal 告知，並呼叫 showLogin()
+       退回登入畫面。
+  使用者只能按「確定」關閉，並提醒若非本人操作應儘速修改密碼（安全提示）。
+-->
 <!-- ── Modal：重複登入被迫登出 ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-kicked-out">
   <div class="modal-alert">
@@ -157,6 +335,20 @@
   </div>
 </div>
 
+<!--
+  ── Modal：確認登出 ──
+  觸發時機：使用者點擊 header 上的「登出」按鈕（openModal('modal-confirm-logout')）。
+  這是一個二次確認 UX，避免誤觸。
+    - 「取消」：僅關閉 Modal，不做任何動作。
+    - 「確認登出」：呼叫 executeLogout()，實際流程：
+        1. 關閉本 Modal
+        2. 清除 localStorage 的 admin_active_section（下次登入預設回到 stats 分頁）
+        3. 呼叫 POST /api/logout（後端清除 Flask session cookie）
+        4. 重置全域 state.currentMrn 為 null，並呼叫其他分頁（forms.js）
+           暴露出的 window.resetFormsWorkspace()（若存在）清空表單編輯區工作狀態，
+           避免登出後殘留上一位使用者的編輯內容
+        5. 清空登入表單輸入框、呼叫 showLogin() 顯示登入畫面
+-->
 <!-- ── Modal：確認登出 ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-logout">
   <div class="modal-alert">
@@ -180,6 +372,18 @@
   </div>
 </div>
 
+<!--
+  ── Modal：錯誤提示（泛用）──
+  觸發時機：由各分頁的 JS（例如 forms.js、doctors.js 等，本檔案不定義
+  觸發點）在呼叫後端 API 收到業務邏輯錯誤時（例如新增/修改病歷資料時
+  病歷號重複），動態把錯誤訊息寫入 #error-alert-message 的 textContent
+  或 innerHTML，再呼叫 openModal('modal-alert-error') 顯示。
+  z-index 特別設為 600，高於一般 Modal（modal-backdrop 預設層級），確保
+  即使在其他 Modal 開啟中仍能顯示於最上層（例如編輯表單 Modal 開著時
+  跳出的驗證錯誤）。
+  此處預設文字「該病歷號已存在於系統中，無法修改為此號碼。」僅為初始
+  佔位內容，實際顯示內容會被呼叫端的 JS 覆寫。
+-->
 <!-- ── Modal：錯誤提示 ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-alert-error" style="z-index: 600;">
   <div class="modal-alert">
@@ -202,8 +406,30 @@
   </div>
 </div>
 
+<!--
+  toast：全域輕量訊息提示元件（例如「儲存成功」「刪除成功」等短暫通知）。
+  由 script.js 的 showToast(msg, type) 控制：把文字寫入 textContent，
+  加上 'toast ' + type + ' show' 的 class（type 例如 'success'/'fail'，
+  由 CSS 決定不同底色），並在 2.8 秒後自動移除 'show' class 使其淡出。
+  各分頁 JS 皆可呼叫此共用函式顯示提示，不需各自實作。
+-->
 <!-- toast -->
 <div class="toast" id="toast"></div>
+  <!--
+    以下依序載入本系統所有前端 JavaScript 檔案（對應 GET /main/js/<filename>
+    路由，由 src/admin_server.py 提供靜態檔案）。載入順序具有意義：
+      1. script.js 必須「最先」載入──它定義了全域共用的 state 物件、
+         api()（fetch 包裝）、showToast()、esc()、Modal 開關函式、
+         showSection() 等，其餘分頁 JS 檔在其內部函式（例如 loadStats()、
+         loadChats()）都假設這些共用工具已經存在於全域作用域。
+      2. stats.js / chats.js / forms.js / doctors.js / prompt.js /
+         education.js 各自對應同名分頁，定義該分頁專屬的資料載入、
+         渲染、表單送出等邏輯，並掛載被 script.js 的 showSection()
+         呼叫的 loadXxx() 函式到全域作用域。
+    所有檔案皆未使用 type="module"，因此彼此共享同一個全域
+    (window) 作用域，靜態載入順序即決定函式/變數是否已存在，
+    這也是為什麼 script.js 必須排最前面。
+  -->
   <script src="/main/js/script.js"></script>
   <script src="/main/js/stats.js"></script>
   <script src="/main/js/chats.js"></script>

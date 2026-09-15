@@ -1,10 +1,41 @@
+<!--
+    macros.html — 表單卡片共用的 Jinja2 巨集（card_header / footer_button / text_input）
+
+    這三個巨集被 form.html（透過 {% from 'form/parts/macros.html' import ... %}）
+    以及所有 parts/<key>.html 步驟片段共用，統一了每張步驟卡片的視覺樣式，
+    避免在 auth.html / pair.html / symptoms.html / review.html 中
+    重複撰寫相同的按鈕/輸入框/標題結構與樣式。
+-->
+
 {% macro card_header(titleText) %}
+<!--
+    card_header：每張展開卡片頂部的標題列。
+    純靜態顯示，titleText 由呼叫端傳入（例如「請登入醫師帳號」）。
+-->
 <div class="shrink-0 px-4 pt-4 mb-6">
      <div class="text-2xl font-medium text-slate-400">{{ titleText }}</div>
 </div>
 {% endmacro %}
 
 {% macro footer_button(clickFunc, disableCond, textColor, bgColor, label) %}
+<!--
+    footer_button：每張卡片底部的主要動作按鈕（登入/配對/選擇病患/選擇症狀/確認送出皆共用）。
+
+    參數：
+        clickFunc   — 點擊時要呼叫的 Alpine 方法字串（例如 'confirmLogin()'）
+        disableCond — 額外的停用條件表達式字串（例如必填欄位為空時停用），
+                      會與 step.currentStatus !== STATUS.IDLE 用 OR 合併，
+                      確保「正在處理中」時按鈕一定被停用，避免重複送出
+        textColor / bgColor — 依各步驟情境自訂的文字/底色 Tailwind class
+        label       — 按鈕在 IDLE 狀態下顯示的文字
+
+    按鈕本身依 step.currentStatus 呈現三種內容（對應 state.js 的 STATUS 列舉）：
+        LOADING → 轉圈圈圖示（data_usage，套用 animate-spring 自訂轉動動畫）
+        SUCCESS → 打勾圖示（check_circle），同時外觀變為圓角矩形並放大 1.1 倍
+        IDLE    → 一般文字 label
+    按鈕的 padding 與圓角也會隨狀態與是否停用（disableCond）動態切換，
+    停用時額外套用 25% 透明度提示不可點擊。
+-->
 <div class="shrink-0 px-4 py-4 flex justify-center">
     <button @click="{{ clickFunc }}"
             :disabled="step.currentStatus !== STATUS.IDLE || {{ disableCond }}"
@@ -33,6 +64,28 @@
 {% endmacro %}
 
 {% macro text_input(inputId, inputType, label) %}
+<!--
+    text_input：帶有「浮動標籤（floating label）」效果的文字輸入框，
+    供登入表單（帳號/密碼）、新增關係人（稱呼/病歷號）、
+    帳號本人補填病歷號等情境共用。
+
+    參數：
+        inputId   — 對應 Alpine 狀態中 step.draft 底下的欄位路徑
+                    （例如 'account'、'self.mrc'、'new.relation'），
+                    會直接拼接進 x-model="step.draft.{{ inputId }}"，
+                    因此呼叫端傳入的字串必須是合法的 JS 屬性存取路徑。
+        inputType — HTML input 的 type 屬性（'text' 或 'password'）
+        label     — 浮動標籤顯示的文字
+
+    互動邏輯：
+        - 使用區域變數 focused 追蹤輸入框是否正處於聚焦狀態，
+          聚焦時同步清除 step.error（讓使用者重新輸入時看不到舊的錯誤提示）。
+        - 標籤位置與樣式依三種狀態切換：
+            1. 聚焦中（focused）→ 浮到上方、藍色背景強調
+            2. 有驗證錯誤（step.error）且未聚焦 → 浮到上方、紅色背景警示
+            3. 已有內容但未聚焦 → 浮到上方、灰色背景，呈現一般已填欄位樣式
+            4. 空欄位且未聚焦 → 停留在輸入框內部，作為 placeholder 提示
+-->
 <div class="relative" x-data="{ focused: false }">
     <input type="{{ inputType }}"
             id="{{ inputId }}"

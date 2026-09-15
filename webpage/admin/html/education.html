@@ -72,10 +72,10 @@
   </p>
 
   <div style="display:flex; justify-content:flex-end; margin-top:16px;">
-    <!-- 新增類別入口：呼叫 education.js::openEducationCreateModal()，將 Modal 切到
+    <!-- 新增衛教單入口：呼叫 education.js::openEducationCreateModal()，將 Modal 切到
          「新增模式」（educationEditingBodypart / educationEditingCategory 皆設為 null），
          並清空下方 Modal 所有輸入欄位、重建部位下拉選單後開啟 Modal。 -->
-    <button class="btn btn-primary" onclick="openEducationCreateModal()">+ 新增類別</button>
+    <button class="btn btn-primary" onclick="openEducationCreateModal()">+ 新增衛教單</button>
   </div>
 
   <!--
@@ -96,7 +96,7 @@
        display 屬性），引導管理員點右上角按鈕新增第一筆資料。 -->
   <div class="empty-state" id="education-empty" style="display:none;">
     <div class="empty-icon">📚</div>
-    <p>目前尚無衛教資料類別，請點選右上角「新增類別」建立第一筆資料。</p>
+    <p>目前尚無衛教資料類別，請點選右上角「新增衛教單」建立第一筆資料。</p>
   </div>
 </section>
 
@@ -118,11 +118,11 @@
   <div class="modal">
     <!-- 標題文字會依模式動態替換為「新增衛教類別」或「編輯衛教類別」 -->
     <div class="modal-title" id="education-modal-title">
-      <span>📚</span> <span id="education-modal-title-text">新增衛教類別</span>
+      <span>📚</span> <span id="education-modal-title-text">新增衛教單</span>
     </div>
 
     <div class="form-group">
-      <label>部位</label>
+      <label>部位或科別</label>
       <!--
         部位下拉選單：選項由 education.js 的 populateBodypartOptions() 依目前
         educationList 裡「已出現過的所有部位」去重、排序後動態產生 <option>，
@@ -144,10 +144,10 @@
     </div>
 
     <div class="form-group">
-      <label>類別名稱</label>
-      <!-- 類別名稱：對應 category.json 該部位底下的第二層 key。後端規定「類別名稱
-           必須全域唯一」，不可以在不同部位底下出現同名類別（因為 LINE Bot 用症狀
-           名稱去比對類別時，是以類別名稱查整個 category.json，若允許重名會造成
+      <label>衛教單名稱</label>
+      <!-- 衛教單名稱：對應 category.json 該部位底下的第二層 key。後端規定「衛教單名稱
+           必須全域唯一」，不可以在不同部位底下出現同名衛教單（因為 LINE Bot 用症狀
+           名稱去比對衛教單時，是以衛教單名稱查整個 category.json，若允許重名會造成
            查詢結果歧義）。此欄位由 submitEducationForm() 讀值並做前端必填檢查。 -->
       <input type="text" id="education-input-category" placeholder="例如：頭暈">
     </div>
@@ -210,7 +210,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
       </svg>
     </div>
-    <div class="modal-alert-title">確認刪除衛教類別</div>
+    <div class="modal-alert-title">確認刪除衛教單</div>
     <div class="modal-alert-banner danger">
       <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
@@ -218,7 +218,7 @@
       <!-- 目標描述由 openEducationDeleteModal() 動態填入「部位 / 類別」文字，
            讓管理員在按下確認刪除前，能明確看到即將刪除哪一筆對照關係。 -->
       <div style="font-weight:600; font-size:14px; line-height:1.45;">
-        即將刪除類別「<span id="education-delete-target"></span>」，此操作無法復原。
+        即將刪除衛教單「<span id="education-delete-target"></span>」，此操作無法復原。
       </div>
     </div>
     <div class="modal-alert-actions">

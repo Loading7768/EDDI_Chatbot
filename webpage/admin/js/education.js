@@ -294,13 +294,13 @@ function renderEducationTable() {
              style="display:flex; align-items:center; gap:8px; padding:12px 16px; cursor:pointer; background:#f8f9fb;">
           <span style="display:inline-block; transition:transform .15s; transform:rotate(${isOpen ? '90deg' : '0deg'});">▶</span>
           <strong>${escapeHtml(bodypart)}</strong>
-          <span style="color:var(--muted); font-size:13px;">（${items.length} 個類別）</span>
+          <span style="color:var(--muted); font-size:13px;">（${items.length} 個衛教單）</span>
         </div>
         <div class="bodypart-body" style="display:${isOpen ? 'block' : 'none'}; padding:8px 16px 12px 16px;">
           <table style="width:100%;">
             <thead>
               <tr>
-                <th style="width:200px;">類別</th>
+                <th style="width:200px;">衛教單</th>
                 <th style="width:200px;">md 檔名</th>
                 <th style="width:150px;">操作</th>
               </tr>
@@ -403,7 +403,7 @@ function populateBodypartOptions(selectedBodypart) {
 
   select.innerHTML = bodyparts.map(bp =>
     `<option value="${escapeHtml(bp)}">${escapeHtml(bp)}</option>`
-  ).join('') + `<option value="${NEW_BODYPART_VALUE}">+ 新增部位…</option>`;
+  ).join('') + `<option value="${NEW_BODYPART_VALUE}">+ 新增部位或科別…</option>`;
 
   let valueToSelect;
   let prefillNewInput = '';
@@ -478,7 +478,7 @@ function getSelectedBodypart() {
 function openEducationCreateModal() {
   educationEditingBodypart = null;
   educationEditingCategory = null;
-  document.getElementById('education-modal-title-text').textContent = '新增衛教類別';
+  document.getElementById('education-modal-title-text').textContent = '新增衛教單';
   populateBodypartOptions(null);
   document.getElementById('education-input-category').value = '';
   document.getElementById('education-input-filename').value = '';
@@ -513,13 +513,13 @@ function openEducationCreateModal() {
 async function openEducationEditModal(bodypart, category) {
   const item = educationList.find(i => i.bodypart === bodypart && i.category === category);
   if (!item) {
-    eduToast('找不到此類別的資料', false);
+    eduToast('找不到此衛教單的資料', false);
     return;
   }
 
   educationEditingBodypart = bodypart;
   educationEditingCategory = category;
-  document.getElementById('education-modal-title-text').textContent = '編輯衛教類別';
+  document.getElementById('education-modal-title-text').textContent = '編輯衛教單';
   populateBodypartOptions(item.bodypart);
   document.getElementById('education-input-category').value = item.category;
   document.getElementById('education-input-filename').value = item.filename;
@@ -649,7 +649,7 @@ async function submitEducationForm() {
   const content = document.getElementById('education-input-content').value.trim();
 
   if (!bodypart || !category || !filename || !content) {
-    showEducationModalError('部位、類別名稱、檔名與衛教內容皆不可空白');
+    showEducationModalError('部位或科別、衛教單名稱、檔名與衛教內容皆不可空白');
     return;
   }
 
@@ -767,7 +767,7 @@ async function confirmDeleteEducation() {
     }
 
     closeModal('modal-education-delete');
-    eduToast('已刪除衛教類別', true);
+    eduToast('已刪除衛教單', true);
     educationDeleteTarget = null;
     await loadEducationList();
   } catch (err) {

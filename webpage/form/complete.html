@@ -1,3 +1,21 @@
+<!--
+    complete.html — 衛教表單送出完成後的靜態結尾頁
+
+    當 js/app.js 的 submitForm() 呼叫 /api/form_submit 成功、且後端
+    （form_handler.py 的 form_submit()）回傳 redirect 網址時，
+    瀏覽器會被導向這個頁面。純靜態展示，無 Alpine.js 邏輯、無任何後端資料注入，
+    只是告知醫師/使用者「資料已送出，可以關閉頁面」。
+
+    視覺效果：
+        - ring-pulse：外圈的打勾圖示背景持續往外擴散一道透明度漸淡的光環，
+          象徵「完成」動作的餘波擴散，強化任務結束的儀式感。
+        - icon-pop：打勾圖示（check_circle）進場時先放大到 1.1 倍再回彈至 1 倍，
+          搭配彈性的 cubic-bezier 緩動曲線，產生「跳出來」的活潑感。
+        - text-fade：下方文字延遲 0.45 秒（等圖示動畫大致完成）後才淡入並輕微上移，
+          讓整體進場動畫有先後層次，而非所有元素同時出現。
+        - 三組 @keyframes 與套用 class 皆為此頁面獨有，故直接寫在 <head> 內，
+          未併入共用的 css/style.css。
+-->
 <!DOCTYPE html>
 <html lang="zh-TW">
 
@@ -13,17 +31,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 
     <style>
+        /* 打勾圖示進場：從縮小透明 → 放大超過 1 倍（回彈）→ 定格於正常大小 */
         @keyframes pop-in {
             0%   { transform: scale(0.4); opacity: 0; }
             70%  { transform: scale(1.1); opacity: 1; }
             100% { transform: scale(1);   opacity: 1; }
         }
 
+        /* 下方文字：由下往上淡入 */
         @keyframes fade-up {
             from { transform: translateY(12px); opacity: 0; }
             to   { transform: translateY(0);    opacity: 1; }
         }
 
+        /* 外圈光環持續向外擴散並淡出，循環播放 */
         @keyframes ring-pulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
             50%       { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
@@ -37,6 +58,7 @@
             animation: ring-pulse 2s ease-out infinite;
         }
 
+        /* 初始透明度為 0，延遲 0.45 秒後才開始淡入動畫（等圖示動畫先播完） */
         .text-fade {
             opacity: 0;
             animation: fade-up 0.4s ease-out 0.45s forwards;

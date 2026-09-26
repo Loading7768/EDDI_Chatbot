@@ -1,13 +1,74 @@
+<!-- ════════════════════════════════════════════════════════════════════════════
+  檔案總覽：chats.html —「病患對話紀錄」分頁（後台管理系統 / EDDI_Chatbot）
+  ════════════════════════════════════════════════════════════════════════════
+
+  【這個頁面在整體系統中的角色】
+  這是 Flask 後台（src/app.py 啟動 → 註冊 src/admin_server.py 的 admin_bp 藍圖）
+  所提供的其中一個分頁畫面（section-chats）。醫護人員登入後台後，切換到「聊天
+  紀錄」分頁即會看到這個區塊。此區塊本身只是純 DOM 結構（含少量 inline style），
+  所有動態渲染、事件處理、資料抓取邏輯都寫在同目錄的 chats.js（見該檔案開頭的
+  總覽註解），本檔案負責提供 chats.js 要操作的容器元素（以 id 對應）。
+
+  【主要功能列表】
+  1. 左欄「病患列表」(#patient-list-body)：顯示目前登入者可見的所有病患
+     （一般醫師只能看自己曾看診過的病患，管理員可看全部，此過濾邏輯完全
+     在後端 GET /api/chats 依 session 帳號自動完成，前端不需額外判斷）。
+     每筆病患顯示病歷號、與 LINE 帳號的關係、看診/回診狀態徽章（含紅色
+     「須回診」警示）、最近科別、是否已開始聊天、就診次數、最新就診日期。
+     右上角下拉選單 (#patient-sort-select) 可依「就診日期」或「病歷號」
+     升冪/降冪排序（純前端排序，不重新打 API）。
+  2. 中欄「就診紀錄」(#visit-list-body)：點擊左欄病患後，顯示該病患所有
+     出院表單（每次掛急診/看診紀錄），來源為 GET /api/chats/<mrn> 回傳的
+     forms 陣列。
+  3. 右欄「聊天面板」(#chat-body + #chat-timeline-nav)：點擊中欄某次就診
+     紀錄後，顯示該次就診期間對應的 LINE 對話內容，依 session（一次連續
+     對話，超過 1 小時無互動就會被 LINE Bot 後端切成新檔案）分組並以分隔線
+     呈現，並提供右側時間軸圓點 (#chat-timeline-nav) 供快速跳轉。
+  4. 「已看診 / 已回診」警示清除按鈕 (#btn-clear-return-visit)：當病患狀態為
+     「須看診」或「須回診」（LINE Bot AI 回覆偵測到「請就近至醫療院所看診」
+     或「請立即前往急診回診」等字眼時，後端會自動把該病患狀態設為這兩者之
+     一），醫護人員確認已處理後可點擊此按鈕，透過 Modal 二次確認後呼叫
+     POST /api/patients/<mrn>/clear_return_visit 清除警示。
+  5. 「重新整理」按鈕 (#btn-refresh-chat)：重新向後端拉取病患列表與目前
+     病患詳情，用於病患剛傳新訊息、想立刻看到最新對話內容時使用。
+
+  【資料從哪裡來】
+  - 病患列表：GET /api/chats（見 src/admin_server.py get_chats()）。
+  - 病患詳情（表單歷史 + 對話 session）：GET /api/chats/<mrn>
+    （見 src/admin_server.py get_chat_detail()，對話內容讀取自
+    chat_logs/<mrn>/*.json）。
+  - 清除警示：POST /api/patients/<mrn>/clear_return_visit
+    （見 src/admin_server.py clear_return_visit()）。
+  以上三個 API 的實際呼叫、回應處理與 DOM 渲染邏輯皆寫在 chats.js。
+  ════════════════════════════════════════════════════════════════════════════ -->
 <!-- 聊天紀錄 -->
 <section id="section-chats" class="section">
   <div class="section-title">聊天紀錄</div>
+  <!-- chat-layout：三欄式版面，由左至右分別是「病患列表」「就診紀錄」「聊天面板」，
+       三欄透過 CSS grid/flex 排列（樣式定義於 css），彼此以使用者點擊逐層帶出下一欄內容：
+       點左欄病患 → 帶出中欄該病患的就診紀錄 → 點中欄某次就診 → 帶出右欄該次就診期間的對話。 -->
   <div class="chat-layout">
+    <!-- ──────────────────────────────────────────────────────────────────
+         左欄：病患列表 (patient-list)
+         資料來源：chats.js 的 loadChats() 呼叫 GET /api/chats，結果存進
+         state.allPatients，再由 renderPatientList() 渲染進 #patient-list-body。
+         ────────────────────────────────────────────────────────────────── -->
     <div class="patient-list">
       <div class="plist-header" style="justify-content: space-between; align-items: center;">
         <div style="display: flex; align-items: center; gap: 8px;">
           病患列表
+          <!-- #patient-count：目前列表中的病患總數，由 renderPatientList() 更新為 patients.length -->
           <span class="badge badge-gray" id="patient-count">0</span>
         </div>
+        <!--
+          #patient-sort-select：病患列表排序方式下拉選單。
+          觸發時機：使用者變更選項時 (onchange)。
+          對外影響：呼叫 chats.js 的 sortAndRenderPatients(this.value)，該函式對
+          state.allPatients（前端已快取的病患陣列，不重新呼叫 API）做純前端排序後
+          再呼叫 renderPatientList() 重新渲染 #patient-list-body。
+          - checkout_desc / checkout_asc：依 latest_checkout（最新就診日期字串）排序
+          - mrn_desc / mrn_asc：依 medical_record_num（病歷號字串）排序
+        -->
         <select id="patient-sort-select" class="patient-sort-dropdown" onchange="sortAndRenderPatients(this.value)" style="font-size: 11px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; outline: none; max-width: 120px;">
           <option value="checkout_desc">就診日期 ⬇</option>
           <option value="checkout_asc">就診日期 ⬆</option>
@@ -15,6 +76,15 @@
           <option value="mrn_asc">病歷號 ⬆</option>
         </select>
       </div>
+      <!--
+        #patient-list-body：病患卡片列表容器。
+        - 初始為「載入中…」佔位畫面，頁面載入時 chats.js 會呼叫 loadChats()，
+          成功取得資料後由 renderPatientList(patients) 整段覆寫 innerHTML，
+          內容包含每位病患的病歷號、關係徽章、狀態徽章（含紅色「需回診」警示）、
+          科別、聊天狀態、就診次數與最新就診日期；每張卡片綁定
+          onclick="loadDetail(mrn, this)" 以載入該病患詳情。
+        - 若無資料則顯示「無病患資料」空狀態。
+      -->
       <div id="patient-list-body">
         <div class="empty-state" style="padding:32px 0;">
           <div class="empty-icon">👤</div><p>載入中…</p>
@@ -22,11 +92,28 @@
       </div>
     </div>
 
+    <!-- ──────────────────────────────────────────────────────────────────
+         中欄：就診紀錄 (visit-list)
+         資料來源：點擊左欄病患後，chats.js 的 loadDetail(mrn) 呼叫
+         GET /api/chats/<mrn>，回應中的 forms 陣列存入 state.currentForms，
+         再由 renderVisits() 渲染進 #visit-list-body。
+         ────────────────────────────────────────────────────────────────── -->
     <div class="visit-list">
       <div class="plist-header">
         就診紀錄
+        <!-- #visit-count：目前病患的出院表單（就診紀錄）總數，由 renderVisits() 更新 -->
         <span class="badge badge-gray" id="visit-count">0</span>
       </div>
+      <!--
+        #visit-list-body：就診紀錄卡片列表容器。
+        - 初始顯示「請先選擇病患」空狀態；點選病患後先短暫顯示 spinner「載入中…」，
+          資料回來後由 renderVisits() 整段覆寫 innerHTML，每張卡片顯示就診日期、
+          科別徽章、該次就診期間是否已有聊天紀錄（依對話 session 的 start_time
+          是否落在本次就診日期與下一次就診日期之間判斷），並綁定
+          onclick="selectVisit(checkoutDate, this)" 以在右欄顯示該次就診的對話。
+        - renderVisits() 執行完後會自動點擊第一張（或先前記住的 state.currentVisitDate
+          對應的）卡片，讓使用者一進入病患詳情就能直接看到對話內容，不需再多一次點擊。
+      -->
       <div id="visit-list-body" class="visit-list-body">
         <div class="empty-state" style="padding:32px 0;">
           <div class="empty-icon">📋</div><p>請先選擇病患</p>
@@ -34,42 +121,123 @@
       </div>
     </div>
 
+    <!-- ──────────────────────────────────────────────────────────────────
+         右欄：聊天面板 (chat-panel)
+         資料來源：state.currentSessions（來自 GET /api/chats/<mrn> 的 sessions
+         陣列），由 chats.js 的 selectVisit() 依所選就診日期篩出對應的 session
+         後渲染進 #chat-body，並在 #chat-timeline-nav 產生對應的時間軸圓點。
+         ────────────────────────────────────────────────────────────────── -->
     <div class="chat-panel">
       <div class="chat-panel-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <!-- #chat-title：右欄標題，選擇就診紀錄後由 selectVisit() 設為目前病歷號 -->
             <div class="chat-panel-title" id="chat-title">請選擇病患</div>
+            <!--
+              #chat-relation-badge：顯示此病患與所綁定 LINE 帳號的關係（如「帳號本人」
+              「父親」）。由 loadDetail() 依 d.patient.relation 是否存在決定顯示/隱藏，
+              資料來自 GET /api/chats/<mrn> 回應中的 patient.relation 欄位。
+            -->
             <span id="chat-relation-badge" class="badge badge-relation" style="display: none; font-weight: 500;"></span>
+            <!--
+              #chat-return-badge：病患狀態警示徽章。由 loadDetail() 依
+              d.patient.status（'須看診'/'已看診'/'須回診'/'已回診' 其中之一）
+              決定文字內容與顏色：
+                須看診 → 橘色「需看診」、已看診 → 淺黃「已看診」、
+                須回診 → 紅色「需回診」（最高優先的警示，代表 LINE Bot AI 回覆偵測到
+                「請立即前往急診回診」等字眼）、已回診 → 淺紅「已回診」。
+              其他狀態（如「出院」）則隱藏此徽章。
+            -->
             <span id="chat-return-badge" class="badge" style="display: none; background-color: #ef4444; color: white; font-weight: 500;">需回診</span>
           </div>
+          <!-- #chat-sub：右欄副標題，選擇就診紀錄後由 selectVisit() 設為該次就診日期 -->
           <div class="chat-panel-sub"   id="chat-sub">點擊左側病患查看詳情</div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
+          <!--
+            #btn-refresh-chat：重新整理按鈕。
+            觸發時機：使用者點擊時 (onclick)。
+            對外影響：呼叫 chats.js 的 refreshChatHistory()，該函式重新呼叫
+            GET /api/chats 更新病患列表快取，並重新呼叫 loadDetail(mrn) 重新拉取
+            目前病患的最新對話內容（用於病患剛傳新訊息時，醫護人員想立即看到更新）。
+            僅在已選擇病患後（loadDetail 成功）才會顯示 (display: inline-flex)。
+          -->
           <button id="btn-refresh-chat" class="btn btn-gray btn-sm" onclick="refreshChatHistory()" style="display: none; white-space: nowrap; gap: 6px; align-items: center;">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink: 0;">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
             </svg>
             <span>重新整理</span>
           </button>
+          <!--
+            #btn-clear-return-visit：清除警示按鈕（依狀態顯示為「已看診」或「已回診」）。
+            觸發時機：使用者點擊時 (onclick)。
+            對外影響：呼叫 chats.js 的 confirmClearReturnVisit()，該函式會依按鈕目前
+            文字（'已看診' 或 '已回診'）調整 Modal（#modal-confirm-return-visit）的
+            文案後開啟二次確認視窗；使用者在 Modal 中按下確認鈕才會真正呼叫
+            executeClearReturnVisit() → POST /api/patients/<mrn>/clear_return_visit
+            來源清除病患的紅色/橘色警示狀態。此按鈕的顏色、文字、是否可點擊
+            (disabled) 皆由 loadDetail() 依病患目前狀態動態設定：
+              須看診 → 顯示「已看診」（可點擊）；已看診 → 顯示「已看診」（disabled，
+              代表已經處理過，僅供顯示）；須回診 → 顯示「已回診」（可點擊）；
+              已回診 → 顯示「已回診」（disabled）。
+          -->
           <button id="btn-clear-return-visit" class="btn btn-danger btn-sm" onclick="confirmClearReturnVisit()" style="display: none; background-color: #ef4444; color: white; border: none; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;">已回診</button>
+          <!-- #session-select-wrapper / #session-select：目前以 timeline-nav 取代此下拉選單顯示，
+               保留於 DOM 中但以 style="display: none !important;" 強制隱藏（未被 chats.js 使用/賦值選項）。 -->
           <div id="session-select-wrapper" style="display: none !important;">
             <select id="session-select"></select>
           </div>
         </div>
       </div>
+      <!--
+        #chat-body：對話內容捲動容器。
+        - 初始顯示「選擇左側病患以查看表單與聊天紀錄」空狀態。
+        - selectVisit() 會依所選就診日期篩出對應的 session（見 chats.js 內對
+          「session 分組顯示邏輯」的說明），並將每個 session 的訊息以聊天泡泡
+          (bubble-row user/assistant) 呈現，session 之間以 .session-divider
+          分隔線標示（例如「———— 2026-05-21 對話 #01 (22:00:00) ————」）。
+        - 綁定 onscroll 事件（由 selectVisit() 動態賦值 chatBody.onscroll），
+          捲動時會偵測目前捲動位置對應到哪一個 session 分隔線，並同步將右側
+          #chat-timeline-nav 對應的圓點標記為 active，讓使用者知道目前看到的
+          是哪一段對話。
+      -->
       <div class="chat-panel-body" id="chat-body">
         <div class="empty-state">
           <div class="empty-icon">💬</div>
           <p>選擇左側病患以查看表單與聊天紀錄</p>
         </div>
       </div>
-      <!-- Timeline Navigation -->
+      <!--
+        Timeline Navigation
+        #chat-timeline-nav：右側直向時間軸，每個 .timeline-dot 對應一個對話 session，
+        由 selectVisit() 產生，並綁定 onclick="scrollToSession(idx)" 讓使用者可以
+        點擊圓點快速捲動到對應 session 的分隔線位置（見 chats.js scrollToSession()）。
+        僅在目前所選就診紀錄有對話紀錄時才顯示 (display: flex)。
+      -->
       <div class="chat-timeline-nav" id="chat-timeline-nav" style="display: none;"></div>
     </div>
   </div>
 </section>
 
-<!-- ── Modal：確認已回診 ── -->
+<!--
+  ── Modal：確認已回診 / 已看診（二次確認視窗）──
+  用途：避免醫護人員誤觸 #btn-clear-return-visit 而不小心清除病患的警示狀態，
+  點擊按鈕後不會直接呼叫 API，而是先跳出此 Modal 要求再次確認。
+
+  文案為動態內容：預設 HTML 內容以「已回診」措辭撰寫，但實際顯示的標題/說明文字
+  會被 chats.js 的 confirmClearReturnVisit() 依目前病患狀態（'須看診' 或 '須回診'）
+  即時改寫（例如若病患狀態是「須看診」，文案會被改成「確認已看診」）。
+
+  流程：
+    1. 使用者點擊右側面板的 #btn-clear-return-visit
+       → chats.js confirmClearReturnVisit() 依按鈕文字調整本 Modal 的標題／
+         banner／subtitle／確認鈕文字與顏色後，呼叫 openModal() 顯示此 Modal。
+    2. 使用者點擊「取消」→ closeModal('modal-confirm-return-visit') 關閉視窗，不做任何事。
+    3. 使用者點擊「確認已回診／確認已看診」（.modal-alert-actions .btn-danger）
+       → 呼叫 chats.js 的 executeClearReturnVisit()，該函式才會真正呼叫
+         POST /api/patients/<mrn>/clear_return_visit 更新後端病患狀態，
+         成功後更新畫面上所有相關徽章、按鈕狀態，並重新排序/渲染病患列表。
+-->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-return-visit">
   <div class="modal-alert">
     <div class="modal-alert-icon-wrap success">
@@ -77,16 +245,30 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
       </svg>
     </div>
+    <!-- .modal-alert-title：標題文字，會被 confirmClearReturnVisit() 改寫為「確認已看診」或「確認已回診」 -->
     <div class="modal-alert-title">確認已回診</div>
     <div class="modal-alert-banner success">
       <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
       </svg>
+      <!-- .modal-alert-banner div：說明文字，同樣由 confirmClearReturnVisit() 依情境改寫 -->
       <div style="font-weight: 600; font-size: 14px; line-height: 1.45;">將該病患狀態更新為「已回診」。</div>
     </div>
+    <!-- .modal-alert-subtitle：次標題，同樣由 confirmClearReturnVisit() 依情境改寫 -->
     <div class="modal-alert-subtitle">確定要將該病患狀態更新為「已回診」嗎？</div>
     <div class="modal-alert-actions">
+      <!-- 取消：僅關閉 Modal，不呼叫任何 API，不影響病患狀態 -->
       <button class="btn btn-outline" onclick="closeModal('modal-confirm-return-visit')">取消</button>
+      <!--
+        確認按鈕：真正觸發清除警示的動作。
+        onclick 呼叫 chats.js 的 executeClearReturnVisit()，該函式會：
+          1. 讀取 state.currentMrn 與按鈕目前文字判斷 targetStatus（'已看診' 或 '已回診'）。
+          2. 呼叫 POST /api/patients/<mrn>/clear_return_visit，body 為 { status: targetStatus }。
+          3. 成功後：關閉本 Modal、顯示成功 toast、更新右欄徽章與按鈕樣式為
+             disabled 的淺色徽章（代表已處理過）、同步更新 state.allPatients /
+             state.allFormPatients 快取中對應病患的 status，並重新渲染病患列表。
+        按鈕文字（'確認已看診' / '確認已回診'）與背景色由 confirmClearReturnVisit() 動態設定。
+      -->
       <button class="btn btn-danger" onclick="executeClearReturnVisit()">確認已回診</button>
     </div>
   </div>

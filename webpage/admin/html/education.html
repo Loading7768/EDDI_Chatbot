@@ -1,4 +1,70 @@
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  檔案總覽：衛教資料管理分頁（webpage/admin/html/education.html）
+  ════════════════════════════════════════════════════════════════════════
+
+  【這個頁面在整體系統中的角色】
+  這是「急診出院衛教 LINE Bot + 醫護後台管理系統」中，管理員維護「衛教內容資料庫」
+  的後台畫面。此頁面被嵌入（include）到後台主頁面（例如 admin_server.py 的
+  dashboard 樣板）之中，搭配同資料夾下的 webpage/admin/js/education.js 一起運作：
+  本檔案負責畫面骨架（section、Modal、表單欄位、按鈕）；education.js 負責資料
+  存取（呼叫後端 API）、渲染邏輯與所有互動行為（展開/收合、開關 Modal、送出表單）。
+
+  【權限模型】
+  這個分頁的「檢視」對一般登入者可能也可讀，但「新增 / 編輯 / 刪除」（對應
+  POST /api/education、PUT /api/education/<bodypart>/<category>、
+  DELETE /api/education/<bodypart>/<category>）在後端都套用了 @admin_required
+  裝飾器（定義於 src/admin_server.py），非管理員呼叫會收到 HTTP 403。前端目前
+  沒有額外隱藏這些按鈕，是否顯示此分頁、是否顯示編輯/刪除按鈕，取決於後台外層
+  （dashboard）依 GET /api/me 回傳的 is_admin 所做的顯示控制。
+
+  【資料儲存架構（很重要）】
+  衛教資料並不是存在 SQLite 資料庫裡，而是「JSON 目錄結構 + 純文字 Markdown 檔」：
+    1. assets/discharge/category.json
+       格式：{ "部位名稱": { "類別名稱": { "filename": "xxx.md" }, ... }, ... }
+       這是一個兩層的階層式對照表：第一層 key 是「部位」（bodypart，例如「頭」），
+       第二層 key 是「類別」（category，例如「頭暈」），對應到實際內容檔的檔名。
+    2. assets/discharge/<filename>.md
+       每個類別實際的衛教內容文字，以獨立的 Markdown 檔存放。
+       重點：同一個 .md 檔名「可以」被多個不同的部位/類別共同引用（例如兩種症狀
+       其實該讀同一篇衛教文章），所以後端在刪除時，會先確認 category.json 裡
+       是否還有其他 (bodypart, category) 組合引用同一個檔名，若還有其他引用者，
+       就只刪掉 category.json 裡的這一筆對照關係，保留 .md 實體檔案；只有在
+       「已經沒有任何類別引用這個檔名」時，才會真的把 .md 檔案從硬碟刪除。這樣
+       設計是為了避免刪錯共用檔案，或是留下永遠不會被用到的孤兒 .md 檔案。
+
+  【與 LINE Bot AI 回覆的關聯（RAG）】
+  病患看診時記錄的症狀（symptoms，為中文名稱字串）會在 LINE Bot 端（src/bot.py
+  的 build_rag_context 函式）用來比對 category.json，找出對應的 .md 檔名，把
+  裡面的內容整段組合成「RAG context」（檢索增強生成的參考資料），塞進提示詞
+  給 LLM 參考後回覆病患。也就是說：管理員在這個頁面新增/編輯的每一段衛教內容
+  文字，會直接影響 AI 對病患衛教說明的正確性與完整度，因此本頁面的正確性非常
+  重要，錨定資料一致性（部位/類別/檔名不可重複、內容不可空白）是後端與前端共同
+  把關的重點。
+
+  【本頁會用到的後端 API（全部定義在 src/admin_server.py，以下皆由
+    education.js 發出 fetch 呼叫，此 .html 檔本身不直接呼叫 API）】
+    - GET    /api/education                              取得攤平後的列表
+    - GET    /api/education-content/<filename>            取得單一 .md 檔的內容文字
+    - POST   /api/education                                新增一個 (部位, 類別) 對照
+    - PUT    /api/education/<bodypart>/<category>          編輯既有的一筆（可改名/改檔名/改內容）
+    - DELETE /api/education/<bodypart>/<category>          刪除一筆對照（並視情況刪除 .md 實體檔）
+  ════════════════════════════════════════════════════════════════════════
+-->
+
 <!-- 衛教資料管理（管理員）-->
+<!--
+  section-education：整個分頁的最外層容器（由後台主頁面依 tab/route 切換顯示/隱藏）。
+  內部結構：
+    - 標題與說明文字
+    - 右上角「+ 新增類別」按鈕：點擊呼叫 education.js 的 openEducationCreateModal()，
+      開啟下方的新增/編輯共用 Modal（此時為「新增模式」）
+    - #education-table-wrap：手風琴列表的外層包裝，內含 #education-groups（真正被
+      education.js 用 innerHTML 動態填入「部位分組 + 展開/收合 + 類別表格」的容器）
+    - #education-empty：當列表為空（尚無任何衛教類別）時顯示的空狀態提示區塊，
+      平常以 display:none 隱藏，由 education.js 的 renderEducationTable() 依資料
+      是否為空來切換顯示/隱藏
+-->
 <section class="section" id="section-education">
   <div class="section-title">📚 衛教資料管理</div>
   <p style="color:var(--muted); font-size:13px; margin-top:4px;">
@@ -6,31 +72,72 @@
   </p>
 
   <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+    <!-- 新增衛教單入口：呼叫 education.js::openEducationCreateModal()，將 Modal 切到
+         「新增模式」（educationEditingBodypart / educationEditingCategory 皆設為 null），
+         並清空下方 Modal 所有輸入欄位、重建部位下拉選單後開啟 Modal。 -->
     <button class="btn btn-primary" onclick="openEducationCreateModal()">+ 新增衛教單</button>
   </div>
 
+  <!--
+    doctor-table-wrap（沿用醫師管理分頁的表格外框樣式 class 名稱，此處實際渲染的是
+    「衛教資料」的手風琴，而非表格）：
+      #education-groups 是真正的渲染目標容器。education.js 的 renderEducationTable()
+      會把 educationList（GET /api/education 取回並存於記憶體的陣列）依 bodypart
+      分組後，用 innerHTML 整段覆寫這個 div，畫出「每個部位一個可展開/收合的區塊，
+      展開後裡面是該部位所有類別的表格（類別名稱 / md 檔名 / 編輯・刪除按鈕）」。
+      當 educationList 為空陣列時，此 wrap 會被設為 display:none，改顯示下方的
+      #education-empty 空狀態提示。
+  -->
   <div class="doctor-table-wrap" id="education-table-wrap">
     <div id="education-groups"></div>
   </div>
 
+  <!-- 空狀態提示：僅在 educationList 為空時顯示（由 renderEducationTable() 控制
+       display 屬性），引導管理員點右上角按鈕新增第一筆資料。 -->
   <div class="empty-state" id="education-empty" style="display:none;">
     <div class="empty-icon">📚</div>
     <p>目前尚無衛教資料類別，請點選右上角「新增衛教單」建立第一筆資料。</p>
   </div>
 </section>
 
-<!-- ── Modal：新增 / 編輯衛教類別 ── -->
+<!--
+  ══════════════════════════════════════════════════════════════════════
+  Modal：新增 / 編輯衛教類別（單一 Modal 共用兩種模式）
+  ══════════════════════════════════════════════════════════════════════
+  這個 Modal 同時肩負「新增」與「編輯」兩種用途，透過 education.js 裡的模組層級
+  變數 educationEditingBodypart / educationEditingCategory 是否為 null 來判斷目前
+  是哪種模式：
+    - 兩者皆為 null            → 新增模式（由 openEducationCreateModal() 開啟）
+    - 兩者皆有值（原始部位/類別）→ 編輯模式（由 openEducationEditModal(bodypart, category) 開啟），
+                                  儲存時會呼叫 PUT /api/education/<原部位>/<原類別>，
+                                  即使表單裡的部位/類別名稱被改掉，後端仍能用 URL 中
+                                  的「原始值」找到要更新的那一筆，並允許同時改名。
+  送出（儲存）由 submitEducationForm() 統一處理，依上述模式決定呼叫 POST 或 PUT。
+-->
 <div class="modal-backdrop" id="modal-education-edit">
   <div class="modal">
+    <!-- 標題文字會依模式動態替換為「新增衛教類別」或「編輯衛教類別」 -->
     <div class="modal-title" id="education-modal-title">
       <span>📚</span> <span id="education-modal-title-text">新增衛教單</span>
     </div>
 
     <div class="form-group">
       <label>部位或科別</label>
+      <!--
+        部位下拉選單：選項由 education.js 的 populateBodypartOptions() 依目前
+        educationList 裡「已出現過的所有部位」去重、排序後動態產生 <option>，
+        並在選單最後固定加一個特殊選項 value="__new__"（對應常數 NEW_BODYPART_VALUE），
+        代表「這是一個全新的部位名稱，要用下面的文字輸入框輸入」。
+        onchange 綁定 onBodypartSelectChange()：切到「+ 新增部位…」時顯示下方文字框
+        並自動 focus；切回既有部位時則隱藏文字框。
+      -->
       <select id="education-input-bodypart-select" onchange="onBodypartSelectChange()">
         <!-- 由 education.js 動態產生 -->
       </select>
+      <!-- 僅在下拉選單選到「+ 新增部位…」時才會顯示（由 JS 切換 display），
+           讓管理員輸入一個尚未存在於 category.json 頂層 key 的新部位名稱。
+           實際送出表單時，最終要用哪個部位名稱由 getSelectedBodypart() 決定：
+           下拉選了既有部位就直接用該值，選了「新增」就用這個文字框的值（trim 後）。 -->
       <input type="text" id="education-input-bodypart-new"
             placeholder="輸入新的部位名稱，例如：頭"
             style="margin-top:6px; display:none;">
@@ -38,29 +145,64 @@
 
     <div class="form-group">
       <label>衛教單名稱</label>
+      <!-- 衛教單名稱：對應 category.json 該部位底下的第二層 key。後端規定「衛教單名稱
+           必須全域唯一」，不可以在不同部位底下出現同名衛教單（因為 LINE Bot 用症狀
+           名稱去比對衛教單時，是以衛教單名稱查整個 category.json，若允許重名會造成
+           查詢結果歧義）。此欄位由 submitEducationForm() 讀值並做前端必填檢查。 -->
       <input type="text" id="education-input-category" placeholder="例如：頭暈">
     </div>
 
     <div class="form-group">
       <label>對應 md 檔名</label>
+      <!-- md 檔名：對應 category.json 該類別底下的 filename 欄位，也是實際內容檔
+           assets/discharge/<filename>.md 的檔名。後端在儲存時會做以下處理：
+             - 若結尾沒有 .md 會自動補上
+             - 只取檔名部分（避免使用者輸入含路徑的字串造成路徑跳脫攻擊）
+             - 若這個檔名已被其他 (部位, 類別) 使用，屬於「刻意共用同一份衛教文章」
+               的合法情境，後端仍會接受；但若是「換一個檔名但撞到別的類別在用的檔名」
+               則會拒絕並要求換名，避免誤把不同內容互相覆蓋。 -->
       <input type="text" id="education-input-filename" placeholder="例如：trauma_contusion_sprain.md">
     </div>
 
     <div class="form-group">
       <label>衛教內容</label>
+      <!-- 衛教內容：即 .md 檔案的實際文字內容。
+             - 新增模式：一開始是空字串，由管理員手動輸入完整衛教說明文字。
+             - 編輯模式：開啟 Modal 時先顯示「載入中...」佔位文字，再由
+               openEducationEditModal() 另外呼叫 GET /api/education-content/<filename>
+               取得目前檔案的實際內容後填入（因為列表 API GET /api/education 只回傳
+               攤平的 bodypart/category/filename，不含內容文字，避免列表回應過大）。
+           這段文字最終會成為 LINE Bot AI 回覆病患時，RAG（檢索增強生成）context
+           的一部分，因此內容的正確性與完整性直接影響病患收到的衛教說明品質。 -->
       <textarea id="education-input-content" rows="12" placeholder="請輸入完整的衛教內容文字"></textarea>
     </div>
 
+    <!-- 表單層級的錯誤訊息顯示區：由 showEducationModalError()/hideEducationModalError()
+         控制文字內容與 display。用於顯示前端必填檢查失敗，或後端 API 回傳的
+         4xx 錯誤訊息（例如「類別名稱已存在」、「檔名已被使用」等），讓管理員在
+         Modal 內就能看到失敗原因而不必關閉視窗。 -->
     <p class="error-msg" id="education-modal-error" style="text-align:left; display:none;"></p>
 
     <div class="modal-actions">
+      <!-- 取消：呼叫 closeEducationEditModal()，關閉 Modal 並清除錯誤訊息，
+           不會送出任何 API 請求，educationList 與畫面均不受影響。 -->
       <button class="btn btn-gray" onclick="closeEducationEditModal()">取消</button>
+      <!-- 儲存：呼叫 submitEducationForm()，依目前模式送出 POST 或 PUT 請求。
+           儲存過程中此按鈕會被暫時 disable，避免重複點擊造成重複送出。 -->
       <button class="btn btn-primary" id="education-save-btn" onclick="submitEducationForm()">儲存</button>
     </div>
   </div>
 </div>
 
-<!-- ── Modal：刪除確認 ── -->
+<!--
+  ══════════════════════════════════════════════════════════════════════
+  Modal：刪除確認
+  ══════════════════════════════════════════════════════════════════════
+  二次確認用的警示型 Modal，避免管理員誤刪衛教類別。開啟時機：在手風琴列表中
+  點擊某一列的「刪除」按鈕 → education.js 呼叫 openEducationDeleteModal(bodypart, category)，
+  將目標記錄到模組變數 educationDeleteTarget，並把「部位 / 類別」文字填入下方的
+  #education-delete-target 讓管理員確認要刪除的是哪一筆。
+-->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-education-delete">
   <div class="modal-alert">
     <div class="modal-alert-icon-wrap danger">
@@ -73,12 +215,22 @@
       <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:2px;">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
       </svg>
+      <!-- 目標描述由 openEducationDeleteModal() 動態填入「部位 / 類別」文字，
+           讓管理員在按下確認刪除前，能明確看到即將刪除哪一筆對照關係。 -->
       <div style="font-weight:600; font-size:14px; line-height:1.45;">
         即將刪除衛教單「<span id="education-delete-target"></span>」，此操作無法復原。
       </div>
     </div>
     <div class="modal-alert-actions">
+      <!-- 取消：直接關閉此 Modal（沿用共用的 closeModal(id) 工具函式），
+           不會清除 educationDeleteTarget，但下次開啟刪除 Modal 時會被覆寫，
+           實務上不會造成資料錯亂。 -->
       <button class="btn btn-outline" onclick="closeModal('modal-education-delete')">取消</button>
+      <!-- 確認刪除：呼叫 confirmDeleteEducation()，對 educationDeleteTarget 記錄的
+           (bodypart, category) 發出 DELETE /api/education/<bodypart>/<category> 請求。
+           後端刪除該筆 category.json 對照關係後，會檢查是否還有其他類別引用同一個
+           .md 檔名，沒有的話才把該 .md 實體檔案從硬碟一併刪除，避免刪除到仍被
+           共用的衛教內容檔。刪除成功後前端會重新呼叫 loadEducationList() 刷新列表。 -->
       <button class="btn btn-danger" onclick="confirmDeleteEducation()">確認刪除</button>
     </div>
   </div>

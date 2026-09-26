@@ -1,27 +1,196 @@
+  /* ════════════════════════════════════════════════════════════════════════
+   * 檔案總覽：style.css — 急診出院衛教 LINE Bot 醫護後台管理系統／共用樣式表
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * 【這份檔案在整體系統中的角色】
+   *   這是 webpage/admin/ 目錄下「唯一一份」共用 CSS，由 Flask 路由
+   *   `GET /main/css/<filename>`（定義於 src/admin_server.py）提供服務，
+   *   並被以下所有後台管理頁面以 <link> 方式共同載入：
+   *     - admin.html    ：整個後台的「外殼」，包含登入畫面、頂部 header、
+   *                       側邊漢堡選單，以及各分頁 <div id="section-xxx">
+   *                       容器（實際各分頁內容由對應 html/js 動態注入）。
+   *     - chats.html    ：病患對話紀錄——左側病患/就診清單 + 右側對話泡泡。
+   *     - doctors.html  ：醫師帳號管理（僅 admin 角色可見的表格 CRUD）。
+   *     - education.html：衛教資料管理，主要重用本檔案的表格 / 卡片 /
+   *                       Modal / 按鈕等通用元件樣式，沒有專屬的獨立區塊。
+   *     - forms.html    ：出院表單建立與編輯（護理師填單／醫師填單／
+   *                       出院單紀錄三種工作模式切換的三欄式版面），
+   *                       是本檔案中樣式規則最複雜、最龐大的一塊。
+   *     - prompt.html   ：AI Prompt 版本管理（僅 admin 角色可見的
+   *                       左中右三欄：歷史版本清單／編輯區／目前生效版）。
+   *     - stats.html    ：統計儀表板（卡片式數據總覽 + hover 顯示定義）。
+   *
+   * 【整體排版策略】
+   *   - App Shell 採「上方固定 header + 左側可收合 sidebar（漢堡選單）+
+   *     右側可滾動 main 內容區」的傳統管理後台骨架，用 flex 直向堆疊
+   *     （header 在上，.layout 在下），.layout 內再用 flex 橫向排出
+   *     sidebar（實際上是 fixed 定位疊加，並非真正佔用 flex 空間）與
+   *     main。sidebar 收合/展開靠 transform: translateX() 位移動畫，
+   *     搭配一層半透明 .sidebar-overlay 蓋住背景內容、點擊可關閉選單。
+   *   - 各分頁內部大多再細分「多欄卡片式版面」：
+   *       - chats/forms 分頁：左側清單欄（病患/就診紀錄）+ 右側內容欄
+   *         （對話紀錄或表單），用 flex 或 grid 分欄，欄與欄之間用
+   *         固定卡片樣式（圓角、border、box-shadow 極輕）呈現層次。
+   *       - forms.html 又更進一步用 CSS Grid 做「三欄式」版面
+   *         （.forms-layout：主欄／子欄／表單欄），並透過
+   *         `[data-state="nurse"|"doctor"|"view"]` 屬性選擇器切換
+   *         欄位的顯示/隱藏與 grid-column 跨欄範圍，用純 CSS
+   *         （不重新排版 DOM）達成「護理師填單／醫師填單／出院單紀錄」
+   *         三種工作模式的版面切換。
+   *       - stats.html：CSS Grid `repeat(auto-fit, minmax(220px, 1fr))`
+   *         做自適應卡片牆，卡片數量隨螢幕寬度自動決定每列張數。
+   *   - RWD（響應式）策略非常精簡：整份檔案只有一個 `@media (min-width:768px)`
+   *     斷點（見「── HAMBURGER SIDEBAR ──」區塊），用來讓桌面尺寸螢幕在
+   *     側邊選單展開時，把主內容區「推」出 240px（margin-left），
+   *     而手機尺寸則維持選單以覆蓋（overlay）方式蓋在內容上方，不佔用版面
+   *     空間。也就是說絕大多數版面（表格、卡片、Modal）本身即具備一定
+   *     彈性（flex-wrap、min()/百分比寬度等），並非靠大量 media query
+   *     堆疊斷點來做 RWD，而是靠彈性版面單位盡量適應各種螢幕寬度。
+   *
+   * 【色彩系統 / CSS 自訂屬性（--variables）用途】
+   *   統一定義於下方 :root，全檔案幾乎所有顏色都透過 var(--xxx) 引用，
+   *   方便日後整體調色或改主題色時只需改這 10 個變數：
+   *     --primary   #1e40af（深藍）：主品牌色，用於 header、sidebar
+   *                 選中狀態、主要按鈕 .btn-primary/.btn-blue、連結色系、
+   *                 對話泡泡（使用者/醫護方發言）背景等「主要強調色」。
+   *     --primary-l #3b82f6（亮藍）：主色的較亮版本，用於 focus 狀態的
+   *                 border 顏色、hover 邊框、以及漸層裝飾（如
+   *                 .session-divider 的漸層分隔線）。
+   *     --accent    #10b981（綠）：正向/成功語意色，用於 .btn-accent、
+   *                 儲存成功提示 .save-status.ok、.toast.ok，以及
+   *                 stat-card.green 系列（例如「已完訪」「正常」等
+   *                 正向統計數字）。
+   *     --danger    #ef4444（紅）：★ 警示/危險語意色 ★——這是與病患
+   *                 「臨床狀態」語意最直接相關的顏色，凡是紅色系
+   *                 （var(--danger) 或其變體 #ef4444/#dc2626/#fee2e2 等）
+   *                 在 chats 分頁與統計卡片中出現，多對應「需要留意／
+   *                 須回診／異常」等警示情境，例如 stat-card.red 的
+   *                 數字色、.draft-count-badge（未完成草稿數量徽章）、
+   *                 危險按鈕 .btn-danger、刪除類 icon 按鈕 hover 態
+   *                 （.btn-icon-sm.danger）、以及警示彈窗
+   *                 .modal-alert-icon-wrap.danger / .modal-alert-banner.danger
+   *                 （用於「確認刪除」「不可逆操作」等對話框）。
+   *                 撰寫/擴充 chats 分頁邏輯時，應留意這個色彩語意的
+   *                 一致性——凡是要標示病患「異常」「須回診」等狀態，
+   *                 應優先重用 --danger 相關的既有 class，而不是另外
+   *                 造一個新顏色，以維持全站警示色的一致辨識度。
+   *     --warn      #f59e0b（橘/黃）：次級警示、提醒語意色，語意上比
+   *                 --danger 輕、但比一般文字更需要注意，用於
+   *                 .btn-warn、stat-card.orange（例如「待處理」數量）、
+   *                 .no-logs-notice（尚無對話紀錄提示）、
+   *                 .modal-alert-icon-wrap.warning（一般性確認提醒，
+   *                 語意介於 info 與 danger 之間，例如「即將覆蓋」）。
+   *     --text      #1f2937（深灰近黑）：主要文字顏色，body 預設字色、
+   *                 標題、表格內文等。
+   *     --muted     #6b7280（中灰）：次要/輔助文字顏色，如時間戳、
+   *                 說明文字、表格 th 標題、badge-gray 等「不需要特別
+   *                 強調」的文字。
+   *     --border    #e5e7eb（淺灰）：所有 1px/1.5px 邊框、分隔線
+   *                 （.divider）的預設顏色。
+   *     --bg        #f3f4f6（極淺灰）：整個後台的頁面背景色，也用於
+   *                 卡片內「次要區塊」的底色（例如 form-card、
+   *                 nurse-draft-input 未聚焦時的底色），營造出比
+   *                 白色卡片 (--card) 更「退一步」的視覺層次。
+   *     --card      #ffffff（純白）：卡片/面板/Modal 的背景色，與
+   *                 --bg 兩者搭配出「頁面底色（灰）＋內容卡片（白）」
+   *                 的雙層視覺層次，是整份後台最基本的版面配色邏輯。
+   *   除了 :root 內的 10 個變數，另外還有兩個「就地」自訂屬性（未在
+   *   :root 宣告、屬於區域性用途，需搭配 inline style 或 JS 動態指定）：
+   *     --arrow-top（見 #popover::before）：由 JS 動態計算彈出框箭頭
+   *                 的垂直位置，CSS 端提供 fallback 值 18px。
+   *     --border-light（見 .symptom-item）：症狀清單項目分隔線顏色，
+   *                 若外部未定義則 fallback 為 #f3f4f6。
+   *
+   * 【命名慣例】
+   *   - 主要採「單一 class、扁平命名」風格，較少嚴格遵循 BEM 的
+   *     block__element--modifier 語法，但仍隱含類似概念：常見前綴
+   *     代表所屬「元件家族」，例如：
+   *       btn-*      ：按鈕變體（.btn-primary/.btn-danger/.btn-xs...）。
+   *       badge-*    ：小型狀態徽章顏色變體。
+   *       modal-*    ：Modal 彈窗系列（含 modal-alert-* 警示彈窗子系列）。
+   *       stat-*     ：統計卡片系列（stats.html）。
+   *       patient-*  / plist-* ：chats 分頁左側病患清單。
+   *       chat-*     / bubble-*：chats 分頁右側對話紀錄與泡泡。
+   *       prompt-*   ：prompt.html 三欄版面。
+   *       forms-*    ：forms.html 三欄版面骨架（.forms-layout/-main-col/
+   *                    -sub-col/-form-col/-state-btn/-state-content）。
+   *       nurse-*    / doctor-* ：forms.html 中依「護理師」/「醫師」
+   *                    角色區分的表單子元件（欄位、下拉選單等）。
+   *       symptom-*  ：forms.html 醫師填單三欄式症狀選擇器。
+   *       view-edit-*：forms.html「出院單紀錄」分頁的檢視/編輯共用列樣式。
+   *       nurse-custom-dd*：forms.html 護理師填單頁自製（非原生 <select>）
+   *                    下拉選單元件，因需要同時顯示「置頂」分組與
+   *                    自訂排版而不用原生 select。
+   *       modal-alert-*：全站共用的「二次確認/警示」彈窗（不同於一般
+   *                    .modal，用於刪除確認、覆蓋警告等更需要使用者
+   *                    停下來注意的情境），依語意再分 warning/info/
+   *                    danger/success 四種配色子變體。
+   *   - 部分規則使用「HTML id + class 巢狀」寫法（例如
+   *     `#doctor-table th`、`#section-chats .patient-list`），用途是
+   *     針對「同一 class 被多個分頁重用，但某個分頁需要覆寫特定樣式」
+   *     的情境做局部覆寫，例如 `#section-chats .visit-list` 就是
+   *     只在「病患對話紀錄」分頁才存在的第二層清單（就診紀錄清單），
+   *     `#section-chats .patient-list { width: 250px !important; }`
+   *     則是刻意縮小共用的 .patient-list 寬度以容納新增的 visit-list 欄。
+   *   - 檔案內偶有「舊規則被新規則覆寫/取代」的痕跡（例如同一個
+   *     `.image-section`/`.image-wrapper` 選擇器在檔案中出現兩次，
+   *     第二次的數值會覆蓋第一次），屬於歷史演進留下的重複定義，
+   *     維護時請留意「後面出現的同名規則才是實際生效版本」。
+   *   - z-index 層疊順序（由低到高，方便排查疊層問題）大致為：
+   *       header(100) < sidebar-overlay(199) < sidebar(200) 同時
+   *       nurse-custom-dd-list(200)＝sidebar 同層但情境不重疊 <
+   *       symptom/hotspot 熱區(5~10) 屬局部堆疊上下文另計 <
+   *       stat-card::after 提示框(100)、popover(100) <
+   *       loading-overlay(999) < toast(800) < modal-backdrop(500) <
+   *       modal-backdrop-alert(600，警示彈窗需蓋在一般 Modal 之上)。
+   *     以上數字並非嚴格全域比較（有些屬於不同容器的獨立堆疊上下文），
+   *     但整體設計原則是：「越接近使用者當前操作焦點、越需要獨佔注意力
+   *     的 UI（警示彈窗 > 一般彈窗 > 全頁 loading > toast 提示 >
+   *     側邊選單 > 頁面固定 header）」z-index 越高。
+   */
+
+  /* ──────── CSS Reset ──────── */
+  /* 讓所有元素（含 ::before/::after）統一採用 border-box 計算 box model，
+     並清除瀏覽器預設 margin/padding，避免各瀏覽器預設樣式造成排版落差。 */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ──────── 全站色彩系統（CSS 自訂屬性 / 主題變數） ──────── */
+  /* 詳細語意說明見上方「檔案總覽」的【色彩系統】段落；
+     此處僅保留變數宣告，修改這裡即可整站換色。 */
   :root {
-    --primary:   #1e40af;
-    --primary-l: #3b82f6;
-    --accent:    #10b981;
-    --danger:    #ef4444;
-    --warn:      #f59e0b;
-    --text:      #1f2937;
-    --muted:     #6b7280;
-    --border:    #e5e7eb;
-    --bg:        #f3f4f6;
-    --card:      #ffffff;
+    --primary:   #1e40af;  /* 主品牌色：深藍，用於 header/sidebar/主按鈕 */
+    --primary-l: #3b82f6;  /* 主色的亮版：focus 邊框、hover 強調、漸層裝飾 */
+    --accent:    #10b981;  /* 成功/正向語意色：綠，儲存成功、正向統計 */
+    --danger:    #ef4444;  /* 警示/危險語意色：紅，對應「須回診/異常」等警示狀態 */
+    --warn:      #f59e0b;  /* 次級警示語意色：橘，提醒但尚未到危險程度 */
+    --text:      #1f2937;  /* 主要文字色：深灰近黑 */
+    --muted:     #6b7280;  /* 次要/輔助文字色：中灰，說明文字、時間戳 */
+    --border:    #e5e7eb;  /* 邊框/分隔線色：淺灰 */
+    --bg:        #f3f4f6;  /* 頁面底色：極淺灰，卡片以外的退階背景 */
+    --card:      #ffffff;  /* 卡片/面板/Modal 背景色：純白 */
   }
 
+  /* body 全站預設字型/底色：字型優先採系統原生字（跨平台一致且免額外
+     載入字型檔），背景/文字色套用上方變數，min-height:100vh 確保內容
+     過少時背景仍鋪滿整個視窗高度。 */
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
          background: var(--bg); color: var(--text); min-height: 100vh; }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：登入畫面（Login Screen）
+   * 對應 admin.html 中 #login-screen；使用者輸入帳密登入後台前顯示，
+   * 登入成功後由 JS 切換為 display:none，改顯示 #app 主畫面。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── LOGIN ── */
   #login-screen {
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh;
     background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
   }
+  /* 登入卡片本體：置中固定寬 380px 的白色卡片，較大的 box-shadow
+     （20px 擴散、25% 透明黑）用來在深藍漸層背景上「浮起」的視覺效果，
+     這是整份 CSS 中少數刻意使用大範圍陰影營造沉浸式登入頁氛圍的元件。 */
   .login-card {
     background: var(--card); border-radius: 16px; padding: 48px 40px;
     width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
@@ -35,6 +204,12 @@
   .login-logo h1 { font-size: 22px; font-weight: 700; color: var(--primary); }
   .login-logo p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
+  /* ──────── 通用表單欄位（.form-group） ────────
+     全站共用的「標籤 + 輸入框」外框樣式，不限登入頁使用，凡是頁面內
+     有 label+input/select/textarea 成對出現的地方（例如 doctors.html
+     新增醫師 Modal）都套用同一組樣式，確保視覺一致。
+     transition: border .2s 只針對邊框顏色做淡入淡出，避免 focus 切換
+     時邊框顏色瞬間跳動造成視覺突兀。 */
   .form-group { margin-bottom: 18px; }
   .form-group label { display: block; font-size: 13px; font-weight: 600;
                       color: var(--text); margin-bottom: 6px; }
@@ -47,12 +222,15 @@
     border-color: var(--primary-l);
   }
 
+  /* 密碼欄位「顯示/隱藏密碼」眼睛圖示按鈕：以 position:absolute 疊放在
+     input 右側內部（父層 .password-wrapper 需為 relative），
+     不佔用版面空間、也不影響 input 寬度計算。 */
   .password-wrapper {
     position: relative;
     display: flex;
     align-items: center;
   }
-  
+
   .btn-toggle-password {
     position: absolute;
     right: 12px;
@@ -64,11 +242,21 @@
     padding: 0;
     outline: none;
   }
-  
+
   .btn-toggle-password:hover {
     color: var(--text);
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：按鈕元件（Buttons）
+   * 全站唯一一套按鈕樣式系統，透過 .btn 基礎樣式 + 顏色變體 class
+   * （-primary/-blue/-accent/-warn/-danger/-outline/-gray）與尺寸變體
+   * （-sm/-xs）自由組合，供所有分頁重複使用（登入按鈕、表格操作按鈕、
+   * Modal 確認/取消按鈕、狀態切換按鈕等）。
+   * :active 時 transform: scale(.97) 做輕微按壓回饋；hover 則統一用
+   * opacity:.9（除 outline/gray 走底色變化）簡化互動回饈邏輯。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px;
@@ -85,8 +273,14 @@
   .btn-accent:hover  { opacity: .9; }
   .btn-warn    { background: var(--warn); color: #fff; }
   .btn-warn:hover    { opacity: .9; }
+  /* .btn-danger：語意上對應「刪除／不可逆／須留意」等危險操作按鈕，
+     使用 --danger 紅色，需與 chats 分頁「須回診」等紅色警示語意保持
+     一致的視覺辨識度（同一種紅色代表同一種「需要特別注意」的訊號）。 */
   .btn-danger  { background: var(--danger); color: #fff; }
   .btn-danger:hover  { opacity: .9; }
+  /* 停用態一律用 !important 覆蓋，確保無論按鈕原本是哪種顏色變體，
+     停用時都會被強制蓋成統一的「灰階不可互動」外觀，避免顏色變體
+     class 的優先權造成停用樣式失效。 */
   .btn[disabled] {
     background: var(--bg) !important;
     color: var(--muted) !important;
@@ -96,6 +290,9 @@
     box-shadow: none !important;
     opacity: 0.65;
   }
+  /* .btn-outline：用於深色背景（例如登入頁漸層背景、Modal 深色區域）
+     上的次要按鈕，透明底 + 半透明白色邊框，避免在深色底上使用實色
+     按鈕造成視覺過重。 */
   .btn-outline { background: transparent; border: 1.5px solid rgba(255,255,255,.5);
                  color: #fff; }
   .btn-outline:hover { background: rgba(255,255,255,.1); }
@@ -103,12 +300,25 @@
                  border: 1.5px solid var(--border); }
   .btn-gray:hover { background: var(--border); }
 
+  /* 表單錯誤訊息（例如登入帳密錯誤）：固定 min-height:20px 是為了
+     「即使目前沒有錯誤訊息，也預留這行空間」，避免錯誤訊息出現/
+     消失時導致下方版面跳動（layout shift）。 */
   .error-msg { color: var(--danger); font-size: 13px; margin-top: 8px;
                text-align: center; min-height: 20px; }
 
-  /* ── APP SHELL ── */
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：後台主框架（App Shell）
+   * 對應 admin.html 的 #app 容器，登入成功後由 JS 切換 display:none→flex
+   * 顯示。整體採「上方 header（56px 固定高）＋ 下方 .layout（flex:1
+   * 佔滿剩餘高度）」的上下兩段式骨架，height:100vh 確保無論內容多寡
+   * 都撐滿整個視窗（不會出現頁面捲動，改由各分頁內部區域自行捲動）。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   #app { display: none; height: 100vh; flex-direction: column; }
 
+  /* 頂部固定列：品牌名稱（左）＋ 使用者角色徽章與登出等操作（右）。
+     z-index:100 確保視覺上一律蓋在下方內容（.layout/main）之上，
+     但仍低於側邊選單（200）與各種彈窗，避免選單/彈窗被 header 蓋住。 */
   header {
     height: 56px; background: var(--primary); color: #fff;
     display: flex; align-items: center; padding: 0 20px;
@@ -118,17 +328,34 @@
   .header-user { display: flex; align-items: center; gap: 12px; font-size: 14px; }
   .user-badge  { background: rgba(255,255,255,.2); border-radius: 20px;
                  padding: 4px 12px; font-weight: 600; }
+  /* 角色徽章（顯示於 header 右側，標示目前登入者身分）：admin 用黃色、
+     doctor 用綠色，兩者顏色刻意與 --primary/--danger 系統色區隔，
+     避免與「警示狀態」顏色混淆——這裡純粹是「身分標示」而非狀態警示。 */
   .role-tag    { font-size: 11px; padding: 2px 8px; border-radius: 10px;
                  font-weight: 700; letter-spacing: .5px; }
   .role-admin  { background: #fbbf24; color: #78350f; }
   .role-doctor { background: #6ee7b7; color: #065f46; }
 
+  /* .layout：header 以下的主體容器，橫向排出 sidebar + main。
+     margin-left 的 transition 是為了配合 @media(min-width:768px) 下
+     「側邊選單展開時把內容往右推」的動畫（見下方 #app.sidebar-open），
+     手機尺寸則不會套用該 margin-left，選單改以覆蓋方式呈現。 */
   .layout {
     display: flex; flex: 1; overflow: hidden;
     transition: margin-left .25s cubic-bezier(.4,0,.2,1);
   }
 
-  /* ── HAMBURGER SIDEBAR ── */
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：漢堡選單側邊欄（Hamburger Sidebar）
+   * 對應 admin.html 左上角漢堡圖示點擊後展開的導覽選單，用於在
+   * stats/chats/forms/doctors/prompt/education 各分頁之間切換
+   * （.nav-item 對應每個分頁的連結，.active 標示目前所在分頁）。
+   * ──────────────────────────────────────────────────────────────────────
+   */
+  /* 半透明遮罩層：手機尺寸下選單展開時蓋住背景內容，點擊遮罩可關閉
+     選單；桌面尺寸（見下方 media query）遮罩改為極淺（5% 透明黑），
+     因為此時內容已被推開、不需要強烈遮蔽效果，僅作輕微視覺提示。
+     z-index:199 需低於 .sidebar(200)，確保遮罩在選單「下方」。 */
   .sidebar-overlay {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35);
     z-index: 199;
@@ -136,6 +363,12 @@
   }
   .sidebar-overlay.open { display: block; }
 
+  /* ──────── RWD 斷點（本檔案唯一的 media query） ────────
+     768px 以上視為「桌面/平板橫向」尺寸：側邊選單展開時，不再單純疊加
+     在內容上方，而是把 .layout 整體往右推 240px（等同 sidebar 寬度），
+     讓選單與內容並排顯示，比手機尺寸下的全螢幕覆蓋式選單更符合大螢幕
+     的使用習慣。同時遮罩背景改為幾乎透明，因為此時遮罩只是「點擊可
+     關閉」的觸發區，不需要強烈遮蔽視覺。 */
   @media (min-width: 768px) {
     #app.sidebar-open .layout {
       margin-left: 240px;
@@ -145,6 +378,11 @@
     }
   }
 
+  /* 側邊選單本體：fixed 定位、預設 translateX(-100%) 完全移出畫面外
+     （而非 display:none），目的是讓 .open 時的滑入動畫可以透過
+     transform 做平滑位移（display 切換無法做動畫）。
+     z-index:200 高於 overlay(199) 與一般 header(100)，確保選單本身
+     一定蓋在遮罩與內容之上。 */
   .sidebar {
     position: fixed; top: 0; left: 0; height: 100vh; width: 240px;
     background: var(--card); border-right: 1px solid var(--border);
@@ -155,6 +393,9 @@
   }
   .sidebar.open { transform: translateX(0); }
 
+  /* 選單頂部：與主 header 同高（56px）、同色（--primary），視覺上
+     形成「選單頂部與主 header 是同一條橫向色帶」的錯覺，強化整體
+     一致性。 */
   .sidebar-header {
     height: 56px; background: var(--primary); color: #fff;
     display: flex; align-items: center; padding: 0 16px; gap: 12px;
@@ -166,6 +407,10 @@
   }
 
   .nav-items { flex: 1; padding: 12px 0; overflow-y: auto; }
+  /* 每個導覽項目：左側 3px 色條 + 淡藍底色標示目前所在分頁
+     （.active），與後面 .patient-item.active / .visit-item.active /
+     .tab 等「選中態」樣式共用同一種「左側色條 + 淡藍底」視覺語言，
+     是全站用來標示「目前選中/當前所在」狀態的一致設計模式。 */
   .nav-item {
     display: flex; align-items: center; gap: 10px;
     padding: 12px 20px; cursor: pointer; font-size: 14px; font-weight: 500;
@@ -177,7 +422,9 @@
                      border-left-color: var(--primary); font-weight: 700; }
   .nav-icon { font-size: 18px; width: 22px; text-align: center; }
 
-  /* hamburger button */
+  /* hamburger button：三條橫線組成的漢堡圖示，純 CSS 畫出（無圖片/
+     icon font），span 的 transition 保留是為了未來若要做「展開時
+     漢堡圖示變成 X」的動畫可直接沿用，目前 JS 端尚未觸發該變形。 */
   .hamburger {
     background: none; border: none; color: #fff; cursor: pointer;
     padding: 8px; margin-right: 12px; border-radius: 6px;
@@ -190,18 +437,32 @@
     border-radius: 2px; transition: all .25s;
   }
 
-  /* ── MAIN ── */
+  /* ──────── 主內容區（main）與分頁容器（.section） ────────
+     main 佔滿 header 以下剩餘空間並自行捲動（overflow-y:auto），
+     28px 內距讓內容不貼齊視窗邊緣。每個分頁對應一個 #section-xxx，
+     透過 JS 切換 .active class 控制單一時間只顯示一個分頁
+     （display:none/block 切換，而非路由式換頁），因此網址不會改變。 */
   main { flex: 1; overflow-y: auto; padding: 28px; }
 
   .section       { display: none; }
   .section.active{ display: block; }
   .section-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：統計儀表板（stats.html → #section-stats）
+   * 卡片式數據總覽頁，使用 CSS Grid 自適應排列卡片，並透過 hover 顯示
+   * 每個統計指標的文字定義（見後方「Stats hover tooltips」區塊）。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── STATS ── */
   #section-stats {
     max-width: 1100px;
     margin: 0 auto;
   }
+  /* 卡片牆：repeat(auto-fit, minmax(220px,1fr)) 讓瀏覽器依可用寬度
+     自動決定每列放幾張卡片（每張最小 220px，剩餘空間平分），不需要
+     額外寫 media query 就能適應各種螢幕寬度，是本檔案 RWD 策略
+     「靠彈性版面單位」而非「大量斷點」的典型例子。 */
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -209,6 +470,10 @@
     margin-top: 24px;
   }
 
+  /* 單張統計卡片：極輕的雙層 box-shadow（模擬 Material Design 的
+     elevation 質感）+ hover 時上浮 4px 並加深陰影，營造「可互動」
+     的懸浮回饋感，即使卡片本身不可點擊，也能引導使用者注意到
+     hover 時會顯示的文字定義提示（見後方 .stat-card::after）。 */
   .stat-card {
     background: var(--card); border-radius: 16px; padding: 28px 24px;
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.02);
@@ -232,6 +497,10 @@
   }
   .stat-value { font-size: 40px; font-weight: 800; color: var(--primary); line-height: 1.1; margin-bottom: 6px; }
   .stat-label { font-size: 14px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
+  /* 依語意分色的卡片變體：green 代表正向數據（例如已完成／正常），
+     orange 代表待處理/次要警示，red 則對應 --danger、用於「須留意/
+     異常」相關的統計數字（例如須回診人數），與 chats 分頁的紅色
+     警示語意呼應，務必保持同一套紅色系統，不要另外自訂顏色值。 */
   .stat-card.green  .stat-icon { background: rgba(16, 185, 129, 0.08); }
   .stat-card.green  .stat-value { color: var(--accent); }
   .stat-card.orange .stat-icon { background: rgba(245, 158, 11, 0.08); }
@@ -240,6 +509,17 @@
   .stat-card.red    .stat-value { color: var(--danger); }
   .last-updated { font-size: 12px; color: var(--muted); margin-top: 16px; text-align: right; }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：病患對話紀錄（chats.html → #section-chats）
+   * 左側「病患清單」（.patient-list）＋ 右側「對話面板」
+   * （.chat-panel，內含對話泡泡 .bubble-row/.bubble）。本區塊定義的
+   * 是「基礎/預設」版本；後方另有 `#section-chats .xxx` 系列規則，
+   * 針對本分頁額外插入的「就診紀錄清單」（.visit-list）欄位做版面
+   * 覆寫（見「Chats layout (keep original rules...)」區塊），
+   * 因為 .patient-list/.chat-panel 這些 class 同時也被 forms.html
+   * 的「出院單紀錄」分頁重用，兩個分頁需要的欄寬與欄數不完全相同。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── CHATS ── */
   .chat-layout { display: flex; gap: 16px; height: calc(100vh - 196px); margin-top: 20px; }
 
@@ -263,6 +543,13 @@
   .patient-meta { font-size: 12px; color: var(--muted); margin-top: 3px;
                   display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 
+  /* ──────── 小型狀態徽章（.badge-*） ────────
+     全站共用的膠囊型小徽章，用於病患清單/表格中標示各種簡短狀態
+     （例如病歷號、關係、就診次數等 metadata），依語意選色：
+     blue=一般資訊、green=正向/完成、orange=待處理/提醒、
+     gray=中性/次要，relation（黃色）則特別用於標示「與 LINE 帳號的
+     關係」（例如「子女」「配偶」），刻意與 role-admin 同色但語意
+     不同，純粹是視覺上都屬於「補充身分資訊」的黃色系標籤。 */
   .badge        { display: inline-block; padding: 1px 7px; border-radius: 10px;
                   font-size: 11px; font-weight: 700; }
   .badge-blue   { background: #dbeafe; color: var(--primary); }
@@ -271,6 +558,11 @@
   .badge-gray   { background: #f3f4f6; color: var(--muted); }
   .badge-relation { background: #fbbf24; color: #78350f; }
 
+  /* 「切換關係」按鈕：綠色（#06C755 為 LINE 品牌綠，非本檔案的
+     --accent 變數，因為此按鈕語意上直接對應「LINE 帳號」操作，
+     刻意呼應 LINE 官方識別色，讓使用者一看就知道是跟 LINE 綁定/
+     關係相關的操作），align-self:stretch 讓按鈕高度自動撐滿所在的
+     flex 列（與旁邊的病患資訊等高）。 */
   .btn-change-relation {
       background-color: #06C755;
       color: white;
@@ -289,6 +581,11 @@
       background-color: #05b04a;
   }
 
+  /* ──────── 對話面板（.chat-panel） ────────
+     右側主要內容欄：頂部標題列（含病患資訊 + 就診回合下拉選單）+
+     可捲動的對話內容主體。overflow:hidden 在外層、overflow-y:auto
+     在 .chat-panel-body，確保圓角（border-radius）不會被內部捲動
+     內容的方形邊角破壞視覺（子層捲動、母層裁切）。 */
   /* chat panel */
   .chat-panel {
     flex: 1; background: var(--card); border-radius: 12px;
@@ -315,6 +612,8 @@
     border-color: var(--primary-l);
   }
 
+  /* 空狀態（尚未選擇病患 / 尚無資料時的置中提示畫面），全站共用於
+     多個「清單型」分頁（chats、forms 出院單紀錄等）尚無選中項目時。 */
   .empty-state {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     height: 100%; color: var(--muted); gap: 12px;
@@ -322,6 +621,12 @@
   .empty-icon { font-size: 48px; opacity: .4; }
   .empty-state p { font-size: 14px; }
 
+  /* ──────── 出院表單摘要卡片（.form-card 系列） ────────
+     顯示於對話面板中「本次看診相關出院單」的摘要小卡（衛教主題、
+     是否已與病患聊過該主題等），與 forms.html 的正式出院表單編輯
+     介面是兩套不同的呈現方式，這裡是「唯讀摘要」版本。
+     .chatted-tag / .not-chatted-tag 用綠/灰區分「該衛教主題是否已
+     在對話中被提及過」，幫助醫護人員快速掌握病患衛教涵蓋進度。 */
   /* form cards */
   .subsection-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
   .form-card {
@@ -344,6 +649,13 @@
 
   .divider { height: 1px; background: var(--border); margin: 14px 0; }
 
+  /* ──────── 對話泡泡（Chat Bubbles） ────────
+     LINE 聊天室風格的雙欄對話呈現：user（病患端發言）靠右、藍底
+     白字；assistant（機器人/衛教內容回覆）靠左、灰底深字並多加一條
+     border 增加層次（因灰底在白色卡片背景上對比較弱，需要邊框輔助
+     辨識邊界）。bubble-row.user/.assistant 的 .bubble 分別在對應
+     內側角做 4px 小圓角（border-bottom-right/left-radius），模擬
+     「泡泡尖角朝向發言方」的常見聊天 UI 視覺慣例。 */
   /* chat bubbles */
   .bubble-row { display: flex; margin-bottom: 10px; }
   .bubble-row.user      { justify-content: flex-end; }
@@ -369,11 +681,22 @@
   .bubble-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .bubble-row.user .bubble-time { text-align: right; }
 
+  /* 「尚無對話紀錄」提示條：橘/黃底配色（同 --warn 色系），用於提醒
+     使用者「這個病患目前雖已建檔，但 LINE 端尚無互動紀錄」，語意上
+     介於一般資訊與警示之間，因此選用 warn 橘色而非 danger 紅色。 */
   .no-logs-notice {
     background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px;
     padding: 12px 16px; font-size: 13px; color: #92400e;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：AI Prompt 版本管理（prompt.html → #section-prompt，僅 admin）
+   * 左中右三欄式版面：左欄（20%）＝歷史版本清單，中欄（40%）＝
+   * 選中版本的內容檢視/編輯，右欄（40%）＝目前正式生效中的 Prompt。
+   * 三欄皆用 flex:0 0 百分比 固定寬度比例（不隨內容多寡伸縮），
+   * 確保三欄式版面在寬螢幕下維持一致的視覺比重。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── PROMPT ── */
   #section-prompt .section-title {
     text-align: center;
@@ -395,6 +718,10 @@
     flex-direction: column;
     overflow: hidden;
   }
+  /* transition: flex 0.25s：中欄預留了「可能改變寬度比例」的動畫
+     過渡（例如未來若要在只選中歷史版本、未進入編輯模式時讓中欄
+     收合/展開），目前雖無對應的 flex 數值切換觸發點，但保留此
+     transition 可讓未來擴充時動畫自然生效而不需額外補寫。 */
   .prompt-col-center {
     flex: 0 0 40%;
     background: var(--card);
@@ -416,21 +743,38 @@
     overflow: hidden;
     padding: 16px 20px;
   }
+  /* 淡藍色資訊提示框：用於說明「這是歷史版本，僅供檢視」或使用
+     說明等中性資訊，藍色（info）語意與 --danger/--warn 的警示語意
+     區隔，讓使用者一眼判斷這只是說明文字而非需要處理的警示。 */
   .prompt-info {
     background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
     padding: 10px 14px; font-size: 12px; color: var(--primary); margin-bottom: 12px;
     line-height: 1.45;
   }
+  /* Prompt 內容編輯區：使用 monospace 字型（Consolas）方便閱讀/
+     編輯結構化的 Prompt 文字（常含換行、條列、變數佔位符等），
+     底色刻意用比純白稍灰的 #fafafa，focus 時才轉為純白+主色邊框，
+     以視覺區分「目前是否正在編輯」的狀態。 */
   #prompt-textarea, #prompt-active-textarea {
     width: 100%; padding: 14px; font-family: 'Consolas', monospace;
     font-size: 13px; line-height: 1.6; border: 1.5px solid var(--border);
     border-radius: 8px; outline: none; background: #fafafa;
   }
   #prompt-textarea:focus { border-color: var(--primary-l); background: #fff; }
+  /* 儲存狀態文字：預設灰色（中性/尚未有結果），成功轉綠、失敗轉紅，
+     與全站 --accent/--danger 語意色保持一致。 */
   .save-status      { font-size: 12px; color: var(--muted); }
   .save-status.ok   { color: var(--accent); }
   .save-status.fail { color: var(--danger); }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：醫師帳號管理（doctors.html → #section-doctors，僅 admin）
+   * 單欄置中版面（max-width:900px），內容主要是一個醫師帳號列表
+   * 表格（新增/編輯/刪除醫師帳號），下方 #doctor-table 系列規則針對
+   * 這個特定表格微調字級/間距，其餘泛用表格樣式見後方
+   * 「── 通用表格樣式（table/th/td） ──」區塊。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── DOCTORS ── */
   #section-doctors {
     max-width: 900px;
@@ -456,6 +800,15 @@
     font-size: 13px;
     padding: 6px 12px;
   }
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：通用表格樣式（table / th / td）
+   * 全站唯一一套裸元素層級（非 class）的表格樣式，凡是頁面內出現
+   * <table> 都會自動套用（doctors.html 醫師列表、education.html
+   * 衛教資料列表等）。border-collapse:collapse + overflow:hidden 是
+   * 讓外層 border-radius 圓角能正確裁切表格四角（否則 <table> 內部
+   * 格線會直角穿出圓角外）的常見組合寫法。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   table { width: 100%; border-collapse: collapse; background: var(--card);
           border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
   th { background: var(--bg); font-size: 12px; font-weight: 700; color: var(--muted);
@@ -465,6 +818,16 @@
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--bg); }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：一般用途 Modal 彈窗（.modal-backdrop / .modal）
+   * 用於「新增/編輯」類表單彈窗（例如新增醫師帳號、編輯衛教項目），
+   * 與後方「Alert Modals」（.modal-alert 系列）是兩套不同用途的
+   * 彈窗：這裡是「填寫表單」，Alert 是「確認/警示」，視覺與
+   * z-index 皆刻意區分（一般 Modal z-index:500，Alert 更高
+   * z-index:600，確保警示彈窗永遠能疊在一般表單彈窗之上，
+   * 例如在編輯表單中途要跳出「確認捨棄變更？」的警示）。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── MODAL ── */
   .modal-backdrop {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
@@ -480,6 +843,11 @@
                  display: flex; align-items: center; gap: 8px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
 
+  /* ──────── 讀取中動畫（Spinner） ────────
+     純 CSS border-top-color 差異製造的圓形旋轉動畫，dark 版用於白底
+     卡片內（例如 loading-box），white 版用於彩色按鈕內（例如儲存中
+     的 .btn-primary），animation-duration 統一 .6s 保持全站讀取動畫
+     節奏一致。 */
   /* spinner */
   .spinner-dark {
     width: 24px; height: 24px; border: 3px solid var(--border);
@@ -492,10 +860,17 @@
     animation: spin .6s linear infinite; display: inline-block;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* .spinning：可疊加在任何元素（例如重新整理圖示按鈕）上讓其持續
+     旋轉，用 !important 確保優先權高於元素原本可能定義的其他
+     animation，避免被覆蓋導致「點擊後圖示沒有轉動」的視覺回饋缺失。 */
   .spinning {
     animation: spin 0.8s linear infinite !important;
   }
 
+  /* 全頁讀取遮罩：半透明白底蓋住整個畫面（inset:0 + position:fixed），
+     z-index:999 是全檔案數值最高的層級之一，確保讀取中畫面「一定」
+     蓋在包括側邊選單、一般 Modal 之上（讀取中理應阻擋所有其他互動），
+     但仍低於 loading-overlay 概念上不需與 Alert Modal 同時出現。 */
   .loading-overlay {
     position: fixed; inset: 0; background: rgba(255,255,255,.55);
     display: none; align-items: center; justify-content: center; z-index: 999;
@@ -507,6 +882,12 @@
     font-weight: 600;
   }
 
+  /* ──────── Toast 提示訊息 ────────
+     右下角浮動的短暫操作結果提示（例如「儲存成功」），預設隱藏於
+     視線外（opacity:0 + 向下位移 8px），.show 時淡入並回到原位，
+     transition: all .2s 統一處理透明度與位移兩種效果。
+     pointer-events:none 確保 toast 顯示期間不會擋住使用者對底下
+     其他元素的滑鼠操作（純資訊性提示，不需可互動）。 */
   .toast {
     position: fixed; bottom: 28px; right: 28px; z-index: 800;
     background: #1f2937; color: #fff; padding: 12px 20px; border-radius: 10px;
@@ -518,6 +899,19 @@
   .toast.ok   { background: var(--accent); }
   .toast.fail { background: var(--danger); }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：人體圖示互動症狀選擇器（人體圖片 + 熱區 + 彈出核取清單）
+   * 用於 forms.html 醫師/衛教相關流程中，讓使用者直接點擊人體示意圖
+   * 上的部位熱區（.hotspot）快速跳出該部位可勾選的症狀/衛教項目
+   * 清單（#popover），是比純文字三欄清單（見後方 .symptom-* 系列）
+   * 更直覺的替代/輔助互動方式。以下 .image-section/.image-wrapper
+   * 選擇器在檔案中「重複定義了兩次」——第二次的數值（max-width:550px、
+   * display:block）會覆蓋第一次（max-width:320px、
+   * display:inline-block），屬於歷史演進留下的重複規則，維護時請以
+   * 「後面出現的規則才是實際生效版本」為準，若要清理重複定義請先
+   * 確認兩份定義中的其他規則沒有互相依賴後面規則覆寫的副作用。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* 人體圖片與互動區塊設定 */
   .image-section {
       margin-top: 15px;
@@ -530,7 +924,7 @@
       max-width: 320px;
       margin: 0 auto;
   }
-  /* 人體圖片與互動區塊設定 */
+  /* 人體圖片與互動區塊設定（後定義版本，實際生效值，會覆蓋上方同名規則） */
   .image-section {
       margin-top: 30px;
       text-align: center;
@@ -552,8 +946,16 @@
       display: block;
       border-radius: 8px;
   }
-  
+
   /* 3-column Interactive Layout */
+  /* 三欄式互動排版：左欄（.body-column，固定 140px）放人體圖，
+     中欄（.popover-column，絕對定位、寬 220px、pointer-events:none）
+     是彈出清單「可能出現的浮動空間預留區」（本身不接受滑鼠事件，
+     真正可互動的是內部的 #popover），右欄（.buttons-column，固定
+     75px）放部位捷徑按鈕（皮膚/精神/其他）。這種「中欄用空的
+     pointer-events:none 容器」設計是為了讓 popover 可以用
+     left/transition 在中欄範圍內滑動定位，而不會擋住兩側欄位的
+     點擊。 */
   .interactive-layout {
       display: flex;
       justify-content: space-between;
@@ -586,8 +988,12 @@
       flex: 0 0 75px;
       position: relative;
   }
-  
-  /* 熱區圓圈 */
+
+  /* 熱區圓圈：疊在人體圖片上方的透明可點擊圓形區域，預設半透明綠色
+     （呼應 LINE 品牌綠 #06C755），hover/active 時加深透明度、加粗
+     邊框並放大 5%，給予明確的「已選中/可點擊」視覺回饋。
+     z-index 由 5 提升到 10（hover/active 時）是為了避免多個熱區
+     圓圈重疊時，目前互動中的那個熱區被相鄰熱區的邊框蓋住。 */
   .hotspot {
       position: absolute;
       border: 2px solid #06C755;
@@ -606,6 +1012,13 @@
   }
 
   /* 底層類 Chip 型按鈕樣式 */
+  /* 右欄「部位捷徑」按鈕（皮膚/精神/其他），視覺上做成藥丸型 Chip
+     （border-radius:21px 接近膠囊），!important 大量出現是因為這些
+     按鈕的定位（position/width/height）由下方 .btn-skin/-mental/
+     -other 依各自垂直位置各自覆寫，用 !important 確保無論按鈕元素
+     原本套用哪些通用 .btn 系列 class，此處的絕對定位版面規則都優先
+     生效，避免共用按鈕樣式的 inline-flex/寬度設定干擾三顆按鈕的
+     精確定位。 */
   .bottom-btn {
       position: absolute !important;
       width: 100% !important;
@@ -626,6 +1039,10 @@
   }
   
   /* Specific vertical alignments */
+  /* 三顆捷徑按鈕分別固定在右欄的 25%/50%/75% 垂直位置（模擬人體
+     頭部/軀幹/下半身三個大致區域），並用 translateY(-50%) 讓按鈕
+     的「中心點」對齊該百分比位置，而非按鈕左上角對齊，這樣按鈕
+     高度變化（例如文字換行）不會影響其視覺置中效果。 */
   .btn-skin {
       top: 25% !important;
       left: 0 !important;
@@ -661,6 +1078,14 @@
       transform: translateY(-50%) scale(1.05) !important;
   }
 
+  /* ──────── 浮動彈出框 (Popover) ────────
+     點擊人體圖熱區後彈出的症狀/衛教項目核取清單卡片。預設
+     display:none 搭配 opacity/transform 做「淡入 + 由 0.92 倍放大
+     至 1 倍」的展開動畫（.show 時觸發），比單純 display 切換更有
+     「從熱區位置彈出」的空間感。z-index:100 只需高於同一互動區塊
+     內的其他元素（熱區 z-index 5~10），不需要與全站彈窗系統
+     （Modal 500+）競爭層級，因為 popover 只會出現在 forms.html
+     此互動元件範圍內。 */
   /* 浮動彈出框 (Popover) */
   #popover {
       display: none;
@@ -681,6 +1106,11 @@
   }
 
   /* 切分內容區塊以實作標題固定與清單滑動 */
+  /* .popover-content 用 flex-direction:column + max-height 限制整體
+     高度，內部標題（h4）flex-shrink:0 保持固定不捲動，僅下方
+     .pop-checkbox-list 設 overflow-y:auto 可捲動——這是「標題固定、
+     內容捲動」的常見卡片版面組合寫法，避免清單項目一多時把標題也
+     一起往上推出視野。 */
   .popover-content {
       background: #fff;
       border: 1.5px solid #06C755;
@@ -724,6 +1154,14 @@
   }
   
   /* 彈出框箭頭設定 */
+  /* 用旋轉 45 度的正方形（透過 ::before 偽元素 + border-left/top）
+     製造「對話框指向熱區」的三角形箭頭視覺效果，是純 CSS 常見的
+     箭頭實作技巧：只畫兩條邊框並旋轉 45 度，讓正方形的一個角變成
+     箭頭尖端。.arrow-left/.arrow-right 依 popover 相對熱區的左右
+     位置切換箭頭要指向左邊還是右邊（旋轉角度 -45deg / 135deg 剛好
+     相差 180 度，讓同一個「L 型邊框」在鏡射情境下仍能正確指向）。
+     --arrow-top 由 JS 動態設定，讓箭頭的垂直位置精確對齊觸發的
+     熱區，CSS 端僅提供 18px 的 fallback 預設值。 */
   #popover::before {
       content: '';
       position: absolute;
@@ -764,6 +1202,12 @@
       flex-shrink: 0;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：已選症狀確認區塊與 Chip 標籤（.confirmation-section / .chip）
+   * 顯示在人體圖互動元件下方，把目前已勾選的所有症狀彙整成一列可
+   * 點擊移除的 Chip 標籤，讓使用者送出前能一次性檢視/微調完整清單。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* Chips */
   .confirmation-section {
       margin-top: 30px;
@@ -784,6 +1228,10 @@
       flex-wrap: wrap;
       gap: 10px;
   }
+  /* .chip.active/.inactive：點擊 Chip 可切換某症狀「是否納入本次
+     出院衛教」，active 為深綠實心（代表已選中）、inactive 為淺灰
+     （代表曾出現過但目前取消選取，而非直接從清單中移除，讓使用者
+     還能快速點回來重新選取，不需要重新從人體圖尋找該熱區）。 */
   .chip {
       display: inline-flex;
       align-items: center;
@@ -813,6 +1261,26 @@
       opacity: 0.5;
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+   * 檔案內大區塊總覽：出院表單管理三欄式版面（forms.html → #forms-layout）
+   * ══════════════════════════════════════════════════════════════════════
+   * 這是全份 CSS 中「用 CSS 屬性選擇器驅動版面切換」最典型的範例：
+   * .forms-layout 本身固定用 CSS Grid 切成 1fr / 1fr / 2fr 三軌
+   * （主欄 : 子欄 : 表單欄 = 1:1:2），但實際顯示哪些欄、以及表單欄
+   * 要跨幾軌，改由 JS 設定在容器上的 `data-state` 屬性
+   * （"view" | "nurse" | "doctor"）決定：
+   *   - data-state="view"（預設，出院單紀錄模式）：三欄全部顯示——
+   *     主欄＝病患清單、子欄＝該病患的歷次就診紀錄、表單欄＝選中
+   *     那次看診的檢視/編輯內容。
+   *   - data-state="nurse" / "doctor"：子欄（.forms-sub-col）被隱藏
+   *     （因為護理師/醫師填單模式不需要「挑選歷史就診紀錄」），
+   *     同時表單欄的 grid-column 從 `3/4` 擴展為 `2/4`，「吃掉」
+   *     被隱藏的子欄軌道空間，讓填單表單能佔滿右側 3/4 寬度而不留
+   *     空白縫隙。這種「隱藏 + 擴大鄰欄跨軌範圍」的組合，是純 CSS
+   *     （不需 JS 重新計算尺寸）就能做到「依模式切換欄數」效果的
+   *     關鍵技巧。
+   * ══════════════════════════════════════════════════════════════════════
+   */
   /* ═══ FORMS 3-COLUMN LAYOUT ═══ */
   .forms-layout {
     display: grid;
@@ -826,6 +1294,10 @@
   }
 
   /* Column 1: Main — always 1 grid unit */
+  /* 主欄：三種模式下都會顯示，內容依模式不同（view 模式顯示病患
+     清單；nurse/doctor 模式則作為左側導覽，具體內容由 forms.js
+     動態決定），因此本檔案僅定義通用的卡片外觀（圓角/邊框/內距），
+     不含特定業務內容樣式。 */
   .forms-main-col {
     grid-column: 1 / 2; /* 1/4 fw */
     background: var(--card);
@@ -860,6 +1332,9 @@
     overflow: hidden;
   }
 
+  /* 進入 nurse/doctor 填單模式時隱藏子欄（不需要「歷史就診紀錄」
+     這個概念），並讓表單欄跨佔第 2、3 軌位置，補上子欄消失後留下
+     的空間（詳見上方大區塊總覽說明）。 */
   .forms-layout[data-state="nurse"] .forms-sub-col,
   .forms-layout[data-state="doctor"] .forms-sub-col {
     display: none;
@@ -871,6 +1346,11 @@
   }
 
   /* ── State Buttons ── */
+  /* 主欄內的三顆模式切換按鈕（護理師填單／醫師填單／出院單紀錄），
+     .active 時整顆按鈕直接 display:none（而非改變樣式標示選中），
+     因為選中的模式會改為展開對應的 .forms-state-content 內容區塊
+     （見下方），此時再顯示「切換到目前這個模式」的按鈕已無意義，
+     直接隱藏可省下額外的「已選中」視覺標示邏輯。 */
   .forms-state-btn {
     flex-shrink: 0;
     height: 42px;
@@ -898,6 +1378,10 @@
   }
 
   /* ── State Content (expanded area) ── */
+  /* 對應被點擊、目前展開中的模式按鈕內容區（在主欄內就地展開，
+     不是另開頁面），min-height:0 是 flex 子元素常見的「允許內部
+     overflow-y:auto 生效」修正寫法——沒有這行，flex 子項目預設
+     min-height:auto 會撐開超出父容器高度，導致內部捲動失效。 */
   .forms-state-content {
     display: none;
     flex-direction: column;
@@ -913,6 +1397,14 @@
   }
 
   /* ── Nurse form panel (in form column) ── */
+  /* 護理師填單表單實際上渲染在「表單欄」（.forms-form-col）而非
+     主欄內展開的 state-content（主欄的護理師按鈕點擊後只是切換
+     data-state，真正的填單表單畫面顯示在右側大表單欄），因此需要
+     另外用 `.forms-layout[data-state="nurse"] .nurse-form-panel`
+     規則來控制其顯示/隱藏，並同時隱藏表單欄中「原本 view 模式」
+     會顯示的內容（doctor-fp-header/chat-panel-header 等，見下方
+     一大串 `display:none !important` 規則），避免兩種模式的內容
+     互相疊在一起。 */
   .nurse-form-panel {
     display: none; /* hidden by default, shown in nurse state via CSS below */
     flex-direction: column;
@@ -927,6 +1419,12 @@
     display: flex;
   }
   /* Hide regular form content in nurse and doctor states */
+  /* 這一整組選擇器的用途：表單欄（.forms-form-col）在「view 出院單
+     紀錄」模式下會顯示一般的檢視/編輯內容（doctor-fp-header、
+     chat-panel-header/body、form-view-body），但這些內容元素在
+     nurse/doctor 填單模式下仍然存在於 DOM 中（並未被移除），必須
+     明確用 !important 隱藏，才不會與該模式各自的填單表單
+     （.nurse-form-panel / .doctor-form-panel）同時顯示、疊在一起。 */
   .forms-layout[data-state="nurse"] .forms-form-col > .doctor-fp-header,
   .forms-layout[data-state="nurse"] .forms-form-col > .chat-panel-header,
   .forms-layout[data-state="nurse"] .forms-form-col > .chat-panel-body,
@@ -939,6 +1437,9 @@
   }
 
   /* Doctor form panel (in form column) */
+  /* 醫師填單表單同樣渲染於表單欄，僅在 data-state="doctor" 時顯示；
+     用 !important 是因為 .doctor-form-panel 預設 display:none，
+     這裡覆寫需確保優先權高於任何內聯樣式或其它較晚載入的規則。 */
   .doctor-form-panel {
     display: none;
     flex-direction: column;
@@ -950,6 +1451,9 @@
   }
 
   /* Doctor panel header */
+  /* 醫師填單表單頂部：顯示草稿摘要資訊（病歷號/病患/看診醫師等，
+     見下方 .doctor-meta-box），flex-shrink:0 確保捲動內容過長時
+     這個標題列固定不被壓縮消失。 */
   .doctor-fp-header {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
@@ -966,6 +1470,10 @@
   }
 
   /* Doctor Meta Box */
+  /* 顯示草稿的固定 metadata（病歷號、病患姓名/關係、看診醫師、
+     建立日期等）唯讀資訊卡，灰底（--bg）與白底表單區塊做出區隔，
+     視覺上明確傳達「這些欄位是護理師階段已確定、醫師填單時不可
+     修改」的唯讀語意。 */
   .doctor-meta-box {
     background: var(--bg);
     border: 1.5px solid var(--border);
@@ -995,7 +1503,17 @@
     color: var(--text);
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：症狀選擇器（三欄式：部位/類別 → 該類別下的衛教項目 → 已選）
+   * 醫師填單模式的核心互動元件，是「文字清單版」的症狀選擇方式
+   * （相對於前面「人體圖 + 熱區 + popover」的圖像版選擇方式，兩者
+   * 皆存在於系統中、對應不同 UI 情境）。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* Symptom Selection: centered equal-width columns */
+  /* 固定高度 290px（非依內容自動撐高）是刻意設計：確保三欄高度一致
+     且不隨中間欄位項目多寡而改變整體版面高度，避免使用者切換部位
+     類別時外層版面跳動。 */
   .symptom-selection-container {
     display: flex;
     justify-content: center;
@@ -1028,6 +1546,9 @@
     flex: 1;
     overflow-y: auto;
   }
+  /* 單個症狀/類別項目：三種狀態——一般、active（目前選中的類別，
+     用於驅動右側欄顯示對應內容）、disabled（該分類目前沒有可選
+     項目，用低透明度 + pointer-events:none 呈現不可互動）。 */
   .symptom-item {
     padding: 9px 12px;
     font-size: 13px;
@@ -1054,6 +1575,10 @@
     pointer-events: none;
     background: var(--bg);
   }
+  /* 第三欄「已選症狀」的 Chip 標籤：藍色（一般選中語意，非警示），
+     hover 時轉為紅色系（暗示「再點一下會移除」的操作預告），
+     .readonly 版本用於「出院單紀錄」檢視模式下顯示已送出的症狀
+     （不可再點擊移除）。 */
   .symptom-chip {
     display: inline-flex;
     align-items: center;
@@ -1079,6 +1604,14 @@
     pointer-events: none;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：出院單紀錄檢視／編輯共用版面（forms.html data-state="view"）
+   * .form-view-body 為唯讀「檢視」時的內容容器；.view-edit-body /
+   * .view-edit-row 則是「檢視」與「編輯」兩種模式共用的欄位排列
+   * 樣式（class 名稱中的 view-edit 即代表兩用），讓同一批欄位
+   * 排版邏輯不需要為檢視/編輯各寫一份。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── View form body (replaces inline style on #form-edit-body) ── */
   .form-view-body {
     flex: 1;
@@ -1089,6 +1622,10 @@
   }
 
   /* ── View Edit layout body ── */
+  /* justify-content: space-evenly 讓各列（病患資訊/病歷號/症狀等）
+     在固定高度的容器中平均分散間距，而非全部貼齊頂部，視覺上與
+     forms.html 其它模式（護理師/醫師填單，見下方 .nurse-fp-body 也
+     使用類似的 space-evenly 邏輯）保持一致的「垂直居中分佈」風格。 */
   .view-edit-body {
     display: flex;
     flex-direction: column;
@@ -1119,6 +1656,10 @@
   }
 
   /* ── Header icon buttons ── */
+  /* 各面板標題列（chat-panel-header/doctor-fp-header 等）右上角的
+     小型圖示按鈕（編輯/儲存/刪除/取消等），34x34px 固定方形，
+     .danger/.success 兩種語意色變體對應「刪除類」與「儲存/確認類」
+     操作，與全站警示色系一致。 */
   .btn-icon-sm {
     width: 34px;
     height: 34px;
@@ -1141,6 +1682,13 @@
   .btn-icon-sm:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
 
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：護理師填單表單內部樣式（.nurse-fp-*、.nurse-draft-input、
+   * .nurse-select、.nurse-custom-dd 等）
+   * 對應 forms.html「護理師填單」模式下，選擇 LINE 帳號、選擇/新增
+   * 病患關係、填寫病歷號的表單欄位群。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   .nurse-fp-header {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
@@ -1151,6 +1699,14 @@
   }
 
   /* Nurse form body: content area with space-evenly between line row and patient group */
+  /* 上下 64px 的大內距＋已註解掉的 space-between/margin-top 是歷史
+     調整版面時留下的痕跡：目前實際生效是靠固定 padding 撐出視覺
+     間距，而非用 flex 對齊屬性自動分配（那些寫法已被下方
+     .nurse-fp-group 的 padding-top:128px + min-height:160px 取代，
+     用「固定大內距」手動精調出「LINE 帳號選單」與「病患資訊群組」
+     之間視覺上恰好的垂直間隔，屬於針對此表單特定字段數量微調過的
+     magic number，若表單欄位數量之後有變動，這幾個數值可能需要
+     重新調整）。 */
   .nurse-fp-body {
     display: flex;
     flex-direction: column;
@@ -1181,6 +1737,12 @@
   }
 
   /* Draft text inputs */
+  /* 護理師填單用的自訂文字輸入框（例如病歷號、新增關係文字），
+     風格與 .form-group input 略有不同（灰底 --bg 而非白底，圓角
+     10px 較大），這是因為此表單位於灰底卡片（.forms-form-col）內，
+     輸入框刻意用灰底融入背景、focus 時才浮現藍色光暈
+     （box-shadow 模擬 outline 光圈但可搭配圓角），.invalid 則換成
+     紅色光暈標示驗證錯誤欄位。 */
   .nurse-draft-input {
     width: 100%;
     padding: 10px 14px;
@@ -1205,6 +1767,11 @@
   }
 
   /* LINE native select (reuse nurse-select styles) */
+  /* 原生 <select> 元素：appearance:none 移除瀏覽器預設下拉箭頭樣式，
+     改用內嵌 SVG data URI 畫出自訂箭頭圖示（background-image），
+     這樣可以統一箭頭顏色（var(--muted) 灰）與位置，不受各瀏覽器
+     原生下拉樣式差異影響，同時仍保留原生 <select> 的無障礙與
+     鍵盤操作特性（相對於下方完全自製的 .nurse-custom-dd）。 */
   .nurse-select-wrap { width: 100%; position: relative; }
   .nurse-select {
     width: 100%;
@@ -1233,6 +1800,15 @@
     color: var(--muted); cursor: not-allowed; opacity: 0.55; border-style: dashed;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：自製病患/LINE 帳號下拉選單（.nurse-custom-dd 系列）
+   * 因為需要在選單內顯示「置頂分組」（剛綁定 LINE、尚未建檔的
+   * 帳號，見上方檔案總覽【pinned 置頂佇列】說明）與自訂排版
+   * （關係文字靠左、病歷號靠右的兩欄式列），原生 <select> 的
+   * <option> 無法達成這種版面，因此改用 button + 絕對定位清單
+   * 的方式自製一套下拉選單元件。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── Custom patient dropdown ── */
   .nurse-custom-dd {
     position: relative;
@@ -1280,6 +1856,8 @@
   .nurse-custom-dd-btn:disabled {
     color: var(--muted); cursor: not-allowed; opacity: 0.55; border-style: dashed;
   }
+  /* 觸發按鈕內的箭頭 icon（svg）依開合狀態旋轉 180 度，模擬原生
+     select 常見的「展開時箭頭朝上」互動回饋。 */
   .nurse-custom-dd-btn svg {
     flex-shrink: 0;
     transition: transform .2s;
@@ -1290,6 +1868,9 @@
   }
 
   /* Dropdown list */
+  /* z-index:200 與 .sidebar 相同層級並非巧合造成的衝突，是因為兩者
+     不會同時出現在同一個視覺堆疊情境（下拉選單只在表單欄內開合，
+     不會與側邊選單重疊），故沿用同一個「次高層級」數值即可。 */
   .nurse-custom-dd-list {
     display: none;
     position: absolute;
@@ -1307,6 +1888,10 @@
   .nurse-custom-dd.open .nurse-custom-dd-list { display: block; }
 
   /* Regular patient row: relation left, mrn right */
+  /* 這正是原生 <option> 做不到、需要自製下拉選單的核心原因：
+     每一行同時顯示「關係文字」（靠左）與「病歷號」（靠右，
+     monospace 字型讓數字對齊好讀），中間用 .npi-spacer（flex:1）
+     把兩者推開到左右兩端。 */
   .nurse-patient-item {
     display: flex;
     align-items: center;
@@ -1345,6 +1930,9 @@
 
 
   /* ── Placeholder for not-yet-implemented states ── */
+  /* 尚未實作或暫無資料時的通用置中提示區塊（例如某模式下暫時沒有
+     內容可顯示），與 .empty-state 用途類似但語意更偏向「開發中/
+     尚未實作」而非「資料為空」，兩者外觀刻意保持相似風格。 */
   .forms-state-placeholder {
     flex: 1;
     display: flex;
@@ -1361,6 +1949,10 @@
   }
 
   /* ── Form column internals (re-use chat-panel classes) ── */
+  /* 表單欄在 view 模式下直接重用 chats 分頁的 .chat-panel-header/
+     -body 樣式（同一套「標題列 + 可捲動內容」版面模式），避免
+     重複定義幾乎相同的 padding/flex 規則，體現本檔案「同一種版面
+     模式在不同分頁間共用 class」的設計傾向。 */
   .forms-form-col .chat-panel-header {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
@@ -1374,6 +1966,15 @@
     overflow-y: auto;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：chats 分頁專屬版面覆寫（局部覆寫共用元件寬度/結構）
+   * 因為 .patient-list / .chat-panel 等 class 同時被 forms.html
+   * 的「出院單紀錄」分頁重用，但 chats.html 需要多插入一欄「就診
+   * 紀錄清單」（.visit-list），因此用 `#section-chats` 前綴把這裡
+   * 的覆寫規則限定在「病患對話紀錄」分頁範圍內，不影響 forms.html
+   * 對同名 class 的用法。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── Chats layout (keep original rules for chats section only) ── */
   #section-chats .chat-layout {
     display: flex;
@@ -1386,6 +1987,8 @@
     width: 250px !important;
     flex-shrink: 0;
   }
+  /* 新增的第二層清單欄：列出選中病患的所有歷次就診紀錄，點選其中
+     一筆才會在右側 .chat-panel 顯示該次看診對應的完整對話。 */
   #section-chats .visit-list {
     width: 260px;
     flex-shrink: 0;
@@ -1402,7 +2005,13 @@
     position: relative; /* relative parent for timeline navigation */
   }
 
-  /* Stats hover tooltips */
+  /* ──────── 統計卡片 hover 顯示定義提示（Stats hover tooltips） ────────
+     利用 ::after 偽元素 + content: attr(data-definition) 直接讀取
+     HTML 上的 data-definition 屬性作為提示文字內容，不需要額外寫
+     JS 或另外一個 DOM 節點即可做出「hover 顯示說明」效果，是純
+     CSS tooltip 的常見實作技巧。深色底（rgba(15,23,42,.95)）搭配
+     白字，與卡片本身的淺色系統形成對比，確保提示文字在任何卡片
+     顏色變體（green/orange/red）上都維持一致且清楚可讀。 */
   .stat-card {
     position: relative;
   }
@@ -1431,6 +2040,9 @@
     transform: translateX(-50%) translateY(0);
   }
 
+  /* padding-right:60px 為右側「時間軸導覽點」（.chat-timeline-nav，
+     絕對定位於右緣 15px 處）預留空間，避免對話內容文字被浮動的
+     時間軸圓點列蓋住。 */
   #chat-body {
     position: relative;
     padding-right: 60px;
@@ -1441,6 +2053,10 @@
     overflow-y: auto;
   }
 
+  /* 就診紀錄清單項目：右側多留 60px 內距（padding-right），是配合
+     項目本身可能附帶的「待處理草稿數徽章」（.draft-count-badge，
+     見下方）或其他右側裝飾元素預留視覺呼吸空間，避免文字被截斷或
+     過於貼近邊界。 */
   .visit-item {
     padding: 16px 60px 16px 20px !important;
     border-bottom: 1px solid var(--border);
@@ -1472,6 +2088,13 @@
     gap: 5px;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：對話時間軸導覽（Chat Timeline Navigation）
+   * 對話面板右緣的一排小圓點，讓使用者快速跳轉至對話中的各個
+   * 「會話（session）分段」（例如同一次就診中，病患分次與 Bot
+   * 互動所形成的多個對話區段），對應 .session-divider 分隔線。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* Chat timelines */
   .chat-timeline-nav {
       position: absolute;
@@ -1483,6 +2106,10 @@
       gap: 12px;
       z-index: 10;
   }
+  /* 小圓點（non-interactive）用於標示「非會話分界」的一般訊息位置
+     密度示意，僅供視覺參考不可點擊；大圓點（.timeline-dot）才是
+     真正可點擊跳轉、且會在滑鼠移入時顯示該會話標籤文字
+     （見 .timeline-dot::after）的互動節點。 */
   .timeline-dot-small {
     width: 6px;
     height: 6px;
@@ -1504,6 +2131,11 @@
     background: var(--primary);
     transform: scale(1.3);
   }
+  /* ★ 草稿數量警示徽章 ★：紅底白字，語意上明確對應「須留意——
+     這位病患/這次就診還有未完成的醒目草稿」，刻意使用與 --danger
+     完全相同的紅色（#ef4444），與 stats/badge 等其他警示元素的
+     紅色系統保持一致，讓使用者在不同分頁間都能用同一種紅色快速
+     辨識「需要處理」的項目。 */
   .draft-count-badge {
     display: inline-flex;
     align-items: center;
@@ -1518,6 +2150,9 @@
     font-weight: 700;
     margin-left: auto;
   }
+  /* 同樣採用「content: attr(data-label) 讀取 data 屬性」的純 CSS
+     tooltip 技巧（呼應上方 .stat-card::after），hover 大圓點時
+     顯示該時間點對應的會話標籤文字（例如日期或會話序號）。 */
   .timeline-dot::after {
     content: attr(data-label);
     position: absolute;
@@ -1540,6 +2175,11 @@
     transform: translateY(-50%) translateX(0);
   }
 
+  /* ──────── 會話分隔線（Session Divider） ────────
+     在同一則就診對話中，用來標示「病患分次與 LINE Bot 互動」形成的
+     不同會話區段邊界（例如同一天但分好幾次傳訊息），視覺上仿照
+     常見聊天軟體的「日期分隔線」樣式：一條漸層淡出的橫線，中間
+     浮一個帶邊框的圓角標籤文字。 */
   .session-divider {
     text-align: center;
     margin: 28px 0 16px;
@@ -1568,7 +2208,21 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+   * 區塊：警示/二次確認彈窗（Alert Modals，.modal-alert 系列）
+   * 全站用於「刪除確認」「不可逆操作警告」「操作成功提示」等需要
+   * 使用者停下來特別注意的情境，比一般 .modal 視覺更強烈（更大的
+   * 圓角、置中對齊、圖示 + 標題 + 說明橫幅的三段式結構），並依語意
+   * 分為 warning/info/danger/success 四種配色子變體，分別對應
+   * 「提醒/一般資訊/危險操作/操作成功」四種語境。
+   * ──────────────────────────────────────────────────────────────────────
+   */
   /* ── Alert Modals ── */
+  /* backdrop-filter: blur(8px) 對背景內容做模糊處理（而非只是加深
+     半透明黑），比一般 Modal 的純變暗遮罩更強烈地把使用者注意力
+     鎖定在警示彈窗本身；z-index:600 高於一般 Modal 的 500，確保
+     警示彈窗永遠能疊在任何既有的表單 Modal 之上（例如編輯表單中
+     跳出的「確認捨棄」提示）。 */
   .modal-backdrop-alert {
     backdrop-filter: blur(8px);
     background: rgba(15, 23, 42, 0.45) !important;
@@ -1583,6 +2237,8 @@
     box-shadow: 0 20px 48px -10px rgba(15, 23, 42, 0.18);
     text-align: center;
   }
+  /* 頂部圓形圖示容器：依語意變體換底色/圖示色，danger 用紅色系
+     （對應「刪除/不可逆」等高風險操作，與全站警示紅色語意一致）。 */
   .modal-alert-icon-wrap {
     width: 56px;
     height: 56px;
@@ -1614,6 +2270,9 @@
     color: #0f172a;
     margin-bottom: 12px;
   }
+  /* 說明橫幅（banner）：在標題與確認按鈕之間，額外呈現一段強調的
+     補充說明文字（例如列出即將被刪除的項目名稱），配色與圖示容器
+     呼應同一組語意變體，加強視覺一致性。 */
   .modal-alert-banner {
     border-radius: 12px;
     padding: 14px 18px;
@@ -1662,6 +2321,11 @@
     border-radius: 10px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  /* 危險確認按鈕（例如「確認刪除」）：刻意使用「彩色陰影」
+     （box-shadow 顏色跟按鈕背景同色系、僅調低透明度），比一般
+     灰黑陰影更能強化「這是一個重要/危險操作」的視覺重量感；
+     hover 時陰影範圍加大、顏色加深且些微上浮（translateY(-1px)），
+     強化「請再次確認」的互動張力，是全站唯一使用彩色陰影的按鈕。 */
   .modal-alert-actions .btn-danger {
     background: #ef4444;
     color: #ffffff;

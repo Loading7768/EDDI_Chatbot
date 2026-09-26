@@ -1,3 +1,20 @@
+<!--
+    intro.html — 衛教表單系統的靜態導引頁
+
+    對應 form_handler.py 的 intro_page() 路由（/form/intro 或類似入口，
+    詳見該路由的實際掛載路徑）。這是一個純展示用的靜態頁面，
+    沒有任何 Alpine.js 邏輯、也不依賴任何後端注入的資料——
+    只有一個置中的說明卡片與一顆「開始」按鈕，點擊後導向 /form
+    （即 form_handler.py 的 form_page()，實際開始登入/填表流程）。
+
+    視覺效果：
+        - icon-float：讓上方圖示（health_and_safety）以正弦波方式緩慢浮動，
+          增加畫面生氣、暗示這是一個「有生命力」的醒目起始頁。
+        - btn-glow：讓「開始」按鈕持續脈動發光，引導使用者視覺焦點，
+          滑鼠移上去時關閉脈動動畫改以固定的更亮光暈呈現（hover 時給予明確回饋）。
+        - 上述兩個關鍵影格動畫（@keyframes）與其套用的 class 皆直接寫在
+          <head> 內的 <style> 區塊，因為僅此頁面使用、無需併入共用的 css/style.css。
+-->
 <!DOCTYPE html>
 <html lang="zh-TW">
 
@@ -14,6 +31,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 
     <style>
+        /* 圖示外框的柔和光暈脈動：0.3 → 0.6 透明度來回漸變 */
         @keyframes pulse-glow {
             0%, 100% {
                 box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
@@ -23,6 +41,7 @@
             }
         }
 
+        /* 圖示上下緩慢浮動 8px，營造輕盈懸浮感 */
         @keyframes float {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-8px); }
@@ -32,10 +51,12 @@
             animation: float 3s ease-in-out infinite;
         }
 
+        /* 開始按鈕持續呼吸般發光，吸引使用者點擊 */
         .btn-glow {
             animation: pulse-glow 2.5s ease-in-out infinite;
         }
 
+        /* 滑鼠移上按鈕時：停止脈動動畫，改為固定但更強烈的光暈，作為 hover 回饋 */
         .btn-glow:hover {
             animation: none;
             box-shadow: 0 0 50px rgba(16, 185, 129, 0.8);
@@ -65,6 +86,7 @@
         </div>
 
         <!-- Start Button -->
+        <!-- 導向 /form：form_handler.py 的 form_page()，開始實際的登入/配對/填表流程 -->
         <a href="/form"
             id="btn-start"
             class="btn-glow mt-2 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-semibold text-lg py-4 rounded-2xl transition-all duration-200 select-none">

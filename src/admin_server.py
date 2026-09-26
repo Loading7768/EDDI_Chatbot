@@ -1,3 +1,50 @@
+"""
+admin_server.py — EDDI 管理後台（護理站 / 醫師端）Flask Blueprint
+======================================================================
+
+【這個檔案在整個系統中的角色】
+app.py 建立 Flask app 並註冊三個 Blueprint：form_bp（病患填表頁面）、
+admin_bp（本檔案，護理站 / 醫師管理後台）、以及 LINE Webhook 路由本身。
+本檔案負責「人」（護理師、醫師、管理員）透過瀏覽器操作系統的所有後端邏輯，
+對應到前端 webpage/admin/ 底下的頁面與 JS（admin.html/script.js、
+chats.html/js、doctors.html/js、forms.html/js、prompt.html/js、
+stats.html/js、education.html/js）。
+
+【權限模型】
+所有 API 皆使用 Flask session cookie 驗證登入狀態（見 login()、logout()）。
+兩層權限透過裝飾器實作：
+  - login_required：任何已登入的醫師/護理師帳號皆可使用。
+  - admin_required：session['is_admin'] 必須為真，僅系統管理員可用
+    （例如：新增/刪除醫師帳號、管理科別、管理衛教資料、修改 AI Prompt）。
+
+【資料儲存位置總覽】
+  - database/hospital.db（SQLite）：doctors / patients / line_accounts /
+    line_patient_pairs / record 五張表，結構請見 scripts/db_init.py。
+  - chat_logs/<病歷號>/*.json：LINE 對話紀錄（由 chat_logs.py 寫入，本檔案
+    只負責「讀取」給前端顯示，讀取邏輯見下方 chat_logs JSON 讀取工具區塊）。
+  - drafts/D{doctor_id:07d}/{mrn}_{date}.json：護理師建立的「病歷草稿」，
+    等醫師確認症狀內容後才會正式寫入 record 表（doctor_submit）。
+  - assets/prompts/prompt_NNN.md + data/prompt_config.json：AI 系統提示詞
+    的版本控制（可回溯上一版、切換任意版本、命名別名）。
+  - assets/discharge/category.json + assets/discharge/*.md：衛教文章資料，
+    同時也是 bot.py 的 build_rag_context() 用來做 RAG 檢索的資料來源
+    ── 因此本檔案對衛教資料的增刪修改，會直接影響 LINE Bot 的回覆內容。
+  - data/departments.json：科別清單（獨立於 doctors.department 欄位之外，
+    多存了「是否啟用」狀態，讓管理員可以停用但不刪除仍有醫師在使用的科別）。
+  - data/stats_cache.json：/api/stats 的計算結果快取，用來記錄
+    「數值最後一次真正變動」的時間，而不是「最後一次被查詢」的時間。
+
+【本檔案的 8 大功能分區（依code順序）】
+  1. 科別 / 衛教資料的檔案存取小工具（load_departments 等）
+  2. 共用 helpers（密碼雜湊、DB 連線、登入/管理員裝飾器）
+  3. chat_logs JSON 讀取工具（給 /api/chats 系列使用）
+  4. Prompt 版本控制 helpers
+  5. 認證路由（/main、/api/me、/api/login、/api/logout）
+  6. 統計數據、聊天紀錄查詢路由
+  7. 表單（出院/回診紀錄）與醫師帳號管理路由
+  8. Prompt、科別、衛教資料管理路由
+"""
+
 from flask import Blueprint, request, render_template, jsonify, session, send_from_directory
 import sqlite3
 import hashlib
@@ -7,8 +54,13 @@ import re
 import glob
 from datetime import datetime
 from functools import wraps
+# 從 bot.py 匯入「置頂 LINE 帳號」佇列的存取函式：
+# 當護理師替某個置頂中的 LINE 帳號建立病歷草稿後（nurse_create），
+# 該帳號就會被移出置頂清單（因為已經「被處理」了）。
 from bot import get_pinned, remove_from_pinned
 
+# 本檔案採用 Flask Blueprint 架構，前綴路徑於 app.py 註冊時決定
+# （目前為不加前綴，因此 /main、/api/... 皆為最終路徑）。
 admin_bp = Blueprint('admin_bp', __name__)
 
 # ── 路徑設定 ──────────────────────────────────────────────────────────────────
@@ -30,10 +82,15 @@ import threading
 
 DEPARTMENTS_FILE = os.path.join(BASE_DIR, 'data', 'departments.json')
 
+# 衛教資料（category.json + 對應 .md 檔）的讀寫皆需搶這把鎖，
+# 避免多個管理員/醫師同時編輯衛教內容時，JSON 檔案發生競態寫壞的情況。
 education_lock = threading.Lock()
 
 def load_departments() -> list:
-    """讀取科別設定 JSON"""
+    """讀取科別設定 JSON（data/departments.json）。
+    若檔案不存在，代表是全新安裝，會建立包含「急診科／內科／小兒科」的
+    預設清單並寫入檔案後回傳，確保後續 /api/departments 一定有資料可顯示。
+    每個科別項目格式為 {"name": 科別名稱, "is_active": 是否啟用}。"""
     if not os.path.exists(DEPARTMENTS_FILE):
         initial = [
             {"name": "急診科", "is_active": True},
@@ -52,7 +109,8 @@ def load_departments() -> list:
         return []
 
 def save_departments(deps: list):
-    """寫入科別設定 JSON"""
+    """寫入科別設定 JSON。呼叫時機：新增/修改/刪除（停用）科別、
+    或是新增/修改醫師時科別若不存在則自動補上一筆啟用中的科別紀錄。"""
     try:
         os.makedirs(os.path.dirname(DEPARTMENTS_FILE), exist_ok=True)
         with open(DEPARTMENTS_FILE, 'w', encoding='utf-8') as f:
@@ -62,7 +120,10 @@ def save_departments(deps: list):
 
 def load_education() -> dict:
     """讀取衛教資料 JSON，key 為類別，value 為衛教內容文字。
-    相容舊格式（list of {topic_zh, topic_en, content}），讀取時會自動轉換並存回新格式。"""
+    相容舊格式（list of {topic_zh, topic_en, content}），讀取時會自動轉換並存回新格式。
+    註：目前 /api/education 系列路由實際上都是直接讀寫 EDUCATION_FILE
+    （新格式：{部位: {類別: {filename: ...}}}），本函式與 save_education
+    保留給其他可能仍依賴舊格式的呼叫端使用。"""
     if not os.path.exists(EDUCATION_FILE):
         return {}
     try:
@@ -92,20 +153,28 @@ def save_education(edu: dict):
             json.dump(edu, f, ensure_ascii=False, indent=4)
     except Exception as e:
         print(f"[Education Save Error] {e}")
-        
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def hash_pw(pw: str) -> str:
+    """密碼雜湊：以 SHA256 對明文密碼做單向雜湊後儲存/比對，
+    與 db_init.py、db_test.py 建立測試帳號時使用的演算法一致。"""
     return hashlib.sha256(pw.encode()).hexdigest()
 
 
 def get_db() -> sqlite3.Connection:
+    """建立一個新的 SQLite 連線，並設定 row_factory 為 sqlite3.Row，
+    使查詢結果可用欄位名稱（如 row['doctor_id']）存取，而非只能用索引。
+    每個路由函式各自呼叫、各自負責在 try/finally 或流程結束時 close()，
+    未使用連線池（符合 Flask 短生命週期請求的簡單腳本風格）。"""
     conn = sqlite3.connect(DB_HOSPITAL)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def login_required(f):
+    """裝飾器：檢查 Flask session 中是否有 'account' 鍵（登入成功時由 login() 寫入）。
+    未登入則回傳 401 並中斷請求，不會執行被裝飾的路由函式本體。"""
     @wraps(f)
     def wrapper(*args, **kwargs):
         if 'account' not in session:
@@ -115,6 +184,10 @@ def login_required(f):
 
 
 def admin_required(f):
+    """裝飾器：在 login_required 的基礎上，再檢查 session['is_admin'] 是否為真。
+    用於保護「僅系統管理員可用」的路由（醫師帳號的新增/刪除/修改、
+    科別與衛教資料的新增/修改/刪除、AI Prompt 的所有寫入操作）。
+    未登入回 401，已登入但非管理員回 403。"""
     @wraps(f)
     def wrapper(*args, **kwargs):
         if 'account' not in session:
@@ -126,9 +199,16 @@ def admin_required(f):
 
 
 # ── chat_logs JSON 讀取工具 ────────────────────────────────────────────────────
+# 本區塊的函式都是「唯讀」性質：chat_logs/<mrn>/*.json 的寫入完全由
+# chat_logs.py 的 save_chat_to_json / finalize_session 負責（LINE Bot 對話流程），
+# admin_server.py 只負責讀出來，組裝成 /api/chats、/api/chats/<mrn> 的回應格式，
+# 供 chats.html/chats.js 顯示病患對話紀錄。
 
 def _parse_timestamp(ts: str) -> str:
-    """把 ISO 8601 timestamp 轉成 'YYYY-MM-DD HH:MM:SS' 字串。"""
+    """把 ISO 8601 timestamp（例如 '2024-05-01T22:00:00.123+08:00' 或
+    帶 'Z' 結尾的 UTC 格式）轉成不含時區、人類易讀的 'YYYY-MM-DD HH:MM:SS' 字串。
+    做法：從第 10 個字元之後（跳過日期本身的 '-'）尋找 '+' 或 'Z'，
+    找到就切掉時區部分，再把中間的 'T' 換成空白。"""
     if not ts:
         return ''
     ts = ts.strip()
@@ -141,9 +221,11 @@ def _parse_timestamp(ts: str) -> str:
 
 def load_messages_for_mrn(mrn: str) -> list:
     """
-    讀取 chat_logs/<mrn>/ 下所有 *.json，
-    依 timestamp 排序後回傳 message list。
-    active_session.json 也會被讀入。
+    讀取 chat_logs/<mrn>/ 下所有 *.json（包含尚在進行中的 active_session.json
+    與已封存的 <YYYYMMDD>_<NN>.json），把每個檔案裡的 messages 陣列全部攤平、
+    合併成單一列表，並依 created_at 時間排序、重新編上連續的 id。
+    用途：目前主要供其他工具函式或未來需要「整個病患完整對話串流」時使用；
+    /api/chats/<mrn> 實際顯示則是採用下方 load_sessions_for_mrn（保留分場次資訊）。
     """
     mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
     if not os.path.isdir(mrn_dir):
@@ -174,10 +256,13 @@ def load_messages_for_mrn(mrn: str) -> list:
 def load_sessions_for_mrn(mrn: str) -> list:
     """
     讀取 chat_logs/<mrn>/ 下所有 *.json，
-    依 start_time 降序排序，並回傳 session list。
+    依 start_time 降序排序（最新的場次在最前面），並回傳 session list，
+    供 chats.js 用時間軸方式呈現「一次一次的對話場次」（對應 chat_logs.py
+    以 1 小時閒置為界線切分場次的設計）。
     每一個 session 包含:
       - session_id (檔名)
-      - label (顯示標籤)
+      - label (顯示標籤，例如「2024-05-01 對話 #01 (22:00:00)」或
+               「進行中對話 (...)」──若檔名是 active_session.json)
       - messages (訊息清單)
       - metadata (原 metadata)
     """
@@ -241,7 +326,10 @@ def load_sessions_for_mrn(mrn: str) -> list:
 
 
 def get_chat_stats_for_mrn(mrn: str) -> dict:
-    """回傳 {msg_count, last_chat} 給病患列表使用，輕量掃描。"""
+    """回傳 {msg_count, last_chat} 給病患列表（/api/chats）使用，屬於輕量掃描：
+    只累計訊息數量、取出各檔案 metadata.end_time 中最新的日期，
+    不像 load_sessions_for_mrn 那樣把完整訊息內容都讀出組裝，
+    因此列表頁載入時效能較好。"""
     mrn_dir = os.path.join(CHAT_LOGS_DIR, mrn)
     if not os.path.isdir(mrn_dir):
         return {'msg_count': 0, 'last_chat': None}
@@ -268,7 +356,8 @@ def get_chat_stats_for_mrn(mrn: str) -> dict:
 
 
 def list_mrns_with_logs() -> set:
-    """回傳 chat_logs/ 下有 json 檔的 MRN 集合。"""
+    """回傳 chat_logs/ 下「確實有至少一個 json 檔」的病歷號（MRN）子目錄名稱集合，
+    目前未被其他路由直接使用，屬於保留的查詢工具函式。"""
     if not os.path.isdir(CHAT_LOGS_DIR):
         return set()
     result = set()
@@ -279,8 +368,18 @@ def list_mrns_with_logs() -> set:
 
 
 # ── Prompt Versioning Helpers ──────────────────────────────────────────────────
+# AI 系統提示詞（system prompt）版本控制設計：
+#   - 每個版本是 assets/prompts/ 底下的一個獨立檔案 prompt_NNN.md（NNN 為
+#     三位數編號，遞增），bot.py 的 load_prompt_template() 讀取的是
+#     data/prompt_config.json 裡記錄的 current_version 對應檔案。
+#   - assets/prompt.md 是「目前生效版本」的鏡像複本：每次切換/回溯版本
+#     時都會同步覆寫這個檔案，保留給舊版程式碼或外部工具直接讀取單一
+#     固定路徑使用（相容性用途）。
+#   - prompt_001.md 視為「原始版本」，規則上不可被刪除。
 
 def get_all_prompt_versions() -> list:
+    """掃描 assets/prompts/ 目錄下所有 prompt_*.md 檔案，依編號數字（檔名
+    第 8~-3 個字元，即 NNN 部分）由小到大排序後回傳檔名列表。"""
     versions = []
     if os.path.isdir(PROMPTS_DIR):
         files = glob.glob(os.path.join(PROMPTS_DIR, 'prompt_*.md'))
@@ -295,6 +394,8 @@ def get_all_prompt_versions() -> list:
     return [x[1] for x in versions]
 
 def load_config() -> dict:
+    """讀取 data/prompt_config.json，內容包含 current_version（目前生效
+    的版本檔名）與 nicknames（版本檔名 → 使用者自訂別名的字典）。"""
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -305,6 +406,7 @@ def load_config() -> dict:
 
 
 def save_config(cfg: dict):
+    """寫入 data/prompt_config.json。"""
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -314,11 +416,17 @@ def save_config(cfg: dict):
 
 
 def get_current_prompt_info():
-    """確保目錄、原始版本、以及設定檔存在，並回傳 (current_version_filename, content, has_prev, has_next, prev_version, next_version)"""
+    """確保目錄、原始版本、以及設定檔存在，並回傳
+    (current_version_filename, content, has_prev, has_next, prev_version, next_version)。
+    這是本檔案取得「目前生效中」Prompt 完整資訊的統一入口，供 get_prompt()、
+    rollback_prompt()、delete_prompt() 呼叫，避免重複撰寫初始化/降級邏輯。
+    has_prev/has_next 是相對於「版本編號順序」而言，用於前端上一版/下一版導覽按鈕。"""
     os.makedirs(PROMPTS_DIR, exist_ok=True)
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-    
-    # 確保原始 prompt_001.md 存在
+
+    # 確保原始 prompt_001.md 存在：若 assets/prompt.md（舊版單檔式提示詞）存在，
+    # 直接複製一份作為 prompt_001.md；否則寫入一句最簡單的預設提示詞，
+    # 保證系統一定有「版本 001」可用，不會出現無版本可切換的狀況。
     p001 = os.path.join(PROMPTS_DIR, 'prompt_001.md')
     if not os.path.exists(p001):
         original_prompt_path = os.path.join(BASE_DIR, 'assets', 'prompt.md')
@@ -369,24 +477,33 @@ def get_current_prompt_info():
 
 @admin_bp.route('/main')
 def index():
+    """後台入口頁面：回傳 admin.html（單頁式應用殼層，實際頁面切換由
+    script.js 的 showSection() 在前端完成，不會有多次整頁換頁）。"""
     return render_template('admin/html/admin.html')
 
 
 @admin_bp.route('/main/css/<path:filename>')
 def admin_css(filename):
+    """靜態資源：提供 webpage/admin/css/ 底下的 CSS 檔案（例如 style.css）。"""
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'css'), filename)
 
 
 @admin_bp.route('/main/js/<path:filename>')
 def admin_js(filename):
+    """靜態資源：提供 webpage/admin/js/ 底下的 JS 檔案（script.js、chats.js、
+    doctors.js、forms.js、prompt.js、stats.js、education.js）。"""
     return send_from_directory(os.path.join(WEBPAGE_DIR, 'admin', 'js'), filename)
 
 
 @admin_bp.route('/api/me')
 def get_me():
+    """回傳目前登入狀態，前端 script.js 的 checkAuth() 在應用初始化時呼叫，
+    用來決定顯示登入畫面還是主畫面，並依 is_admin 決定是否顯示管理員限定選單。
+    刻意不加 @login_required，未登入時回 200 + logged_in:false（而非 401），
+    因為這正是用來「查詢」是否已登入的端點，不該被登入裝飾器擋下。"""
     if 'account' not in session:
         return jsonify({'logged_in': False})
-        
+
     return jsonify({
         'logged_in':   True,
         'account':     session['account'],
@@ -397,6 +514,12 @@ def get_me():
 
 @admin_bp.route('/api/login', methods=['POST'])
 def login():
+    """帳號密碼登入：比對 doctors 表的 account_name + password_hash（SHA256）
+    + is_active = 1（已停用帳號無法登入，即使密碼正確）。
+    成功後將 account / doctor_name / is_admin 寫入 Flask session，
+    並設定 session.permanent = True（配合 app.py 設定的
+    PERMANENT_SESSION_LIFETIME，讓登入狀態能跨瀏覽器分頁/重啟持續存在，
+    不會在關閉瀏覽器後就馬上登出）。"""
     data     = request.get_json() or {}
     account  = data.get('username', '').strip()
     password = data.get('password', '')
@@ -436,6 +559,7 @@ def login():
 
 @admin_bp.route('/api/logout', methods=['POST'])
 def logout():
+    """登出：清空整個 session（連同 account/doctor_name/is_admin 一次清除）。"""
     session.clear()
     return jsonify({'success': True})
 
@@ -445,6 +569,23 @@ def logout():
 @admin_bp.route('/api/stats')
 @login_required
 def get_stats():
+    """儀表板統計數據（供 stats.html/stats.js 顯示卡片與匯出 CSV）。
+    計算的指標：
+      - total_friends：LINE 好友總數（line_accounts 表列數）。
+      - total_patients：病患總數（patients 表列數）。
+      - total_forms：出院/回診表單總數（record 表列數）。
+      - patients_chatted / bot_usage_rate：has_chatted=1 的病患數，
+        以及其佔病患總數的百分比（LINE Bot 使用率）。
+      - return_visits：回診次數，用「表單總數 - 病患總數」估算
+        （邏輯：每位病患至少有一張出院單，多出來的表單數即為回診次數；
+        用 max(0, ...) 避免資料異常時出現負數）。
+
+    快取機制（data/stats_cache.json）的語意是「數值最後一次真正改變的時間」，
+    而不是「最後一次被查詢的時間」：每次呼叫都重新計算 stats，
+    但只有當新算出來的 snapshot 與快取內容不同時，才更新 last_updated
+    時間戳並覆寫快取檔；若數值未變，則沿用快取裡舊的 last_updated。
+    這讓前端顯示的「更新時間」能真實反映資料異動時間，而非每次整理頁面
+    就跳動的查詢時間，方便管理員判斷數據的新鮮度。"""
     stats = {}
 
     try:
@@ -454,13 +595,13 @@ def get_stats():
         # 1. 病患總數改成查詢資料庫中 patients 的 medical_record_number 數量
         stats['total_patients'] = conn.execute('SELECT COUNT(medical_record_number) FROM patients').fetchone()[0]
         stats['total_forms'] = conn.execute('SELECT COUNT(*) FROM record').fetchone()[0]
-        
+
         # 2. LINE bot 使用率改成 patients 中 has_chatted == 1 的數量 / 病患總數
         patients_chatted = conn.execute('SELECT COUNT(*) FROM patients WHERE has_chatted = 1').fetchone()[0]
         total_p = stats['total_patients']
         stats['patients_chatted'] = patients_chatted
         stats['bot_usage_rate']   = round(patients_chatted / total_p * 100, 1) if total_p > 0 else 0.0
-        
+
         conn.close()
     except Exception as e:
         print(f'[stats] 讀取失敗: {e}')
@@ -478,13 +619,16 @@ def get_stats():
         if os.path.exists(STATS_CACHE):
             with open(STATS_CACHE, 'r', encoding='utf-8') as f:
                 cached = json.load(f)
+        # 比對本次算出的完整快照與快取中的舊快照是否相同
         snapshot = {k: v for k, v in stats.items()}
         if cached.get('data') != snapshot:
+            # 數值有變動：更新時間戳並覆寫快取檔
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             stats['last_updated'] = now
             with open(STATS_CACHE, 'w', encoding='utf-8') as f:
                 json.dump({'data': snapshot, 'last_updated': now}, f, ensure_ascii=False, indent=2)
         else:
+            # 數值未變：沿用快取中原有的 last_updated，不視為「剛剛更新」
             stats['last_updated'] = cached.get('last_updated', '')
     except Exception:
         stats['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -497,6 +641,12 @@ def get_stats():
 @admin_bp.route('/api/chats')
 @login_required
 def get_chats():
+    """病患列表（chats.html 左側清單）：以病歷號（medical_record_number）
+    為單位聚合，每個病患顯示其 LINE 帳號、關係、表單數、對話訊息數、
+    最近就診日期、看診科別（去重後的清單 + 最新一次的科別）與目前狀態。
+    權限差異：管理員（is_admin）可看到全院所有病患；一般醫師只能看到
+    自己曾經看診過（record.doctor_id 對應到自己帳號）的病患清單，
+    透過 SQL JOIN doctors 並用 WHERE d.account_name = ? 過濾達成。"""
     account  = session['account']
     is_admin = session['is_admin']
 
@@ -542,7 +692,9 @@ def get_chats():
         result = []
         for row in rows:
             mrn = row['medical_record_num']
-            
+
+            # 對每個病患再額外查詢一次「最新一筆就診紀錄的科別」與「所有曾看過的科別」，
+            # 因為上面的主查詢用 GROUP BY 聚合後無法同時取得這兩種細節資訊。
             # 取得最新的一筆看診紀錄當次的看診醫師專科/科別
             latest_doc = conn.execute('''
                 SELECT d.department AS specialty
@@ -596,6 +748,12 @@ def get_chats():
 @admin_bp.route('/api/chats/<mrn>')
 @login_required
 def get_chat_detail(mrn: str):
+    """單一病患詳情頁（chats.html 右側面板）：回傳病患基本資料、
+    該病患所有出院/回診表單（forms）、以及所有 LINE 對話場次（sessions，
+    來自 load_sessions_for_mrn，包含 metadata 供 chats.js 畫時間軸分隔線）。
+    權限檢查：非管理員必須自己至少看診過這位病患一次（record 表中存在
+    doctor_id 對應到自己帳號的紀錄），否則回 403，避免醫師互相偷看
+    彼此負責病患的對話內容。"""
     account  = session['account']
     is_admin = session['is_admin']
 
@@ -615,6 +773,8 @@ def get_chat_detail(mrn: str):
             conn.close()
             return jsonify({'error': '無查看權限'}), 403
 
+    # 用 LEFT JOIN 是因為即使病患目前尚未被任何 LINE 帳號綁定/配對，
+    # 仍需要能查到 patients 表本身的基本資料（不能因為沒有 LINE 配對就整個查不到）。
     patient = conn.execute('''
         SELECT p.medical_record_number, MIN(la.uuid) AS line_uuid, MIN(lpp.relation) AS relation, MIN(p.status) AS status
         FROM patients p
@@ -682,10 +842,24 @@ def get_chat_detail(mrn: str):
 
 
 # ── 修改表單 ──────────────────────────────────────────────────────────────────
+# 本區塊對應 forms.html/forms.js 的「護理師建立病歷草稿 → 醫師確認送出」
+# 兩階段流程：
+#   1. 護理師（或醫師本人）選擇一個 LINE 帳號，替其建立/選擇病患配對關係，
+#      系統會在 drafts/D{doctor_id:07d}/ 底下寫入一份草稿 JSON
+#      （nurse_create），此時尚未寫入正式的 record 資料表。
+#   2. 該醫師登入後在「草稿列表」看到待確認的草稿（doctor_drafts /
+#      doctor_draft 詳情），填入症狀等資訊後按下確認送出（doctor_submit），
+#      才會正式 INSERT 進 record 表，草稿檔案隨即被刪除。
+# 置頂佇列（pinned，來自 bot.py 的 get_pinned/remove_from_pinned）用來讓
+# 護理站快速找到「剛剛才透過 LINE 綁定、但還沒有人幫忙建立病歷」的帳號，
+# 一旦護理師替某帳號建立了草稿（nurse_create），該帳號就會自動從置頂佇列移除。
 
 @admin_bp.route('/api/forms/get_line_accounts', methods=['GET'])
 @login_required
 def get_line_accounts():
+    """列出所有 LINE 帳號（供 forms.js 的下拉選單選擇要建立病歷的對象），
+    並附帶目前的置頂佇列 line_account_id 清單（pinned/pinned_ids，內容相同，
+    保留兩個鍵名是為了前端相容性，避免舊版前端讀取到 undefined）。"""
     conn = get_db()
     try:
         rows = conn.execute(
@@ -708,6 +882,10 @@ def get_line_accounts():
 @admin_bp.route('/api/forms/doctor_drafts', methods=['GET'])
 @login_required
 def get_doctor_drafts():
+    """列出目前登入醫師自己的所有待確認草稿（掃描 drafts/D{doctor_id:07d}/
+    目錄下的 *.json 檔名，檔名格式為 {mrn}_{YYYYMMDD}.json，從檔名反解析出
+    病歷號與日期，不需要真的把每個檔案內容都讀出來，效能較好）。
+    依檔名反向排序（reverse=True），使較新建立的草稿排在列表前面。"""
     account = session['account']
     conn = get_db()
     try:
@@ -749,6 +927,7 @@ def get_doctor_drafts():
 @admin_bp.route('/api/forms/doctor_draft/<filename>', methods=['GET'])
 @login_required
 def get_doctor_draft_detail(filename):
+    """讀取單一草稿檔案的完整內容（供醫師端開啟編輯 Modal 帶入現有資料）。"""
     account = session['account']
     conn = get_db()
     try:
@@ -759,7 +938,8 @@ def get_doctor_draft_detail(filename):
             return jsonify({'error': '找不到醫師帳號'}), 404
         doctor_id = doctor_row['doctor_id']
 
-        # Prevent directory traversal
+        # 用 os.path.basename 去除路徑中可能夾帶的 '../' 等目錄跳脫符號，
+        # 避免使用者傳入惡意 filename 讀取到 drafts 目錄以外的檔案（路徑穿越攻擊）。
         safe_filename = os.path.basename(filename)
         draft_path = os.path.join(BASE_DIR, 'drafts', f'D{doctor_id:07d}', safe_filename)
         if not os.path.exists(draft_path):
@@ -778,6 +958,8 @@ def get_doctor_draft_detail(filename):
 @admin_bp.route('/api/forms/doctor_draft/<filename>', methods=['DELETE'])
 @login_required
 def delete_doctor_draft(filename):
+    """捨棄草稿：直接刪除草稿檔案，不會對資料庫做任何變更
+    （因為草稿階段本來就還沒寫入 record 表）。"""
     account = session['account']
     conn = get_db()
     try:
@@ -803,6 +985,10 @@ def delete_doctor_draft(filename):
 @admin_bp.route('/api/forms/doctor_submit', methods=['POST'])
 @login_required
 def doctor_submit():
+    """醫師確認送出草稿：把草稿內容正式寫入 record 表，完成後刪除草稿檔案。
+    line_patient_pair_id 與 checkout_date 若前端沒有直接傳來，會回頭讀取
+    草稿檔案內已儲存的值（草稿建立時 nurse_create 就已經把這兩項寫進去），
+    確保即使前端表單只送出 symptoms，仍能取得完整寫入 record 所需的欄位。"""
     data = request.get_json() or {}
     filename = data.get('filename')
     symptoms = data.get('symptoms', [])
@@ -864,6 +1050,9 @@ def doctor_submit():
 @admin_bp.route('/api/forms/get_existing_relations', methods=['GET'])
 @login_required
 def get_existing_relations():
+    """查詢某個 LINE 帳號目前已配對的所有病患關係（例如「帳號本人」、
+    「父親」、「母親」等），供 forms.js 在建立新病歷草稿時，讓使用者選擇
+    「這是幫誰看診」──可以是既有配對，也可以另外新建一個配對關係。"""
     line_account_id = request.args.get('line_account_id', type=int)
     if not line_account_id:
         return jsonify({'error': 'line_account_id required'}), 400
@@ -891,6 +1080,22 @@ def get_existing_relations():
 @admin_bp.route('/api/forms/nurse_create', methods=['POST'])
 @login_required
 def nurse_create():
+    """護理師（或醫師本人）建立病歷草稿的核心端點，也是 forms.js「開始看診」
+    流程的起點。pair_id 有三種模式，對應到 forms.js 前端下拉選單的三種選項：
+      - 'self'：這個 LINE 帳號本人就是病患，relation 固定為「帳號本人」。
+      - 'new'：幫這個 LINE 帳號新增一個新的病患配對關係（例如「幫父親掛號」），
+               需要同時提供 mrn（病歷號）與 relation（關係稱謂）。
+      - 既有的 line_patient_pairs_id（整數字串）：直接沿用該筆既有配對，
+        不需要重新輸入病歷號/關係，系統會自動查出對應的 mrn/relation。
+
+    流程：
+      1. 從 session 帳號查出 doctor_id/doctor_name（草稿要標示是哪位醫師）。
+      2. 依 pair_id 模式解析或建立 patient / line_patient_pairs 資料
+         （'self'/'new' 模式下會用 upsert 方式找到既有病患或新增一筆）。
+      3. 把上述資訊組成草稿 JSON，寫入 drafts/D{doctor_id:07d}/{mrn}_{日期}.json。
+      4. 把這個 LINE 帳號從「置頂佇列」移除（因為已經有人開始處理了）。
+      5. 提交資料庫交易；若草稿檔案寫入失敗則回滾資料庫變更，確保
+         DB 與檔案系統狀態一致（不會出現「DB 有配對但沒有草稿檔」的半殘狀態）。"""
     data           = request.get_json() or {}
     line_account_id = data.get('line_account_id')
     pair_id        = data.get('pair_id')        # 'self', 'new', or existing int
@@ -920,7 +1125,7 @@ def nurse_create():
         ).fetchone()
         line_name = line_acc_row['name'] if line_acc_row else ''
 
-        # 2. If existing pair (int pair_id) → skip upsert, just get lpp_id, mrn, relation
+        # 2. 若 pair_id 是既有配對的整數 ID → 跳過 upsert，直接查出 lpp_id/mrn/relation
         if pair_id not in ('self', 'new'):
             try:
                 lpp_id = int(pair_id)
@@ -974,7 +1179,7 @@ def nurse_create():
                 )
                 lpp_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
 
-        # 3. Save draft JSON file
+        # 3. 儲存草稿 JSON 檔案（尚未寫入 record 表，等醫師 doctor_submit 才會正式入庫）
         now = datetime.now()
         date_str_ymd = now.strftime('%Y%m%d')
         datetime_str = now.strftime('%Y-%m-%dT%H:%M:%S.') + f'{now.microsecond // 1000:03d}'
@@ -996,11 +1201,11 @@ def nurse_create():
             with open(draft_path, 'w', encoding='utf-8') as f:
                 json.dump(draft_data, f, ensure_ascii=False, indent=4)
         except Exception as file_err:
-            # File write failed — rollback DB and report error
+            # 檔案寫入失敗 → 回滾資料庫變更並回報錯誤，避免 DB 與檔案系統狀態不一致
             conn.rollback()
             return jsonify({'error': f'草稿檔案儲存失敗：{file_err}'}), 500
 
-        # Remove line_account_id from pinned queue if present
+        # 草稿建立成功後，將該 LINE 帳號從置頂佇列移除（若原本不在佇列中則靜默忽略）
         try:
             remove_from_pinned(int(line_account_id))
         except Exception as pe:
@@ -1020,11 +1225,19 @@ def nurse_create():
 @admin_bp.route('/api/forms/<mrn>/<checkout_date>', methods=['PUT'])
 @login_required
 def update_form(mrn: str, checkout_date: str):
+    """修改既有的正式表單（record 表中已存在的紀錄），支援：
+      - 修改病歷號（mrn_changed）：僅限管理員，且會連帶把 chat_logs/<舊病歷號>/
+        整個目錄搬移（os.rename）到新病歷號目錄，並更新目錄內每份 JSON
+        的 metadata.medical_record_num 欄位，確保對話紀錄跟著病歷號走。
+      - 修改病患與 LINE 帳號的關係稱謂（relation_changed）：任何登入使用者
+        皆可修改，不需要管理員權限。
+      - 修改症狀清單（symptoms）：可傳入 list 或逗號分隔字串，皆會轉存成 JSON。
+    就診日期與看診醫師視為唯讀欄位，本路由不會更動 checkout_date/doctor_id。"""
     account  = session['account']
     is_admin = session['is_admin']
 
     conn = get_db()
-    
+
     try:
         # 1. 精確比對 checkout_date，確保要修改的表單存在
         row = conn.execute('''
@@ -1157,6 +1370,14 @@ def update_form(mrn: str, checkout_date: str):
 @admin_bp.route('/api/forms/view_edit', methods=['PUT'])
 @login_required
 def view_edit_form():
+    """另一個修改表單的路由，與 update_form 的差異在於：本路由允許同時
+    改變表單所連結的 LINE 帳號 + 病患配對（line_account_id + pair_id + relation
+    + new_mrn），並不需要管理員權限即可修改病歷號（相較 update_form 中
+    「改病歷號僅限管理員」的限制較為寬鬆）；但本路由不處理 chat_logs
+    目錄搬移，也不支援回傳 record_id 給呼叫端。update_form 主要供
+    「病歷號需要管理員審核修改」的情境使用，view_edit_form 則供
+    forms.js 檢視/編輯表單時快速調整配對用。
+    pair_id 的三種模式定義與 nurse_create 相同（'self' / 'new' / 既有整數 ID）。"""
     data = request.get_json() or {}
     mrn = data.get('mrn')
     checkout_date = data.get('checkout_date')
@@ -1269,12 +1490,17 @@ def view_edit_form():
 
 
 # ── 醫師帳號管理（管理員）────────────────────────────────────────────────────
-
+# 對應 doctors.html/doctors.js。除了 list_doctors（GET）任何登入使用者皆可查看
+# 醫師名單以外，新增/刪除/修改醫師帳號皆需 admin_required（僅管理員可操作）。
 
 import secrets
 import string
 
 def generate_random_password(length=8) -> str:
+    """新增醫師帳號時，系統自動產生一組隨機密碼（英文大小寫+數字混合，
+    預設 8 碼），透過 secrets 模組（而非 random）確保密碼具備
+    密碼學層級的隨機性，避免被預測。產生的密碼只在建立當下回傳一次
+    給管理員複製給該醫師，資料庫中僅儲存雜湊值，之後無法再次查詢明文。"""
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
@@ -1282,6 +1508,12 @@ def generate_random_password(length=8) -> str:
 @admin_bp.route('/api/doctors', methods=['GET'])
 @login_required
 def list_doctors():
+    """列出所有醫師帳號。每筆額外附加 can_delete 欄位，決定 doctors.js
+    是否顯示刪除按鈕：一位醫師「可以被刪除」的條件是同時滿足
+      (a) 該醫師在 record 表中沒有任何看診紀錄（避免刪除後產生
+          record.doctor_id 指向不存在醫師的資料完整性問題），且
+      (b) 不是目前登入者自己的帳號（避免管理員把自己刪除導致無法登入）。
+    排序：管理員帳號（is_admin DESC）優先顯示，其餘依帳號名稱排序。"""
     try:
         conn = get_db()
         # 1. 查詢 record，取得所有已有病歷紀錄的醫師 id
@@ -1311,6 +1543,11 @@ def list_doctors():
 @admin_bp.route('/api/doctors', methods=['POST'])
 @admin_required
 def create_doctor():
+    """新增醫師帳號：帳號格式限制為英數字與底線（防止特殊符號造成問題），
+    密碼由系統隨機產生並以明文形式在回應中回傳一次（generated_password），
+    給管理員複製轉交給該醫師；資料庫僅儲存 hash_pw() 後的雜湊值。
+    若指定的 specialty（科別）尚未存在於 data/departments.json，
+    會自動新增一筆啟用中的科別紀錄，讓科別清單與實際使用中的醫師科別保持同步。"""
     data = request.get_json() or {}
     account = data.get('account_name', '').strip()
     name = data.get('doctor_name', '').strip()
@@ -1367,6 +1604,9 @@ def create_doctor():
 @admin_bp.route('/api/doctors/<account>', methods=['DELETE'])
 @admin_required
 def delete_doctor(account: str):
+    """刪除醫師帳號：與 list_doctors 的 can_delete 規則一致，
+    後端會再次獨立檢查一次（不可刪除自己、不可刪除已有看診紀錄的醫師），
+    避免前端邏輯被繞過（例如直接呼叫 API）而破壞資料完整性。"""
     account = account.strip()
     current_user = session.get('account')
 
@@ -1404,6 +1644,12 @@ def delete_doctor(account: str):
 @admin_bp.route('/api/doctors/<account>', methods=['PUT'])
 @admin_required
 def update_doctor(account: str):
+    """修改醫師帳號資料：姓名、啟用狀態、是否為管理員、科別、（可選）重設密碼。
+    關鍵防呆規則：系統中必須至少保留一位管理員帳號，因此若目前登入的管理員
+    正在修改「自己」的帳號並試圖把 is_admin 改為 0，會先確認資料庫中
+    是否還有其他 is_admin=1 的帳號存在，否則拒絕這次修改
+    （避免整個系統變成沒有任何管理員、無法再管理醫師帳號的窘境）。
+    修改科別時，若該科別尚未存在於 departments.json，也會自動補上一筆。"""
     data = request.get_json() or {}
     conn = get_db()
     row  = conn.execute('SELECT * FROM doctors WHERE account_name = ?', (account,)).fetchone()
@@ -1462,14 +1708,23 @@ def update_doctor(account: str):
 
 
 # ── Prompt 修改（管理員）────────────────────────────────────────────────────
+# 對應 prompt.html/prompt.js。所有路由皆需 admin_required，因為系統提示詞
+# 直接影響 LINE Bot（bot.py 的 load_prompt_template）對所有病患的回覆內容與語氣，
+# 屬於高風險設定，僅限管理員可修改。
 
 @admin_bp.route('/api/prompt', methods=['GET'])
 @admin_required
 def get_prompt():
+    """讀取 Prompt 內容與版本導覽資訊。
+    區分「目前生效版本」（active_version/active_content，即 bot.py 實際使用中的
+    那一版）與「目前正在檢視/編輯的版本」（view_version/content，可透過
+    query string ?version=xxx 指定要查看歷史上的哪一版，預設等於 active_version）。
+    這樣設計讓管理員可以在不切換生效版本的前提下，先「預覽」舊版本內容，
+    確認後才透過 switch_prompt 真正切換。"""
     try:
         # Get active version info
         active_version, active_content, has_prev_act, has_next_act, prev_act, next_act = get_current_prompt_info()
-        
+
         # Determine which version to view/edit
         view_version = request.args.get('version', '').strip()
         if not view_version:
@@ -1517,6 +1772,9 @@ def get_prompt():
 @admin_bp.route('/api/prompt', methods=['POST'])
 @admin_required
 def save_prompt():
+    """儲存新的 Prompt 內容為一個全新版本（不會覆蓋現有版本檔案，
+    也不會自動切換為生效版本 —— 若要生效需另外呼叫 switch_prompt）。
+    版本號自動遞增：掃描現有 prompt_*.md 中最大的編號 +1。"""
     data    = request.get_json() or {}
     content = data.get('content', '')
     try:
@@ -1551,11 +1809,15 @@ def save_prompt():
 @admin_bp.route('/api/prompt/rollback', methods=['POST'])
 @admin_required
 def rollback_prompt():
+    """一鍵回溯到「目前生效版本」的上一個版本（依版本編號順序）。
+    與 delete_prompt 的差異：rollback 不會刪除目前版本的檔案，
+    單純只是把 current_version 指標往前移一版並同步 assets/prompt.md，
+    因此之後仍可透過 switch_prompt 再切回去。"""
     try:
         current_version, _, has_prev, has_next, prev_version, next_version = get_current_prompt_info()
         if not has_prev or not prev_version:
             return jsonify({'error': '找不到上一個版本的 Prompt 備份或已是原始版本'}), 404
-            
+
         # 更新 config 檔 (不用真的把當前的版本刪除)
         cfg = load_config()
         cfg['current_version'] = prev_version
@@ -1578,6 +1840,9 @@ def rollback_prompt():
 @admin_bp.route('/api/prompt/switch', methods=['POST'])
 @admin_required
 def switch_prompt():
+    """切換到任意指定的歷史版本，使其成為新的生效版本
+    （更新 data/prompt_config.json 的 current_version，並同步覆寫
+    assets/prompt.md，讓 bot.py 下次讀取時使用新版本內容）。"""
     data = request.get_json() or {}
     version = data.get('version', '').strip()
     if not version:
@@ -1610,20 +1875,26 @@ def switch_prompt():
 @admin_bp.route('/api/prompt/delete', methods=['POST'])
 @admin_required
 def delete_prompt():
+    """永久刪除一個 Prompt 版本檔案（無法刪除原始版本 prompt_001.md，
+    此為業務規則上的保護：系統必須永遠保有一個「出廠預設值」可供還原）。
+    若刪除的正好是目前生效版本，會自動決定接替的版本：
+    優先切換到編號較小的前一版，若沒有前一版則切換到後一版，
+    最後手段才退回 prompt_001.md，確保系統永遠有一個生效版本可用，
+    不會出現「刪除後無版本生效」的狀態。同時會清除 config 中對應的別名紀錄。"""
     data = request.get_json() or {}
     version = data.get('version', '').strip()
-    
+
     active_version, *_ = get_current_prompt_info()
     if not version:
         version = active_version
-        
+
     if version == 'prompt_001.md' or version == 'prompt.md':
         return jsonify({'error': '不可刪除原始版本'}), 400
-        
+
     versions = get_all_prompt_versions()
     if version not in versions:
         return jsonify({'error': '找不到指定的版本'}), 404
-        
+
     try:
         idx = versions.index(version)
         # 決定刪除後切換到哪個版本
@@ -1665,6 +1936,9 @@ def delete_prompt():
 @admin_bp.route('/api/prompt/nickname', methods=['POST'])
 @admin_required
 def save_prompt_nickname():
+    """替某個版本設定顯示用的自訂別名（例如「較活潑的語氣」），
+    純粹是 UI 顯示用途，儲存在 config.json 的 nicknames 字典中，
+    不影響版本檔案內容本身或哪個版本生效。"""
     data = request.get_json() or {}
     version = data.get('version', '').strip()
     nickname = data.get('nickname', '').strip()
@@ -1697,10 +1971,18 @@ def save_prompt_nickname():
 @admin_bp.route('/api/patients/<mrn>/clear_return_visit', methods=['POST'])
 @login_required
 def clear_return_visit(mrn: str):
+    """將病患狀態標記為「已處理」，用於 chats.js 列表中護理師/醫師手動
+    確認某位「須看診」或「須回診」病患已完成對應動作時呼叫。
+    patients.status 的完整狀態機定義於 scripts/db_init.py 的 CHECK 條件：
+    '出院'、'須看診'、'已看診'、'須回診'、'已回診'。
+    若前端沒有明確指定要切換成哪個狀態（target_status 未傳入），
+    則依目前狀態自動判斷對應的「已完成」狀態：
+      須看診 → 已看診；須回診 → 已回診；其他情況預設為 已回診。
+    這個自動判斷邏輯讓前端只需要呼叫「清除」動作，不必自己維護狀態轉換規則。"""
     mrn = mrn.strip()
     data = request.get_json() or {}
     target_status = data.get('status')
-    
+
     conn = get_db()
     try:
         if not target_status:
@@ -1715,7 +1997,7 @@ def clear_return_visit(mrn: str):
                     target_status = '已回診'
             else:
                 target_status = '已回診'
-                
+
         if target_status not in ('已看診', '已回診'):
             return jsonify({'error': '無效的狀態更新'}), 400
             
@@ -1737,6 +2019,10 @@ def clear_return_visit(mrn: str):
 @admin_bp.route('/api/departments', methods=['GET'])
 @login_required
 def get_departments():
+    """列出所有科別，並標註每個科別目前是否「正被使用」（is_used：
+    doctors 表中是否有醫師的 department 欄位等於此科別名稱）。
+    is_used 用於前端判斷刪除科別時該顯示「刪除」還是「停用」的提示文字
+    （實際的刪除/停用邏輯在 delete_or_disable_department 中執行）。"""
     deps = load_departments()
     conn = get_db()
     try:
@@ -1760,12 +2046,15 @@ def get_departments():
 @admin_bp.route('/api/departments', methods=['POST'])
 @admin_required
 def create_department():
+    """新增科別。若同名科別已存在但目前是停用狀態，則改為「重新啟用」
+    而非報錯（因為刪除有醫師使用中的科別時，實際上只是被停用而非真的移除，
+    見 delete_or_disable_department，所以新增時要能把停用的科別復活）。"""
     data = request.get_json() or {}
     name = data.get('name', '').strip()
-    
+
     if not name:
         return jsonify({'error': '科別名稱不可空白'}), 400
-        
+
     deps = load_departments()
     # 檢查是否已存在
     for d in deps:
@@ -1785,6 +2074,8 @@ def create_department():
 @admin_bp.route('/api/departments/<old_name>', methods=['PUT'])
 @admin_required
 def update_department(old_name: str):
+    """修改科別：可重新命名（同步更新 doctors.department 欄位，
+    確保改名後既有醫師的科別欄位不會變成孤兒資料）與/或切換啟用狀態。"""
     old_name = old_name.strip()
     data = request.get_json() or {}
     new_name = data.get('name', '').strip()
@@ -1830,6 +2121,12 @@ def update_department(old_name: str):
 @admin_bp.route('/api/departments/<name>', methods=['DELETE'])
 @admin_required
 def delete_or_disable_department(name: str):
+    """刪除科別的「軟性」處理邏輯：
+      - 若目前沒有任何醫師使用該科別 → 直接從 departments.json 移除。
+      - 若已有醫師的 department 欄位指向該科別 → 不會真的刪除
+        （避免造成醫師資料中的科別欄位失去對應），而是改為停用
+        （is_active=False），停用後的科別仍會保留在清單中但不會出現在
+        新增/編輯醫師時的科別選單選項裡（前端 doctors.js 過濾邏輯）。"""
     name = name.strip()
     deps = load_departments()
     
@@ -1862,9 +2159,21 @@ def delete_or_disable_department(name: str):
         return jsonify({'success': True, 'action': 'deleted', 'message': '科別已成功刪除。'})
 
 # ── 衛教資料管理（醫師自行維護，僅限管理員新增/編輯/刪除）──────────────────────
+# 對應 education.html/education.js。這裡管理的資料是 LINE Bot RAG（檢索增強
+# 生成）機制的知識來源：assets/discharge/category.json 記錄「部位 → 類別 →
+# 對應 .md 檔名」的映射，實際衛教內容則存在各自的 .md 檔案中
+# （assets/discharge/*.md）。bot.py 的 build_rag_context() 會依照病患填單時
+# 選擇的症狀，用模糊比對找出對應的類別，讀取對應 .md 檔內容注入到 AI 的
+# system prompt 的 {context} 位置，讓 AI 回覆病患衛教資訊時有正確的醫療知識依據。
+# 因此本區塊任何新增/修改/刪除操作，都會直接影響 LINE Bot 未來對病患的回覆內容。
+# 一個 .md 檔可以同時被多個「部位/類別」組合共用（見 _find_filename_owner /
+# _delete_md_file_if_unshared），因此刪除時必須先確認沒有其他類別仍在引用
+# 該檔案，才會真的刪除實體檔案，避免刪除後其他還在使用該檔的類別失效。
+
 # 輔助函式
 def _sanitize_md_filename(filename: str) -> str:
-    """限制自訂檔名只能是純檔名（擋掉路徑符號），並確保副檔名是 .md。"""
+    """限制自訂檔名只能是純檔名（用 os.path.basename 擋掉路徑符號，
+    防止路徑穿越攻擊），並確保副檔名是 .md（若使用者沒打副檔名則自動補上）。"""
     filename = os.path.basename((filename or '').strip())
     if not filename:
         return ''
@@ -1874,12 +2183,14 @@ def _sanitize_md_filename(filename: str) -> str:
 
 
 def _write_md_content(filename: str, content: str) -> None:
+    """把衛教內容文字寫入 assets/discharge/<filename>.md（新增/覆寫）。"""
     os.makedirs(DISCHARGE_MD_DIR, exist_ok=True)
     with open(os.path.join(DISCHARGE_MD_DIR, filename), 'w', encoding='utf-8') as f:
         f.write(content)
 
 
 def _read_md_content(filename: str) -> str | None:
+    """讀取指定 .md 檔內容，檔案不存在則回傳 None（供路由判斷回 404）。"""
     path = os.path.join(DISCHARGE_MD_DIR, filename)
     if not os.path.exists(path):
         return None
@@ -1921,7 +2232,9 @@ def _find_filename_owner(edu: dict, filename: str):
 @admin_bp.route('/api/education', methods=['GET'])
 @login_required
 def list_education():
-    """回傳所有「部位/類別/檔名」，攤平成列表供顯示（不含 content，內容另外抓）。"""
+    """回傳所有「部位/類別/檔名」，攤平成列表供顯示（不含 content，內容另外
+    透過 get_education_content 依需求載入，避免列表頁一次讀取全部 .md 檔內容）。
+    任何登入使用者皆可查看（唯讀），僅新增/編輯/刪除需要管理員權限。"""
     test_file = EDUCATION_FILE
 
     with education_lock:
@@ -1957,7 +2270,16 @@ def get_education_content(filename: str):
 @admin_bp.route('/api/education', methods=['POST'])
 @admin_required
 def create_education():
-    """新增衛教類別（部位 + 類別 + 自訂檔名），同步寫入對應的 md 檔"""
+    """新增衛教類別（部位 + 類別 + 自訂檔名），同步寫入對應的 md 檔。
+    兩項唯一性檢查：
+      1. 類別名稱在「整份」資料中必須唯一（不能有兩個部位底下都有同名類別，
+         由 _find_category_location 檢查），因為 bot.py 的 build_rag_context
+         是用類別名稱去模糊比對症狀文字，重複類別名會造成比對結果混淆。
+      2. 檔名也必須唯一（不能借用其他部位/類別「尚未共用」的檔名），
+         若要多個類別共用同一份衛教內容，須透過 update_education
+         明確指定共用；create_education 一律視為建立新的獨立類別。
+    整個檢查 + 寫入 category.json + 寫入 .md 檔的過程都在 education_lock
+    保護下完成，避免並發請求造成資料損毀或重複建立。"""
     test_file = EDUCATION_FILE
 
     data = request.get_json() or {}
@@ -2000,7 +2322,13 @@ def create_education():
 @admin_bp.route('/api/education/<bodypart>/<category>', methods=['PUT'])
 @admin_required
 def update_education(bodypart: str, category: str):
-    """編輯衛教類別（可同時修改部位、類別名稱、檔名，並同步寫入內容到 md 檔）"""
+    """編輯衛教類別（可同時修改部位、類別名稱、檔名，並同步寫入內容到 md 檔）。
+    URL 中的 bodypart/category 是「修改前」的識別鍵，request body 中的
+    new_bodypart/new_category/filename 則是「修改後」的目標值。
+    若改名，仍會檢查新類別名稱是否與其他部位下的類別衝突；
+    若指定的檔名恰好是「自己原本使用的檔名」則允許（owner == (bodypart, category)
+    的情況不視為衝突），否則若該檔名已被其他類別佔用則拒絕，
+    避免不小心覆寫別的類別正在使用的衛教內容。"""
     test_file = EDUCATION_FILE
 
     bodypart = bodypart.strip()

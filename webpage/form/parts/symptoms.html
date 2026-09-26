@@ -1,3 +1,21 @@
+<!--
+    parts/symptoms.html — 步驟 2「選擇衛教主題（症狀）」卡片內容
+
+    對應 state.js 中 key === 'symptoms' 的步驟。核心互動是一張人體構造圖，
+    圖上疊加多個圓形「熱點（hotspot）」代表身體部位，加上右側三顆固定按鈕
+    （皮膚/精神/其他），點擊任一熱點會依 state.js 的 topicMapping 字典
+    彈出對應的症狀勾選清單（popover）。已勾選的症狀同時會列在下方的
+    chip（藥丸狀標籤）清單，點擊 chip 也可以直接取消勾選。
+
+    版面配置定位（人體圖上各熱點的 top/left/width/height 百分比）是針對
+    /assets/images/human_structrue_organs_chatgpt.png 這張特定圖片手動量測、
+    寫死的絕對定位數值，若日後更換底圖，這些座標需要重新調整。
+
+    無資料時的行為：若某部位在 topicMapping 中對應空陣列（例如目前的
+    '手'、'腳' 兩個部位），該熱點會被標記 disabled 樣式（灰色、不可點擊、
+    停用 pulse-glow 提示動畫），避免使用者點擊後看到空的選單。
+-->
+
 <!--Current: expanded card-->
 <template x-if="i === currentStep">
     <div class="flex flex-col h-full">
@@ -6,6 +24,7 @@
         {{ card_header('請選擇要提供的衛教資料') }}
 
         <!-- Body: explicit max-height so overflow-y-auto actually triggers -->
+        <!-- 點擊卡片內容以外的區域（click.away）會自動關閉目前開啟的 popover -->
         <div class="px-4 relative select-none pb-2 overflow-y-auto max-h-[50vh]"
             @click.away="step.activeRegion = null">
 
@@ -13,6 +32,16 @@
             <div class="image-wrapper shrink-0" id="image-wrapper">
                 <div class="interactive-layout">
                     <!-- Left Column: Human Body -->
+                    <!--
+                        人體圖左欄：一張底圖疊加 6 個圓形熱點（頭/脖子/手/軀幹上半部/
+                        軀幹下半部/腳）。每個熱點的 :class 綁定三種狀態：
+                            disabled    — 該部位在 topicMapping 中無對應症狀時停用
+                            active      — 目前展開中的 popover 對應此部位
+                            pulse-glow  — 尚未選擇任何區域、且此部位有可選症狀時，
+                                          持續發光提示使用者可以點擊
+                        點擊時呼叫 app.js 的 showPopover(區域名稱, 事件, 'body')，
+                        'body' 代表 popover 應往熱點右側展開。
+                    -->
                     <div class="body-column">
                         <div class="image-container" id="body-image-container">
                             <img src="/assets/images/human_structrue_organs_chatgpt.png" alt="人體構造圖">
@@ -44,6 +73,11 @@
                     </div>
 
                     <!-- Right Column: 3 Buttons -->
+                    <!--
+                        右欄：三顆固定形狀的長條按鈕（非人體圖上的區域，而是額外的分類：
+                        皮膚問題、精神狀態、其他）。呼叫 showPopover 時第三個參數傳入
+                        'bottom'，讓 popover 改往按鈕左側展開（避免超出畫面右邊界）。
+                    -->
                     <div class="buttons-column">
                         <div class="hotspot bottom-btn btn-skin"
                             :class="[(step.topicMapping['皮膚'] || []).length === 0 ? 'disabled' : '', step.activeRegion === '皮膚' ? 'active' : '', (step.activeRegion === null && (step.topicMapping['皮膚'] || []).length > 0) ? 'pulse-glow' : '']"
@@ -61,6 +95,12 @@
                 </div>
 
                 <!-- Popover positioned relative to image-wrapper -->
+                <!--
+                    症狀勾選選單。絕對定位座標（top/left）與箭頭方向 class
+                    （arrow-left/arrow-right）皆由 app.js 的 showPopover() 動態計算
+                    後寫入 step.popoverTop / step.popoverLeft / step.popoverArrowClass。
+                    x-transition 系列屬性定義開合時的縮放淡入淡出動畫。
+                -->
                 <div id="popover" x-show="step.activeRegion !== null"
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
                     x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100"
@@ -76,6 +116,7 @@
                                 <span class="material-symbols-rounded text-[18px]">close</span>
                             </button>
                         </div>
+                        <!-- 依目前 activeRegion 從 topicMapping 取出該部位的症狀清單逐一渲染，點擊呼叫 toggleSymptom() 切換勾選狀態 -->
                         <div class="pop-checkbox-list">
                             <template x-for="topic in (step.topicMapping[step.activeRegion] || [])" :key="topic">
                                 <div class="pop-checkbox-item"
@@ -88,6 +129,7 @@
                                     <span x-text="topic"></span>
                                 </div>
                             </template>
+                            <!-- 理論上不會觸發：有可選症狀的部位才會呼叫 showPopover（見上方 @click.stop 的長度判斷），保留作為防禦性顯示 -->
                             <template x-if="!(step.topicMapping[step.activeRegion] || []).length">
                                 <span class="text-slate-500 text-sm p-2">此區域無相關衛教資料。</span>
                             </template>
@@ -97,6 +139,7 @@
             </div>
 
             <!-- Selected symptoms chip box at the bottom -->
+            <!-- 已勾選症狀的彙總顯示區，僅在至少選了一項時才顯示；showPrefillMsg 為 true 時額外提示「已根據上次紀錄自動選擇」 -->
             <div class="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 shrink-0"
                 x-show="step.selectedSymptoms.length > 0">
                 <div x-show="step.showPrefillMsg" x-transition class="text-xs text-emerald-400 mb-2 font-medium">
@@ -127,6 +170,7 @@
 </template>
 
 <!-- Completed: compact summary -->
+<!-- 收合摘要：以一排標籤（黃底）列出所有已選症狀 -->
 <template x-if="step.completed && i !== currentStep">
     <div class="flex items-center gap-4">
         <span class="material-symbols-rounded text-blue-400">sick</span>

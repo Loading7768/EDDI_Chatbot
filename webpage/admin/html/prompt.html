@@ -1,3 +1,54 @@
+<!--
+  ════════════════════════════════════════════════════════════════════
+  檔案總覽：prompt.html — 「AI Prompt 版本管理」分頁的 DOM 結構
+  ════════════════════════════════════════════════════════════════════
+
+  【這個頁面在整體系統中的角色】
+    本區塊（#section-prompt）是急診出院衛教 LINE Bot 管理後台的其中一個
+    分頁，僅限管理員角色操作（見標題旁的「管理員」角色標籤 role-admin）。
+    用途是管理 LINE Bot 呼叫 LLM（Gemini / OpenAI / Ollama，依環境變數
+    LLM_PROVIDER 決定，見 src/bot.py）時使用的「System Prompt（系統提示
+    詞）」。所有互動邏輯（DOM 事件綁定、fetch 呼叫後端 API、資料渲染）
+    都寫在對應的 webpage/admin/js/prompt.js 檔案中，本檔案只負責畫面
+    骨架與各元素的 id/onclick 綁定點。
+
+  【版本管理的概念模型（詳見 prompt.js 檔案總覽，此處僅摘要）】
+    - 「版本檔案」：assets/prompts/prompt_NNN.md，每次「儲存」都會新增
+      一個檔案，編號永遠遞增，prompt_001.md 為原始版本、永不可刪除。
+    - 「啟用中版本 (active_version)」：記錄於 data/prompt_config.json 的
+      current_version，是 LINE Bot 實際使用的版本；「新增版本」與
+      「切換成啟用中（套用）」是兩個獨立步驟。
+    - 「瀏覽中版本」：使用者目前在畫面上看/編輯的版本，可透過左側列表
+      或 ↩️/↪️ 按鈕自由切換瀏覽，不影響 LINE Bot 實際使用哪一版。
+    - 「暱稱」：純 UI 顯示輔助，讓版本更好辨識，不影響 Prompt 內容或
+      啟用邏輯。
+    - Prompt 內容中的 {context} 佔位符：LINE Bot 端會在實際呼叫 LLM 前，
+      把 RAG 檢索到的衛教資料內容動態替換進去，因此編輯 Prompt 時應
+      保留此佔位符。
+
+  【整體版面配置（三欄式佈局，見 .prompt-layout 及其子元素）】
+    - 左欄（.prompt-col-left，約 1/5 寬）：#prompt-version-list，顯示
+      所有版本的可點擊列表，內容完全由 prompt.js 的
+      renderPromptVersionsList() 動態產生（見該函式內對應的 HTML 模板
+      字串，結構會複製本檔案原本手寫的靜態骨架但由 JS 動態插入）。
+    - 中欄（.prompt-col-center，約 2/5 寬，寬度會依「是否正在瀏覽啟用中
+      版本」動態調整為 40% 或 80%，見 prompt.js loadPrompt() 邏輯）：
+      編輯框主體，包含版本標籤、使用中徽章、暱稱輸入區、內容編輯框、
+      翻頁/刪除/儲存/套用等操作按鈕，以及操作狀態訊息列。
+    - 右欄（.prompt-col-right / #prompt-active-column，約 2/5 寬，僅在
+      瀏覽中版本與啟用中版本不同時才顯示）：唯讀顯示「目前啟用中版本」
+      的內容，讓管理員在編輯/瀏覽其他版本時，可以隨時對照目前正式運作
+      中的 Prompt 內容有何差異。
+
+  【本頁面會觸發的後端 API（實際 fetch 呼叫邏輯都在 prompt.js 中，這裡
+    列出對照表方便直接從 HTML 元素反查對應的 API）】
+    - 頁面載入 / 點擊版本列表項 / 按 ↩️↪️  → GET  /api/prompt(?version=)
+    - 點擊「💾 儲存並新增」（#btn-save-prompt） → POST /api/prompt
+    - 點擊「套用」→ 確認彈窗「確認套用」        → POST /api/prompt/switch
+    - 點擊「🗑️ 刪除」→ 確認彈窗「確認刪除」      → POST /api/prompt/delete
+    - 點擊「💾 儲存名稱」（#btn-save-nickname）  → POST /api/prompt/nickname
+  ════════════════════════════════════════════════════════════════════
+-->
 <!-- Prompt 修改 -->
 <section id="section-prompt" class="section">
   <div class="section-title">
@@ -5,40 +56,130 @@
     <span class="role-tag role-admin" style="margin-left:8px;vertical-align:middle;">管理員</span>
   </div>
   <div class="prompt-layout">
+    <!-- ════════════════════════════════════════════════════════════
+         左側欄（約 1/5 寬）：Prompt 版本列表
+         ════════════════════════════════════════════════════════════
+         此欄純粹是「可點擊的版本瀏覽入口」，本身不含任何寫入操作。
+         #prompt-version-list 內的實際列表項目（每個版本一個 <div
+         class="patient-item">）完全由 JS 端 prompt.js 的
+         renderPromptVersionsList(versions, activeVersion, viewingVersion,
+         nicknames) 函式動態產生 innerHTML 插入，並非寫死在此 HTML 中。
+         每個列表項目會有一個 onclick="loadPrompt('<版本檔名>')"，點擊後
+         呼叫 GET /api/prompt?version=<版本檔名> 載入該版本內容到中間
+         編輯框，並在該版本正好是「啟用中版本」時額外顯示綠色「使用中」
+         徽章。渲染時機：頁面初次載入、任何一次寫入操作（儲存/套用/刪除/
+         命名）成功後都會重新整理一次此列表，確保永遠反映後端最新狀態。
+    -->
     <!-- 左側 1/5 列表 -->
     <div class="prompt-col-left">
       <div class="plist-header" style="background: var(--bg); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; padding: 12px 16px;">
         📁 Prompt 版本列表
       </div>
       <div id="prompt-version-list" style="flex: 1; overflow-y: auto;">
-        <!-- 列表內容由 JS 產生 -->
+        <!-- 列表內容由 JS 產生：見 prompt.js 的 renderPromptVersionsList() -->
       </div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════
+         中間欄：編輯框主體（本頁面所有寫入操作的核心區域）
+         ════════════════════════════════════════════════════════════
+         寬度會由 prompt.js 的 loadPrompt() 動態調整：當「瀏覽中版本」
+         就是「啟用中版本」時（沒有必要顯示右側對照欄），此欄會撐寬到
+         80%；否則維持 40%，讓右側對照欄有空間顯示。
+    -->
     <!-- 中間 2/5 修改框 -->
     <div class="prompt-col-center">
+      <!--
+        版本標籤區：
+        - #editing-version-label：顯示「目前瀏覽/編輯中版本」的檔名（或
+          「暱稱(檔名)」格式），由 loadPrompt() 依 API 回傳的 current_version
+          欄位（配合 nicknames）計算後寫入。初始值 '-' 代表尚未載入。
+        - #active-badge：綠色「目前使用中」徽章，僅在瀏覽中版本恰好等於
+          啟用中版本時才顯示（display:none → inline-block），用來提示
+          管理員「你正在看的就是 LINE Bot 現在實際使用的版本」。
+      -->
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
         <span>✏️ 編輯框 (<code id="editing-version-label">-</code>)</span>
         <span id="active-badge" class="badge badge-green" style="display:none;">目前使用中</span>
       </div>
+      <!--
+        提示文字：明確告知管理員「儲存」的語義是新增版本而非覆蓋，且
+        prompt_001.md（原始版本）恆常保留、不會被任何儲存操作影響。
+      -->
       <div class="prompt-info" style="margin-bottom: 8px;">
         ℹ️ 修改將會儲存並新增一個版本。最原始的 <code>prompt_001.md</code> 將會被保留。
       </div>
+      <!--
+        自訂暱稱區：
+        - #prompt-nickname-input：文字輸入框，載入版本時由 loadPrompt()
+          預填該版本目前的暱稱（若無暱稱則為空字串）；使用者可自由修改。
+        - #btn-save-nickname：點擊後呼叫 prompt.js 的 savePromptNickname()，
+          對應後端 API POST /api/prompt/nickname，body 為
+          { version: 目前瀏覽中版本, nickname: 輸入框文字(trim 後) }。
+          成功後會重新呼叫 loadPrompt() 讓左側列表、版本標籤等處同步顯示
+          最新暱稱。暱稱純粹是顯示輔助，不影響 Prompt 實際內容或啟用邏輯。
+      -->
       <!-- 自定義 prompt 暱稱 -->
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: var(--bg); padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border);">
         <span style="font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap;">自訂名稱：</span>
         <input type="text" id="prompt-nickname-input" placeholder="例如：活潑版本" style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1.5px solid var(--border); font-size: 13px; outline: none; background: #fff; color: var(--text);">
         <button class="btn btn-primary" id="btn-save-nickname" onclick="savePromptNickname()" style="padding: 6px 14px; font-size: 13px; width: auto; flex-shrink: 0; white-space: nowrap;">💾 儲存名稱</button>
       </div>
+      <!--
+        內容編輯框：
+        - #prompt-textarea：顯示/編輯目前瀏覽中版本的完整 Prompt 文字。
+          由 loadPrompt() 透過 GET /api/prompt 的回應 content 欄位填入。
+          注意此內容中若含有 {context} 佔位符，LINE Bot 端（src/bot.py）
+          在實際呼叫 LLM 前會把 RAG 檢索到的衛教資料動態替換進去，因此
+          管理員編輯時應保留該佔位符，否則 LLM 將無法取得檢索到的知識庫
+          內容作為回覆依據。
+        - oninput="checkPromptModified()"：每次輸入內容變化時，即時比對
+          目前文字是否偏離載入時的原始快照（state.originalPromptContent），
+          藉此動態控制「💾 儲存並新增」按鈕的可用狀態，避免對未變更內容
+          重複建立無意義的新版本。
+      -->
       <textarea id="prompt-textarea" placeholder="載入中…" oninput="checkPromptModified()" style="flex: 1; resize: none; margin-bottom: 12px;"></textarea>
-      
+
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+        <!--
+          瀏覽翻頁按鈕（左側小按鈕 ↩️ 和 ↪️）：
+          - #btn-rollback-prompt（↩️「前一個版本」）：onclick 呼叫
+            prompt.js 的 prevPromptVersion()，若 state.prevVersion 有值
+            則呼叫 loadPrompt(state.prevVersion) 切換瀏覽到編號較小的
+            上一個版本。純瀏覽操作，不影響 LINE Bot 實際啟用的版本。
+            此按鈕預設 style="display:none" 隱藏，只有當 loadPrompt()
+            拿到的 API 回應 has_prev 為 true 時才會被 JS 顯示出來
+            （代表目前瀏覽中版本確實還有更舊的版本可以看）。
+          - #btn-next-prompt（↪️「後一個版本」）：邏輯對稱，onclick 呼叫
+            nextPromptVersion()，依 has_next / state.nextVersion 決定
+            是否顯示與是否可切換到較新的版本。
+        -->
         <!-- 左側小按鈕 ↩️ 和 ↪️ -->
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-gray" id="btn-rollback-prompt" onclick="prevPromptVersion()" style="padding: 6px 12px; font-size: 15px;" title="前一個版本">↩️</button>
           <button class="btn btn-gray" id="btn-next-prompt" onclick="nextPromptVersion()" style="padding: 6px 12px; font-size: 15px;" title="後一個版本">↪️</button>
         </div>
-        
+
+        <!--
+          寫入類操作按鈕（右側功能按鈕）：
+          - #btn-delete-prompt（🗑️ 刪除）：預設 display:none 隱藏，只有
+            當瀏覽中版本存在且不是不可刪除的 prompt_001.md 時，
+            loadPrompt() 才會顯示此按鈕。onclick 呼叫 deletePrompt()，
+            僅先開啟下方「確認刪除」彈窗（modal-confirm-delete-prompt），
+            真正送出 POST /api/prompt/delete 請求的邏輯在使用者於彈窗中
+            點擊「確認刪除」後，由 doDeletePrompt() 執行。
+          - #btn-save-prompt（💾 儲存並新增）：預設 disabled（因為初始
+            載入時內容尚未被修改），只有 checkPromptModified() 偵測到
+            編輯框內容偏離原始快照時才會啟用。onclick 呼叫 savePrompt()
+            → doSavePrompt()，對應後端 API POST /api/prompt，會建立一個
+            全新的版本檔案（編號自動遞增），但不會自動切換為啟用版本。
+          - #btn-apply-prompt（套用）：預設 disabled，只有當瀏覽中版本
+            不等於啟用中版本時（loadPrompt() 判斷）才會啟用。onclick 呼叫
+            applyPrompt()，先開啟「確認套用」彈窗
+            （modal-confirm-apply-prompt），使用者確認後才由
+            doApplyPrompt() 送出 POST /api/prompt/switch，真正把瀏覽中
+            版本設為系統啟用中版本，立即影響 LINE Bot 之後的回覆內容。
+        -->
         <!-- 右側功能按鈕 -->
         <div style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap;">
           <button class="btn btn-danger" id="btn-delete-prompt" onclick="deletePrompt()" style="display:none; white-space: nowrap; width: auto; flex-shrink: 0;">🗑️ 刪除</button>
@@ -46,19 +187,66 @@
           <button class="btn btn-accent" id="btn-apply-prompt" onclick="applyPrompt()" disabled style="white-space: nowrap; width: auto; flex-shrink: 0;">套用</button>
         </div>
       </div>
+      <!--
+        操作狀態訊息列：所有非同步操作（載入、儲存、套用、刪除、設定
+        暱稱）進行中/成功/失敗時的文字回饋都會寫入這個元素的
+        textContent，並透過切換 class（save-status / save-status ok /
+        save-status fail）改變顏色樣式，讓管理員清楚知道目前操作結果。
+      -->
       <div class="save-status" id="save-status" style="margin-top: 8px; font-size: 12px; min-height: 18px;"></div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════
+         右側欄（約 2/5 寬）：目前啟用中版本內容的唯讀對照區
+         ════════════════════════════════════════════════════════════
+         此欄的存在目的是讓管理員在編輯/瀏覽「非啟用中版本」時，能同時
+         對照「LINE Bot 現在實際在用的內容」，方便肉眼比較差異、確認
+         修改方向是否正確。當瀏覽中版本正好等於啟用中版本時，此欄會被
+         loadPrompt() 設為 display:none 隱藏（因為對照自己沒有意義），
+         並讓中間編輯框欄位撐寬至 80% 補滿版面。
+    -->
     <!-- 右側 2/5 當前使用的 prompt -->
     <div class="prompt-col-right" id="prompt-active-column">
+      <!--
+        #active-version-label：顯示目前「啟用中版本」的檔名（或
+        「暱稱(檔名)」格式），由 loadPrompt() 依 API 回應的 active_version
+        欄位（配合 nicknames）計算後寫入，與中間欄的
+        #editing-version-label（瀏覽中版本）互相對照，方便一眼看出兩者
+        是否為同一版本。
+      -->
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">
         🟢 目前使用的 Prompt (<code id="active-version-label">-</code>)
       </div>
+      <!--
+        #prompt-active-textarea：readonly（唯讀，游標樣式為 not-allowed）
+        文字框，內容由 loadPrompt() 透過 API 回應的 active_content 欄位
+        填入，永遠反映「目前啟用中版本」的完整內容，與左側可編輯的
+        #prompt-textarea（瀏覽中版本）形成對照，不接受任何使用者輸入。
+      -->
       <textarea id="prompt-active-textarea" readonly placeholder="載入中…" style="flex: 1; resize: none; background: #fafafa; color: var(--muted); cursor: not-allowed;"></textarea>
     </div>
   </div>
 </section>
 
+<!--
+  ════════════════════════════════════════════════════════════════════
+  Modal：確認套用 Prompt（切換啟用中版本的二次確認彈窗）
+  ════════════════════════════════════════════════════════════════════
+  觸發開啟：中間欄「套用」按鈕（#btn-apply-prompt）的 onclick 呼叫
+    prompt.js 的 applyPrompt()，該函式僅呼叫 openModal(此 modal id)
+    顯示本彈窗，尚未送出任何 API 請求。
+  用途：因為「套用」會立即改變 LINE Bot 對外回覆時實際使用的 System
+    Prompt，影響範圍是所有使用者的下一次對話，屬於高風險操作，因此在
+    真正執行前強制要求管理員做一次明確確認，降低誤觸風險。
+  按鈕行為：
+    - 「取消」→ onclick="closeModal('modal-confirm-apply-prompt')"，
+      單純關閉彈窗，不做任何後端呼叫，回到原本瀏覽狀態。
+    - 「確認套用」→ onclick="doApplyPrompt()"，此函式會先關閉彈窗，
+      再對 state.viewingVersion（目前瀏覽中版本）呼叫
+      POST /api/prompt/switch { version }，把該版本設為系統啟用中版本，
+      後端同時會同步複製內容到 assets/prompt.md 確保與啟用版本一致。
+      成功後前端會重新呼叫 loadPrompt() 刷新整個頁面狀態。
+-->
 <!-- ── Modal：確認套用 Prompt ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-apply-prompt">
   <div class="modal-alert">
@@ -82,6 +270,28 @@
   </div>
 </div>
 
+<!--
+  ════════════════════════════════════════════════════════════════════
+  Modal：確認刪除 Prompt（刪除版本檔案的二次確認彈窗）
+  ════════════════════════════════════════════════════════════════════
+  觸發開啟：中間欄「🗑️ 刪除」按鈕（#btn-delete-prompt，僅在瀏覽中版本
+    不是不可刪除的 prompt_001.md 時才會顯示）的 onclick 呼叫 prompt.js
+    的 deletePrompt()，該函式僅呼叫 openModal(此 modal id) 顯示本彈窗，
+    尚未送出任何 API 請求。
+  用途：刪除版本檔案是不可逆的破壞性操作，因此需要二次確認。
+  按鈕行為：
+    - 「取消」→ onclick="closeModal('modal-confirm-delete-prompt')"，
+      單純關閉彈窗，不做任何後端呼叫。
+    - 「確認刪除」→ onclick="doDeletePrompt()"，此函式會先關閉彈窗，
+      再對 state.viewingVersion（目前瀏覽中版本）呼叫
+      POST /api/prompt/delete { version }。文案中提到「系統將會自動
+      切換到相鄰的其他版本」，對應的後端邏輯是：若刪除的正好是目前
+      啟用中版本，後端會優先切換到編號較小的上一版，找不到則改用
+      下一版，兩者皆無則最終退回 prompt_001.md，並同步更新
+      assets/prompt.md；同時會清除該版本在暱稱設定中的殘留記錄。
+      成功後前端會用後端回傳的新啟用版本檔名呼叫 loadPrompt()，導向
+      一個必定存在的有效版本畫面。
+-->
 <!-- ── Modal：確認刪除 Prompt ── -->
 <div class="modal-backdrop modal-backdrop-alert" id="modal-confirm-delete-prompt">
   <div class="modal-alert">

@@ -15,12 +15,12 @@
       - GET /main/css/<file> → 對應 webpage/admin/css/ 下的靜態檔案
       - GET /main/js/<file>  → 對應 webpage/admin/js/ 下的靜態檔案
     此檔案本身雖是 .html，但實際上是以 Jinja2 模板方式被 Flask 渲染
-    （見下方 {% include ... %} 語法），並非單純靜態檔。
+    （見下方 {% raw %}{% include ... %}{% endraw %} 語法），並非單純靜態檔。
 
   【本檔案在架構中的定位：外殼 / 主框架 (Shell)】
     本檔案本身「不」含有任何分頁 (chats / doctors / education / forms /
     prompt / stats) 的實際內容 HTML，而是透過 Jinja2 的
-    {% include 'admin/html/xxx.html' %} 語法，在伺服器端渲染時把六個分頁
+    {% raw %}{% include 'admin/html/xxx.html' %}{% endraw %} 語法，在伺服器端渲染時把六個分頁
     各自的 HTML 片段「原封不動地貼進來」，全部一次性輸出成同一份完整
     HTML 文件。也就是說：
       - 六個分頁的 DOM 節點「同時存在」於最終頁面中（不是 iframe、也不是
@@ -40,7 +40,7 @@
         showToast() 等工具函式互相協作。
       - 六個分頁各自的內容與邏輯（HTML 結構 + 對應 .js 檔）由其他協作者
         平行維護，本檔案只需維持「掛載點」正確（即
-        {% include %} 呼叫與最下方 <script src> 清單），不深入修改。
+        {% raw %}{% include %}{% endraw %} 呼叫與最下方 <script src> 清單），不深入修改。
 
   【本檔案負責的共用功能（皆由 webpage/admin/js/script.js 驅動）】
     1. 登入畫面 (#login-screen)：帳號密碼輸入、顯示/隱藏密碼、送出登入。
@@ -132,7 +132,7 @@
     1. <header>：頂部導覽列（漢堡選單、系統標題、使用者資訊、登出按鈕）
     2. <nav class="sidebar">：側邊抽屜式選單（六個分頁的導覽入口）
     3. <div class="layout"><main>：實際承載六個分頁內容的容器，六個
-       分頁 HTML 皆透過 Jinja2 {% include %} 在伺服器端渲染時插入於此。
+       分頁 HTML 皆透過 Jinja2 {% raw %}{% include %}{% endraw %} 在伺服器端渲染時插入於此。
 -->
 <!-- ════ APP ════ -->
 <div id="app" style="display:none; flex-direction:column; height:100vh;">
@@ -219,7 +219,7 @@
 
   <!--
     主內容容器：六個分頁的 HTML 皆由 Jinja2 於「伺服器端渲染時」
-    透過 {% include %} 插入，最終瀏覽器收到的是「六份分頁內容全部都在」
+    透過 {% raw %}{% include %}{% endraw %} 插入，最終瀏覽器收到的是「六份分頁內容全部都在」
     的單一 HTML（並非前端動態 fetch 局部 HTML 片段、也不是 iframe）。
     每個被 include 進來的檔案內部應各自定義一個 <section id="section-xxx"
     class="section">，並由 showSection() 控制其中一個帶有 .active。
